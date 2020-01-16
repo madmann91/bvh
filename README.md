@@ -3,7 +3,8 @@
 This is a modern C++17 header-only BVH library optimized for ray-tracing. Traversal and
 construction routines support different primitive types. The design is such that the
 BVH holds no data and only holds nodes. There is no hardware- or platform-specific
-intrinsic used. Parallelization is done using OpenMP tasks.
+intrinsic used. Parallelization is done using OpenMP tasks. There is no dependency
+except the C++ standard library.
 
 The construction algorithm is very fast and produces high-quality, SAH-optimized trees
 (see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by Ingo Wald).
