@@ -222,11 +222,14 @@ struct BVH {
 #else
         using Size = uint32_t;
 #endif
-        BBox bbox;
-        bool is_leaf : 1;
-        bool is_contracted : 1;
-        Size primitive_count : sizeof(Size) * CHAR_BIT - 2;
-        Size first_child_or_primitive;
+        BBox     bbox;
+
+        bool     is_leaf         : 1;
+        bool     is_contracted   : 1;
+        unsigned axis            : 2;
+        Size     primitive_count : sizeof(Size) * CHAR_BIT - 4;
+
+        Size     first_child_or_primitive;
 
         std::pair<Scalar, Scalar> intersect(const Vec3& inverse_origin, const Vec3& inverse_direction, Scalar tmin, Scalar tmax, unsigned ix, unsigned iy, unsigned iz) const {
             assert(!is_contracted);
@@ -385,6 +388,7 @@ struct BVH {
                     node.first_child_or_primitive = left_index;
                     node.primitive_count          = 0;
                     node.is_leaf                  = false;
+                    node.axis                     = best_axis;
                     
                     // Compute the bounding boxes of each node
                     auto& bins = bins_per_axis[SweepAllAxes ? best_axis : 0];
@@ -496,6 +500,13 @@ struct BVH {
         auto node = nodes.get();
         while (true) {
             auto first_child = node->first_child_or_primitive;
+            if (node->is_contracted) {
+                // Use approximate ordering based on the ray direction when the node is contracted
+                int order = ray.direction[node->axis] > 0 ? 0 : 1;
+                stack.push(first_child + (1 - order));
+                node = &nodes[first_child + order];
+                continue;
+            }
 
             auto& left  = nodes[first_child + 0];
             auto& right = nodes[first_child + 1];
