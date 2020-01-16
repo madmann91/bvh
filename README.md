@@ -27,8 +27,8 @@ It only requires an intersection routine for the primitives.
 
 This library is carefully crafted to ensure good single-ray performance, while still
 being simple, portable and high-level. These are performance results versus another
-simple library available on GitHub, brandonpelfrey/Fast-BVH (top of the list for the
-search "bvh"):
+simple library available on GitHub, [brandonpelfrey/Fast-BVH](https://github.com/brandonpelfrey/Fast-BVH)
+(top of the list for the search "bvh"):
 
 |                   | brandonpelfrey/Fast-BVH |    This library    |
 |-------------------|-------------------------|--------------------|
