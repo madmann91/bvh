@@ -223,11 +223,13 @@ struct BVH {
         using Size = uint32_t;
 #endif
         BBox bbox;
-        bool leaf : 1;
-        Size primitive_count : sizeof(Size) * CHAR_BIT - 1;
+        bool is_leaf : 1;
+        bool is_contracted : 1;
+        Size primitive_count : sizeof(Size) * CHAR_BIT - 2;
         Size first_child_or_primitive;
 
         std::pair<Scalar, Scalar> intersect(const Vec3& inverse_origin, const Vec3& inverse_direction, Scalar tmin, Scalar tmax, unsigned ix, unsigned iy, unsigned iz) const {
+            assert(!is_contracted);
             auto values = reinterpret_cast<const float*>(this);
             Scalar entry_x = multiply_add(values[    ix], inverse_direction.x, inverse_origin.x);
             Scalar entry_y = multiply_add(values[    iy], inverse_direction.y, inverse_origin.y);
@@ -282,7 +284,7 @@ struct BVH {
             auto make_leaf = [] (Node& node, size_t begin, size_t end) {
                 node.first_child_or_primitive = begin;
                 node.primitive_count          = end - begin;
-                node.leaf                     = true;
+                node.is_leaf                  = true;
             };
 
             if (item.work_size() <= 1 || item.depth >= max_depth) {
@@ -382,7 +384,7 @@ struct BVH {
                     Node& right = bvh->nodes[left_index + 1];
                     node.first_child_or_primitive = left_index;
                     node.primitive_count          = 0;
-                    node.leaf                     = false;
+                    node.is_leaf                  = false;
                     
                     // Compute the bounding boxes of each node
                     auto& bins = bins_per_axis[SweepAllAxes ? best_axis : 0];
@@ -470,7 +472,7 @@ struct BVH {
         };
 
         // If the root is a leaf, intersect it and return
-        if (nodes[0].leaf) {
+        if (nodes[0].is_leaf) {
             intersect_leaf(nodes[0].first_child_or_primitive, nodes[0].primitive_count);
             return best_hit;
         }
@@ -491,10 +493,9 @@ struct BVH {
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
         TraversalStack<size_t, stack_size> stack;
-        stack.push(0);
-        while (!stack.empty()) {
-            auto& node = nodes[stack.pop()];
-            auto first_child = node.first_child_or_primitive;
+        auto node = nodes.get();
+        while (true) {
+            auto first_child = node->first_child_or_primitive;
 
             auto& left  = nodes[first_child + 0];
             auto& right = nodes[first_child + 1];
@@ -503,13 +504,13 @@ struct BVH {
             bool hit_left  = distance_left.first  <= distance_left.second;
             bool hit_right = distance_right.first <= distance_right.second;
 
-            if (hit_left && left.leaf) {
+            if (hit_left && left.is_leaf) {
                 if (intersect_leaf(left.first_child_or_primitive, left.primitive_count) && AnyHit)
                     break;
                 hit_left = false;
             }
 
-            if (hit_right && right.leaf) {
+            if (hit_right && right.is_leaf) {
                 if (intersect_leaf(right.first_child_or_primitive, right.primitive_count) && AnyHit)
                     break;
                 hit_right = false;
@@ -518,9 +519,13 @@ struct BVH {
             if (hit_left && hit_right) {
                 int order = distance_left.first < distance_right.first ? 0 : 1;
                 stack.push(first_child + (1 - order));
-                stack.push(first_child + order);
+                node = &nodes[first_child + order];
             } else if (hit_left ^ hit_right) {
-                stack.push(first_child + (hit_left ? 0 : 1));
+                node = &nodes[first_child + (hit_left ? 0 : 1)];
+            } else {
+                if (stack.empty())
+                    break;
+                node = &nodes[stack.pop()];
             }
         }
 
