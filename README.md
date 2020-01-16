@@ -5,11 +5,11 @@ construction routines support different primitive types. The design is such that
 BVH holds no data and only holds nodes. There is no hardware- or platform-specific
 intrinsic used. Parallelization is done using OpenMP tasks.
 
-The construction algorithm is very fast and produces high-quality, SAH-optimized trees.
-(see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by Ingo Wald)
+The construction algorithm is very fast and produces high-quality, SAH-optimized trees
+(see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by Ingo Wald).
 It only requires a bounding box and center for each primitive.
 
-The traversal algorithm is optimized in two ways:
+The traversal algorithm is optimized in several ways:
 
   - Rays are classified by octant, to make the ray-box test more efficient,
   - The order of traversal is such that the closest node is chosen first,
