@@ -42,7 +42,7 @@ can be fine-tuned, and a high-level version.
 The high-level API hides the details of the construction or traversal algorithms.
 Default values are used for the builder and indirections are avoided in intersectors
 by shuffling primitive data. For an example of how to use the high-level API,
-see [this simple_example](test/simple_example.cpp).
+see [this simple example](test/simple_example.cpp).
 
 ## Low-level API
 
@@ -63,3 +63,7 @@ Double precision can be enabled by defining `BVH_DOUBLE` before including `bvh.h
 //#define BVH_DOUBLE
 #include "bvh.hpp"
 ```
+
+# License
+
+This library is distributed under the MIT license. See [bvh.hpp](bvh.hpp) for details.
