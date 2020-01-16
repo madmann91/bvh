@@ -103,6 +103,15 @@ inline Vec3 cross(const Vec3& a, const Vec3& b) {
     );
 }
 
+inline Scalar length(const Vec3& v) {
+    return std::sqrt(dot(v, v));
+}
+
+inline Vec3 normalize(const Vec3& v) {
+    auto inv = Scalar(1) / length(v);
+    return v * inv;
+}
+
 /// A ray, defined by an origin and a direction, with minimum and maximum distances along the direction from the origin.
 struct Ray {
     Vec3 origin;
@@ -451,7 +460,7 @@ struct BVH {
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto hit = intersector(first_primitive + i, ray);
                 if (hit) {
-                    best_hit = std::make_optional(std::make_pair(primitive_indices[first_primitive + i], *hit));
+                    best_hit = std::make_optional(std::make_pair(first_primitive + i, *hit));
                     if (AnyHit)
                         return true;
                     ray.tmax = hit->distance;
@@ -623,9 +632,9 @@ struct Accel {
 
         // Remap primitives to avoid indirect access through primitive indices
         std::unique_ptr<Primitive[]> primitives_copy(new Primitive[primitive_count]);
-        std::copy(primitives, primitives + primitive_count, primitives_copy.get());
+        std::move(primitives, primitives + primitive_count, primitives_copy.get());
         for (size_t i = 0; i < primitive_count; ++i)
-            primitives[i] = primitives_copy[bvh.primitive_indices[i]];
+            primitives[i] = std::move(primitives_copy[bvh.primitive_indices[i]]);
     }
 
     using Intersection = typename Primitive::Intersection;
