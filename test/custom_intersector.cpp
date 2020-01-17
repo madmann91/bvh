@@ -22,18 +22,13 @@ int main() {
     // Increasing this value increases the traversal stack size.
     static constexpr size_t max_depth = 64;
 
-    // Boolean controlling whether the builder should test all axes,
-    // or only the largest one. Setting this value to false will make
-    // the builder faster, at the expense of BVH quality.
-    static constexpr bool sweep_all_axes = true;
-
     // The minimum number of primitives necessary to start a new builder task.
     // This number should be high enough to avoid creating too many tasks, but
     // low enough to ensure that there is enough parallelism. A value of 1024
     // is good enough for most primitive types.
     static constexpr size_t parallel_threshold = 1024;
 
-    bvh::BVH<bin_count, max_depth, sweep_all_axes, parallel_threshold> bvh;
+    bvh::BVH<bin_count, max_depth, parallel_threshold> bvh;
     bvh.build(bboxes.data(), centers.data(), bboxes.size());
 
     // Boolean controlling whether the intersection routine exits

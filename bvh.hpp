@@ -207,7 +207,7 @@ inline Vec3 multiply_add(Vec3 x, Vec3 y, Vec3 z) {
 /// This API is very low level but offers full control of the algorithm, including
 /// the number of bins used during building or the maximum tree depth.
 /// For a higher-level API, use the Accel structure.
-template <size_t BinCount = 32, size_t MaxDepth = 64, bool SweepAllAxes = true, size_t ParallelThreshold = 1024>
+template <size_t BinCount = 32, size_t MaxDepth = 64, size_t ParallelThreshold = 1024>
 struct BVH {
     // The size of this structure is 32 bytes in single precision and 64 bytes in double precision.
     struct Node {
@@ -291,23 +291,10 @@ struct BVH {
             for (size_t i = item.begin; i < item.end; ++i)
                 center_bbox.extend(centers[primitive_indices[i]]);
 
-            int first_axis = 0, last_axis = 3;
-            if (!SweepAllAxes) {
-                // Compute largest axis
-                Vec3 extents = node.bbox.diagonal();
-                int axis = 0;
-                if (extents.x < extents.y)
-                    axis = 1;
-                if (extents[axis] < extents.z)
-                    axis = 2;
-                first_axis = axis;
-                last_axis  = axis + 1;
-            }
-
             int    best_axis = -1;
             size_t best_split = 0;
             Scalar best_cost  = std::numeric_limits<Scalar>::max();
-            std::array<Bin, bin_count> bins_per_axis[SweepAllAxes ? 3 : 1];
+            std::array<Bin, bin_count> bins_per_axis[3];
 
             auto inverse = Vec3(bin_count) * center_bbox.diagonal().inverse();
             auto base    = -center_bbox.min * inverse;
@@ -315,8 +302,8 @@ struct BVH {
                 return std::min(size_t(center[axis] * inverse[axis] + base[axis]), size_t(bin_count - 1));
             };
 
-            for (int axis = first_axis; axis < last_axis; ++axis) {
-                auto& bins = bins_per_axis[SweepAllAxes ? axis : 0];
+            for (int axis = 0; axis < 3; ++axis) {
+                auto& bins = bins_per_axis[axis];
 
                 // Setup bins
                 for (auto& bin : bins) {
@@ -360,7 +347,7 @@ struct BVH {
             float  half_total_area  = node.bbox.half_area();
 
             // Check that the split is useful
-            if (best_axis != -1 && best_cost + bvh->traversal_cost * half_total_area < total_primitives * half_total_area) {
+            if (best_split != 0 && best_cost + bvh->traversal_cost * half_total_area < total_primitives * half_total_area) {
                 // Split primitives according to split position
                 size_t begin_right = std::partition(primitive_indices + item.begin, primitive_indices + item.end, [&] (size_t i) {
                     return bin_index(centers[i], best_axis) < best_split;
@@ -379,7 +366,7 @@ struct BVH {
                     node.is_leaf                  = false;
                     
                     // Compute the bounding boxes of each node
-                    auto& bins = bins_per_axis[SweepAllAxes ? best_axis : 0];
+                    auto& bins = bins_per_axis[best_axis];
                     left.bbox = BBox::empty();
                     for (size_t i = 0; i < best_split; ++i)
                         left.bbox.extend(bins[i].bbox);
