@@ -41,7 +41,7 @@ spheres, the algorithm has been modified to load an OBJ file and render triangle
 by their normal. The scene used for this table is Sponza. The machine used is an AMD
 Threadripper 2950X with 16 physical cores and 32 threads. Both libraries use OpenMP and run
 on multiple cores (except that the construction algorithm in Fast-BVH is not multithreaded,
-unlike this library). The rendering resolution is 8Kx8K.
+unlike the one in this library). The rendering resolution is 8Kx8K.
 
 The results are not surprising as the BVH used in Fast-BVH is using the middle split technique
 which is known to be seriously bad for anything but small examples or uniformly distributed
@@ -50,8 +50,8 @@ the compiler (gcc 8.3.1 in this example).
 
 Compared to [Embree](https://github.com/embree/embree), the ray-tracing kernels from Intel, this
 library only supports single-ray tracing and binary BVHs. As a result, it cannot be as fast as the
-stream or packet traversal algorithms. Compared to the single-ray kernels of Embree running on the
-high-quality BVHs built by Embree, this library is around 50% slower, but the actual number can vary
+stream or packet traversal algorithms of Embree. Compared to the single-ray kernels of Embree running on the
+high-quality BVHs also built by Embree, this library is around 50% slower, but the actual number can vary
 depending on the type of ray (e.g. coherent/incoherent) and the scene. To match that level of performance,
 this library would have to implement:
 
