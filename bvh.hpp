@@ -442,6 +442,156 @@ struct BVH {
         }
     }
 
+    struct Optimizer {
+        Node* nodes;
+        size_t node_count;
+        std::unique_ptr<size_t[]> parents;
+
+        Optimizer(Node* nodes, size_t node_count)
+            : nodes(nodes), node_count(node_count), parents(new size_t[node_count])
+        {
+            parents[0] = std::numeric_limits<size_t>::max();
+        }
+
+        void compute_parents() {
+            #pragma omp parallel for
+            for (size_t i = 0; i < node_count; ++i) {
+                if (nodes[i].is_leaf)
+                    continue;
+                auto first_child = nodes[i].first_child_or_primitive;
+                parents[first_child + 0] = i;
+                parents[first_child + 1] = i;
+            }
+        }
+
+        void refit(size_t child) {
+            BBox bbox = nodes[child].bbox;
+            while (child != 0) {
+                auto parent = parents[child];
+                nodes[parent].bbox = bbox.extend(nodes[sibling(child)].bbox);
+                child = parent;
+            }
+        }
+
+        void refit_all(size_t i) {
+            if (nodes[i].is_leaf)
+                return;
+            auto first_child = nodes[i].first_child_or_primitive;
+            refit_all(first_child);
+            refit_all(first_child + 1);
+            nodes[i].bbox = BBox(nodes[first_child].bbox).extend(nodes[first_child + 1].bbox);
+        }
+
+        void reinsert(size_t in, size_t out) {
+            // Remove the node (this gives 2 free nodes: in and sibling(in))
+            auto sibling_in   = sibling(in);
+            auto parent_in    = parents[in];
+            auto sibling_node = nodes[sibling_in];
+            auto out_node     = nodes[out];
+
+            // No need to do anything if the parent/sibling/node itself is the insertion point
+            if (parent_in == out || sibling_in == out || in == out)
+                return;
+
+            // Re-insert it into the destination
+            nodes[out].bbox.extend(nodes[in].bbox);
+            nodes[out].first_child_or_primitive = std::min(in, sibling_in);
+            nodes[out].is_leaf = false;
+            nodes[sibling_in] = out_node;
+            nodes[parent_in] = sibling_node;
+            parents[sibling_in] = out;
+            parents[in] = out;
+            refit(out);
+            refit(parent_in);
+        }
+
+        inline size_t sibling(size_t index) const {
+            assert(index != 0);
+            return index % 2 == 1 ? index + 1 : index - 1;
+        }
+
+        bool search(size_t in) {
+            bool   down  = true;
+            size_t pivot = parents[in];
+            size_t out   = sibling(in);
+            size_t out_best = out;
+
+            auto bbox_in = nodes[in].bbox;
+            auto bbox_parent = nodes[pivot].bbox;
+            auto bbox_pivot = BBox::empty();
+
+            Scalar d = 0;
+            Scalar d_best = 0;
+            const Scalar d_bound = bbox_pivot.half_area() - bbox_in.half_area();
+            while (true) {
+                auto bbox_out = nodes[out].bbox;
+                auto bbox_merged = BBox(bbox_in).extend(bbox_out);
+                if (down) {
+                    auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
+                    if (d_best < d_direct + d) {
+                        d_best = d_direct + d;
+                        out_best = out;
+                    }
+                    d = d + bbox_out.half_area() - bbox_merged.half_area();
+                    if (nodes[out].is_leaf || d_bound + d <= d_best)
+                        down = false;
+                    else
+                        out = nodes[out].first_child_or_primitive;
+                } else {
+                    d = d - bbox_out.half_area() + bbox_merged.half_area();
+                    if (pivot == parents[out]) {
+                        bbox_pivot.extend(bbox_out);
+                        out = parents[out];
+                        bbox_out = nodes[out].bbox;
+                        if (out != parents[in]) {
+                            bbox_merged = BBox(bbox_in).extend(bbox_pivot);
+                            auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
+                            if (d_best < d_direct + d) {
+                                d_best = d_direct + d;
+                                out_best = out;
+                            }
+                            d = d + bbox_out.half_area() - bbox_pivot.half_area();
+                        }
+                        if (out == 0)
+                            break;
+                        out = sibling(pivot);
+                        pivot = parents[out];
+                        down = true;
+                    } else {
+                        assert(out != 0);
+                        if (out == nodes[parents[out]].first_child_or_primitive) {
+                            down = true;
+                            out = sibling(out);
+                        } else {
+                            out = parents[out];
+                        }
+                    }
+                }
+            }
+            return out_best;
+        }
+    };
+
+    void optimize(size_t iteration_count = 1, size_t u = 8) {
+        std::unique_ptr<size_t[]> outs(new size_t[node_count]);
+        Optimizer optimizer(nodes.get(), node_count);
+        optimizer.compute_parents();
+        for (size_t iteration = 0; iteration < iteration_count; ++iteration) {
+            #pragma omp parallel for
+            for (size_t i = iteration % u + 1; i < node_count; i += u)
+                outs[i] = optimizer.search(i);
+            for (size_t i = iteration % u + 1, count = 0; i < node_count; i += u) {
+                if (outs[i] != 0) {
+                    optimizer.reinsert(i, outs[i]);
+                    std::cout << i << " " << outs[i] << std::endl;
+                    if (count++ > 18)
+                        break;
+                }
+            }
+            optimizer.refit_all(0);
+        }
+    }
+
     /// Intersects the BVH with the given ray and intersector.
     template <bool AnyHit, typename Intersector>
     std::optional<std::pair<size_t, typename Intersector::Result>> intersect(Ray ray, const Intersector& intersector) const {
@@ -622,6 +772,7 @@ struct Accel {
             centers[i] = primitives[i].center();
         }
         bvh.build(bboxes.get(), centers.get(), primitive_count);
+        bvh.optimize();
 
         // Remap primitives to avoid indirect access through primitive indices
         std::unique_ptr<Primitive[]> primitives_copy(new Primitive[primitive_count]);
