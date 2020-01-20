@@ -291,9 +291,12 @@ struct BVH {
             for (size_t i = item.begin; i < item.end; ++i)
                 center_bbox.extend(centers[primitive_indices[i]]);
 
-            int    best_axis = -1;
-            size_t best_split = 0;
-            Scalar best_cost  = std::numeric_limits<Scalar>::max();
+            size_t best_split[3] = { 0, 0, 0 };
+            Scalar best_cost[3] = {
+                std::numeric_limits<Scalar>::max(),
+                std::numeric_limits<Scalar>::max(),
+                std::numeric_limits<Scalar>::max()
+            };
             std::array<Bin, bin_count> bins_per_axis[3];
 
             auto inverse = Vec3(bin_count) * center_bbox.diagonal().inverse();
@@ -302,6 +305,7 @@ struct BVH {
                 return std::min(size_t(center[axis] * inverse[axis] + base[axis]), size_t(bin_count - 1));
             };
 
+            #pragma omp taskloop if (item.work_size() > parallel_threshold) grainsize(1) default(shared)
             for (int axis = 0; axis < 3; ++axis) {
                 auto& bins = bins_per_axis[axis];
 
@@ -335,22 +339,27 @@ struct BVH {
                     current_bbox.extend(bins[i].bbox);
                     current_count += bins[i].primitive_count;
                     float cost = current_bbox.half_area() * current_count + bins[i + 1].right_cost;
-                    if (cost < best_cost) {
-                        best_axis  = axis;
-                        best_split = i + 1;
-                        best_cost  = cost;
+                    if (cost < best_cost[axis]) {
+                        best_split[axis] = i + 1;
+                        best_cost[axis]  = cost;
                     }
                 }
             }
+
+            int best_axis = 0;
+            if (best_cost[0] > best_cost[1])
+                best_axis = 1;
+            if (best_cost[best_axis] > best_cost[2])
+                best_axis = 2;
 
             size_t total_primitives = item.end - item.begin;
             float  half_total_area  = node.bbox.half_area();
 
             // Check that the split is useful
-            if (best_split != 0 && best_cost + bvh->traversal_cost * half_total_area < total_primitives * half_total_area) {
+            if (best_split[best_axis] != 0 && best_cost[best_axis] + bvh->traversal_cost * half_total_area < total_primitives * half_total_area) {
                 // Split primitives according to split position
                 size_t begin_right = std::partition(primitive_indices + item.begin, primitive_indices + item.end, [&] (size_t i) {
-                    return bin_index(centers[i], best_axis) < best_split;
+                    return bin_index(centers[i], best_axis) < best_split[best_axis];
                 }) - primitive_indices;
 
                 // Check that the split does not leave one side empty
@@ -368,10 +377,10 @@ struct BVH {
                     // Compute the bounding boxes of each node
                     auto& bins = bins_per_axis[best_axis];
                     left.bbox = BBox::empty();
-                    for (size_t i = 0; i < best_split; ++i)
+                    for (size_t i = 0; i < best_split[best_axis]; ++i)
                         left.bbox.extend(bins[i].bbox);
                     right.bbox = BBox::empty();
-                    for (size_t i = best_split; i < bin_count; ++i)
+                    for (size_t i = best_split[best_axis]; i < bin_count; ++i)
                         right.bbox.extend(bins[i].bbox);
 
                     // Return new work items
