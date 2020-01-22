@@ -19,16 +19,42 @@ Vector3 operator ^ (const Vector3& a, const Vector3& b) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2)
+  if (argc < 2) {
+      std::cout << "Usage: benchmark_vs_fastbvh [--fast-bvh-build] file.obj" << std::endl;
       return 1;
+  }
+
+  bool fast = false;
+  const char* input_file = NULL;
+  for (int i = 1; i < argc; ++i) {
+      if (argv[i][0] == '-') {
+          if (!strcmp(argv[i], "--fast-bvh-build"))
+              fast = true;
+          else {
+              std::cerr << "Unknown option: '" << argv[i] << "'" << std::endl;
+              return 1;
+          }
+      } else {
+          if (input_file) {
+              std::cerr << "Scene file specified twice" << std::endl;
+              return 1;
+          }
+          input_file = argv[i];
+      }
+  }
+
+  if (!input_file) {
+      std::cerr << "Missing a command line argument for the scene file" << std::endl;
+      return 1;
+  }
 
   // Load mesh from file
-  auto objects = obj::load_from_file(argv[1]); 
+  auto objects = obj::load_from_file(input_file);
 
   // Compute a BVH for this object set
   auto start_tick = std::chrono::high_resolution_clock::now();
   BVH bvh(objects.data(), objects.size());
-  bvh.build();
+  bvh.build(fast);
   auto end_tick = std::chrono::high_resolution_clock::now();
   std::cout << "BVH construction took " << std::chrono::duration_cast<std::chrono::milliseconds>(end_tick - start_tick).count() << "ms" << std::endl;
 

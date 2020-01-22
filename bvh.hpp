@@ -838,7 +838,7 @@ struct Accel {
     {}
 
     /// Builds the acceleration structure. 
-    void build() {
+    void build(bool fast = false) {
         assert(primitive_count > 0);
         std::unique_ptr<BBox[]> bboxes(new BBox[primitive_count]);
         std::unique_ptr<Vec3[]> centers(new Vec3[primitive_count]);
@@ -848,7 +848,8 @@ struct Accel {
             centers[i] = primitives[i].center();
         }
         bvh.build(bboxes.get(), centers.get(), primitive_count);
-        bvh.optimize();
+        if (!fast)
+            bvh.optimize();
 
         // Remap primitives to avoid indirect access through primitive indices
         std::unique_ptr<Primitive[]> primitives_copy(new Primitive[primitive_count]);
