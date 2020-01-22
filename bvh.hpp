@@ -465,19 +465,19 @@ struct BVH {
     }
 
     struct Optimizer {
-        Node* nodes;
-        size_t node_count;
+        BVH* bvh;
+
         std::unique_ptr<size_t[]> parents;
 
-        Optimizer(Node* nodes, size_t node_count)
-            : nodes(nodes), node_count(node_count), parents(new size_t[node_count])
+        Optimizer(BVH* bvh)
+            : bvh(bvh), parents(new size_t[bvh->node_count])
         {
             parents[0] = std::numeric_limits<size_t>::max();
             #pragma omp parallel for
-            for (size_t i = 0; i < node_count; ++i) {
-                if (nodes[i].is_leaf)
+            for (size_t i = 0; i < bvh->node_count; ++i) {
+                if (bvh->nodes[i].is_leaf)
                     continue;
-                auto first_child = nodes[i].first_child_or_primitive;
+                auto first_child = bvh->nodes[i].first_child_or_primitive;
                 parents[first_child + 0] = i;
                 parents[first_child + 1] = i;
             }
@@ -485,21 +485,21 @@ struct BVH {
 
         Scalar cost() {
             Scalar cost(0);
-            #pragma omp parallel for reduction(+: cost)
-            for (size_t i = 0; i < node_count; ++i) {
-                if (nodes[i].is_leaf)
-                    cost += 3 * nodes[i].bbox.half_area() * nodes[i].primitive_count;
+#pragma omp parallel for reduction(+: cost)
+            for (size_t i = 0; i < bvh->node_count; ++i) {
+                if (bvh->nodes[i].is_leaf)
+                    cost += bvh->nodes[i].bbox.half_area() * bvh->nodes[i].primitive_count;
                 else
-                    cost += 2 * nodes[i].bbox.half_area();
+                    cost += bvh->traversal_cost * bvh->nodes[i].bbox.half_area();
             }
             return cost;
         }
 
         void refit(size_t child) {
-            BBox bbox = nodes[child].bbox;
+            BBox bbox = bvh->nodes[child].bbox;
             while (child != 0) {
                 auto parent = parents[child];
-                nodes[parent].bbox = bbox.extend(nodes[sibling(child)].bbox);
+                bvh->nodes[parent].bbox = bbox.extend(bvh->nodes[sibling(child)].bbox);
                 child = parent;
             }
         }
@@ -519,15 +519,15 @@ struct BVH {
         void reinsert(size_t in, size_t out) {
             auto sibling_in   = sibling(in);
             auto parent_in    = parents[in];
-            auto sibling_node = nodes[sibling_in];
-            auto out_node     = nodes[out];
+            auto sibling_node = bvh->nodes[sibling_in];
+            auto out_node     = bvh->nodes[out];
 
             // Re-insert it into the destination
-            nodes[out].bbox.extend(nodes[in].bbox);
-            nodes[out].first_child_or_primitive = std::min(in, sibling_in);
-            nodes[out].is_leaf = false;
-            nodes[sibling_in] = out_node;
-            nodes[parent_in] = sibling_node;
+            bvh->nodes[out].bbox.extend(bvh->nodes[in].bbox);
+            bvh->nodes[out].first_child_or_primitive = std::min(in, sibling_in);
+            bvh->nodes[out].is_leaf = false;
+            bvh->nodes[sibling_in] = out_node;
+            bvh->nodes[parent_in] = sibling_node;
 
             // Update parent-child indices
             if (!out_node.is_leaf) {
@@ -555,15 +555,15 @@ struct BVH {
             size_t out   = sibling(in);
             size_t out_best = out;
 
-            auto bbox_in = nodes[in].bbox;
-            auto bbox_parent = nodes[pivot].bbox;
+            auto bbox_in = bvh->nodes[in].bbox;
+            auto bbox_parent = bvh->nodes[pivot].bbox;
             auto bbox_pivot = BBox::empty();
 
             Scalar d = 0;
             Scalar d_best = 0;
             const Scalar d_bound = bbox_parent.half_area() - bbox_in.half_area();
             while (true) {
-                auto bbox_out = nodes[out].bbox;
+                auto bbox_out = bvh->nodes[out].bbox;
                 auto bbox_merged = BBox(bbox_in).extend(bbox_out);
                 if (down) {
                     auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
@@ -572,16 +572,16 @@ struct BVH {
                         out_best = out;
                     }
                     d = d + bbox_out.half_area() - bbox_merged.half_area();
-                    if (nodes[out].is_leaf || d_bound + d <= d_best)
+                    if (bvh->nodes[out].is_leaf || d_bound + d <= d_best)
                         down = false;
                     else
-                        out = nodes[out].first_child_or_primitive;
+                        out = bvh->nodes[out].first_child_or_primitive;
                 } else {
                     d = d - bbox_out.half_area() + bbox_merged.half_area();
                     if (pivot == parents[out]) {
                         bbox_pivot.extend(bbox_out);
                         out = pivot;
-                        bbox_out = nodes[out].bbox;
+                        bbox_out = bvh->nodes[out].bbox;
                         if (out != parents[in]) {
                             bbox_merged = BBox(bbox_in).extend(bbox_pivot);
                             auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
@@ -619,7 +619,7 @@ struct BVH {
         std::unique_ptr<std::atomic<int64_t>[]> locks(new std::atomic<int64_t>[node_count]);
         std::unique_ptr<Insertion[]> outs(new Insertion[node_count]);
 
-        Optimizer optimizer(nodes.get(), node_count);
+        Optimizer optimizer(this);
         auto cost = optimizer.cost();
         for (size_t iteration = 0; ; ++iteration) {
             size_t first_node = iteration % u + 1;
@@ -764,7 +764,7 @@ struct BVH {
     std::unique_ptr<Node[]>   nodes;
     std::unique_ptr<size_t[]> primitive_indices;
     size_t                    node_count = 0;
-    float                     traversal_cost = 1.0f;
+    float                     traversal_cost = 1.5f;
 };
 
 /// Triangle primitive, compatible with the Accel structure.
