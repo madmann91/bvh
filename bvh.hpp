@@ -37,6 +37,7 @@
 #include <limits>
 #include <array>
 #include <stack>
+#include <atomic>
 
 namespace bvh {
 
@@ -45,6 +46,21 @@ using Scalar = double;
 #else
 using Scalar = float;
 #endif
+
+template <typename To, typename From>
+To as(From from) {
+    To to;
+    std::memcpy(&to, &from, sizeof(from));
+    return to;
+}
+
+inline float prodsign(float x, float y) {
+    return as<float>(as<uint32_t>(x) ^ (as<uint32_t>(y) & UINT32_C(0x80000000)));
+}
+
+inline double prodsign(double x, double y) {
+    return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
+}
 
 /// A simple 3D vector class.
 struct Vec3 {
@@ -201,6 +217,12 @@ inline Vec3 multiply_add(Vec3 x, Vec3 y, Vec3 z) {
         multiply_add(x.y, y.y, z.y),
         multiply_add(x.z, y.z, z.z)
     );
+}
+
+template <typename T>
+void atomic_max(std::atomic<T>& x, T y) {
+    T z = x.load();
+    while (z < y && !x.compare_exchange_weak(z, y)) ;
 }
 
 /// This structure represents a BVH with a list of nodes and primitives indices.
@@ -451,9 +473,6 @@ struct BVH {
             : nodes(nodes), node_count(node_count), parents(new size_t[node_count])
         {
             parents[0] = std::numeric_limits<size_t>::max();
-        }
-
-        void compute_parents() {
             #pragma omp parallel for
             for (size_t i = 0; i < node_count; ++i) {
                 if (nodes[i].is_leaf)
@@ -464,14 +483,14 @@ struct BVH {
             }
         }
 
-        Scalar compute_cost() {
+        Scalar cost() {
             Scalar cost(0);
             #pragma omp parallel for reduction(+: cost)
             for (size_t i = 0; i < node_count; ++i) {
                 if (nodes[i].is_leaf)
-                    cost += nodes[i].bbox.half_area() * nodes[i].primitive_count;
+                    cost += 3 * nodes[i].bbox.half_area() * nodes[i].primitive_count;
                 else
-                    cost += nodes[i].bbox.half_area();
+                    cost += 2 * nodes[i].bbox.half_area();
             }
             return cost;
         }
@@ -503,8 +522,6 @@ struct BVH {
             auto sibling_node = nodes[sibling_in];
             auto out_node     = nodes[out];
 
-            assert(!has_ancestor(out, in));
-
             // Re-insert it into the destination
             nodes[out].bbox.extend(nodes[in].bbox);
             nodes[out].first_child_or_primitive = std::min(in, sibling_in);
@@ -530,11 +547,9 @@ struct BVH {
             return index % 2 == 1 ? index + 1 : index - 1;
         }
 
-        bool valid(size_t in, size_t out) {
-            return in != out && sibling(in) != out && parents[in] != out;
-        }
+        using Insertion = std::pair<size_t, Scalar>;
 
-        std::pair<size_t, Scalar> search(size_t in) {
+        Insertion search(size_t in) {
             bool   down  = true;
             size_t pivot = parents[in];
             size_t out   = sibling(in);
@@ -593,27 +608,26 @@ struct BVH {
                 }
             }
 
-            if (!valid(in, out_best) || d_best <= 0)
-                return std::make_pair(0, 0);
-            return std::make_pair(out_best, d_best);
+            if (in == out_best || sibling(in) == out_best || parents[in] == out_best)
+                return Insertion { 0, 0 };
+            return Insertion { out_best, d_best };
         }
     };
 
-    void optimize(size_t u = 9, float threshold = 0.1) {
-        using InsertionTarget = std::pair<size_t, Scalar>;
-        std::unique_ptr<InsertionTarget[]> locks(new InsertionTarget[node_count]);
-        std::unique_ptr<InsertionTarget[]> outs(new InsertionTarget[node_count]);
+    void optimize(size_t u = 9, Scalar threshold = 0.1) {
+        using Insertion = typename Optimizer::Insertion;
+        std::unique_ptr<std::atomic<int64_t>[]> locks(new std::atomic<int64_t>[node_count]);
+        std::unique_ptr<Insertion[]> outs(new Insertion[node_count]);
 
         Optimizer optimizer(nodes.get(), node_count);
-        optimizer.compute_parents();
-        auto cost = optimizer.compute_cost();
+        auto cost = optimizer.cost();
         for (size_t iteration = 0; ; ++iteration) {
             size_t first_node = iteration % u + 1;
 
             // Clear the locks
             #pragma omp parallel for
             for (size_t i = first_node; i < node_count; i += u)
-                locks[i] = InsertionTarget { 0, 0 };
+                locks[i] = 0;
 
             // Search for insertion candidates
             #pragma omp parallel for
@@ -623,39 +637,40 @@ struct BVH {
             // Resolve topological conflicts with locking
             #pragma omp parallel for
             for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].first == 0)
+                if (outs[i].second <= 0)
                     continue;
                 auto conflicts = optimizer.conflicts(i, outs[i].first);
-                #pragma omp critical
-                {
-                    // Do not lock anything if there is a better re-insertion taking place on any of the affected nodes
-                    if (std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return locks[j].second < outs[i].second; })) {
-                        for (auto c : conflicts) {
-                            // Remove the lock from the previous owner
-                            if (locks[c].first != 0)
-                                outs[locks[c].first] = InsertionTarget { 0, 0 };
-                            // Obtain the lock
-                            locks[c] = std::make_pair(i, outs[i].second);
-                        }
-                    } else {
-                        // Locking failed, disable this re-insertion
-                        outs[i] = InsertionTarget { 0, 0 };
-                    }
-                }
+                auto lock = (int64_t(as<int32_t>(float(outs[i].second))) << 32) | (int64_t(i) & INT64_C(0xFFFFFFFF));
+                for (auto c : conflicts)
+                    atomic_max(locks[c], lock);
+            }
+
+            // Check the locks to disable conflicting re-insertions
+            #pragma omp parallel for
+            for (size_t i = first_node; i < node_count; i += u) {
+                if (outs[i].second <= 0)
+                    continue;
+                auto conflicts = optimizer.conflicts(i, outs[i].first);
+                if (!std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return (locks[j] & INT64_C(0xFFFFFFFF)) == i; }))
+                    outs[i] = Insertion { 0, 0 };
             }
 
             // Perform the reinsertions
             #pragma omp parallel for
             for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].first != 0) {
+                if (outs[i].second > 0) {
                     optimizer.reinsert(i, outs[i].first);
+                }
+            }
+            #pragma omp parallel for
+            for (size_t i = first_node; i < node_count; i += u) {
+                if (outs[i].second > 0) {
                     optimizer.refit(i);
                     optimizer.refit(outs[i].first);
                 }
             }
 
-            auto new_cost = optimizer.compute_cost();
-            std::cout << cost << " -> " << new_cost << std::endl;
+            auto new_cost = optimizer.cost();
             if (std::abs(new_cost - cost) < threshold || iteration == u) {
                 if (u <= 1)
                     break;
@@ -749,21 +764,6 @@ struct BVH {
     size_t                    node_count = 0;
     float                     traversal_cost = 1.0f;
 };
-
-template <typename To, typename From>
-To as(From from) {
-    To to;
-    std::memcpy(&to, &from, sizeof(from));
-    return to;
-}
-
-inline float prodsign(float x, float y) {
-    return as<float>(as<uint32_t>(x) ^ (as<uint32_t>(y) & UINT32_C(0x80000000)));
-}
-
-inline double prodsign(double x, double y) {
-    return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
-}
 
 /// Triangle primitive, compatible with the Accel structure.
 struct Triangle {
