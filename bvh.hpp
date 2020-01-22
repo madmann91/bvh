@@ -512,7 +512,7 @@ struct BVH {
                 parent_in,
                 parent_in == 0 ? in : parents[parent_in],
                 out,
-                parents[out],
+                out == 0 ? out : parents[out],
             };
         }
 
