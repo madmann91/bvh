@@ -464,6 +464,18 @@ struct BVH {
             }
         }
 
+        Scalar compute_cost() {
+            Scalar cost(0);
+            #pragma omp parallel for reduction(+: cost)
+            for (size_t i = 0; i < node_count; ++i) {
+                if (nodes[i].is_leaf)
+                    cost += nodes[i].bbox.half_area() * nodes[i].primitive_count;
+                else
+                    cost += nodes[i].bbox.half_area();
+            }
+            return cost;
+        }
+
         void refit(size_t child) {
             BBox bbox = nodes[child].bbox;
             while (child != 0) {
@@ -473,25 +485,25 @@ struct BVH {
             }
         }
 
-        void refit_all(size_t i) {
-            if (nodes[i].is_leaf)
-                return;
-            auto first_child = nodes[i].first_child_or_primitive;
-            refit_all(first_child);
-            refit_all(first_child + 1);
-            nodes[i].bbox = BBox(nodes[first_child].bbox).extend(nodes[first_child + 1].bbox);
+        std::array<size_t, 6> conflicts(size_t in, size_t out) {
+            auto parent_in = parents[in];
+            return std::array<size_t, 6> {
+                in,
+                sibling(in),
+                parent_in,
+                parent_in == 0 ? in : parents[parent_in],
+                out,
+                parents[out],
+            };
         }
 
         void reinsert(size_t in, size_t out) {
-            // Remove the node (this gives 2 free nodes: in and sibling(in))
             auto sibling_in   = sibling(in);
             auto parent_in    = parents[in];
             auto sibling_node = nodes[sibling_in];
             auto out_node     = nodes[out];
 
-            // No need to do anything if the parent/sibling/node itself is the insertion point
-            if (parent_in == out || sibling_in == out || in == out)
-                return;
+            assert(!has_ancestor(out, in));
 
             // Re-insert it into the destination
             nodes[out].bbox.extend(nodes[in].bbox);
@@ -499,18 +511,30 @@ struct BVH {
             nodes[out].is_leaf = false;
             nodes[sibling_in] = out_node;
             nodes[parent_in] = sibling_node;
+
+            // Update parent-child indices
+            if (!out_node.is_leaf) {
+                parents[out_node.first_child_or_primitive + 0] = sibling_in;
+                parents[out_node.first_child_or_primitive + 1] = sibling_in;
+            }
+            if (!sibling_node.is_leaf) {
+                parents[sibling_node.first_child_or_primitive + 0] = parent_in;
+                parents[sibling_node.first_child_or_primitive + 1] = parent_in;
+            }
             parents[sibling_in] = out;
             parents[in] = out;
-            refit(out);
-            refit(parent_in);
         }
 
-        inline size_t sibling(size_t index) const {
+        size_t sibling(size_t index) const {
             assert(index != 0);
             return index % 2 == 1 ? index + 1 : index - 1;
         }
 
-        bool search(size_t in) {
+        bool valid(size_t in, size_t out) {
+            return in != out && sibling(in) != out && parents[in] != out;
+        }
+
+        std::pair<size_t, Scalar> search(size_t in) {
             bool   down  = true;
             size_t pivot = parents[in];
             size_t out   = sibling(in);
@@ -522,7 +546,7 @@ struct BVH {
 
             Scalar d = 0;
             Scalar d_best = 0;
-            const Scalar d_bound = bbox_pivot.half_area() - bbox_in.half_area();
+            const Scalar d_bound = bbox_parent.half_area() - bbox_in.half_area();
             while (true) {
                 auto bbox_out = nodes[out].bbox;
                 auto bbox_merged = BBox(bbox_in).extend(bbox_out);
@@ -541,7 +565,7 @@ struct BVH {
                     d = d - bbox_out.half_area() + bbox_merged.half_area();
                     if (pivot == parents[out]) {
                         bbox_pivot.extend(bbox_out);
-                        out = parents[out];
+                        out = pivot;
                         bbox_out = nodes[out].bbox;
                         if (out != parents[in]) {
                             bbox_merged = BBox(bbox_in).extend(bbox_pivot);
@@ -558,8 +582,8 @@ struct BVH {
                         pivot = parents[out];
                         down = true;
                     } else {
-                        assert(out != 0);
-                        if (out == nodes[parents[out]].first_child_or_primitive) {
+                        // If the node is the left sibling, go down
+                        if (out % 2 == 1) {
                             down = true;
                             out = sibling(out);
                         } else {
@@ -568,27 +592,77 @@ struct BVH {
                     }
                 }
             }
-            return out_best;
+
+            if (!valid(in, out_best) || d_best <= 0)
+                return std::make_pair(0, 0);
+            return std::make_pair(out_best, d_best);
         }
     };
 
-    void optimize(size_t iteration_count = 1, size_t u = 8) {
-        std::unique_ptr<size_t[]> outs(new size_t[node_count]);
+    void optimize(size_t u = 9, float threshold = 0.1) {
+        using InsertionTarget = std::pair<size_t, Scalar>;
+        std::unique_ptr<InsertionTarget[]> locks(new InsertionTarget[node_count]);
+        std::unique_ptr<InsertionTarget[]> outs(new InsertionTarget[node_count]);
+
         Optimizer optimizer(nodes.get(), node_count);
         optimizer.compute_parents();
-        for (size_t iteration = 0; iteration < iteration_count; ++iteration) {
+        auto cost = optimizer.compute_cost();
+        for (size_t iteration = 0; ; ++iteration) {
+            size_t first_node = iteration % u + 1;
+
+            // Clear the locks
             #pragma omp parallel for
-            for (size_t i = iteration % u + 1; i < node_count; i += u)
+            for (size_t i = first_node; i < node_count; i += u)
+                locks[i] = InsertionTarget { 0, 0 };
+
+            // Search for insertion candidates
+            #pragma omp parallel for
+            for (size_t i = first_node; i < node_count; i += u)
                 outs[i] = optimizer.search(i);
-            for (size_t i = iteration % u + 1, count = 0; i < node_count; i += u) {
-                if (outs[i] != 0) {
-                    optimizer.reinsert(i, outs[i]);
-                    std::cout << i << " " << outs[i] << std::endl;
-                    if (count++ > 18)
-                        break;
+
+            // Resolve topological conflicts with locking
+            #pragma omp parallel for
+            for (size_t i = first_node; i < node_count; i += u) {
+                if (outs[i].first == 0)
+                    continue;
+                auto conflicts = optimizer.conflicts(i, outs[i].first);
+                #pragma omp critical
+                {
+                    // Do not lock anything if there is a better re-insertion taking place on any of the affected nodes
+                    if (std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return locks[j].second < outs[i].second; })) {
+                        for (auto c : conflicts) {
+                            // Remove the lock from the previous owner
+                            if (locks[c].first != 0)
+                                outs[locks[c].first] = InsertionTarget { 0, 0 };
+                            // Obtain the lock
+                            locks[c] = std::make_pair(i, outs[i].second);
+                        }
+                    } else {
+                        // Locking failed, disable this re-insertion
+                        outs[i] = InsertionTarget { 0, 0 };
+                    }
                 }
             }
-            optimizer.refit_all(0);
+
+            // Perform the reinsertions
+            #pragma omp parallel for
+            for (size_t i = first_node; i < node_count; i += u) {
+                if (outs[i].first != 0) {
+                    optimizer.reinsert(i, outs[i].first);
+                    optimizer.refit(i);
+                    optimizer.refit(outs[i].first);
+                }
+            }
+
+            auto new_cost = optimizer.compute_cost();
+            std::cout << cost << " -> " << new_cost << std::endl;
+            if (std::abs(new_cost - cost) < threshold || iteration == u) {
+                if (u <= 1)
+                    break;
+                u = u - 1;
+                iteration = 0;
+            }
+            cost = new_cost;
         }
     }
 
