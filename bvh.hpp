@@ -185,16 +185,6 @@ struct BBox {
     (bbox_extend:BBox:omp_out.extend(omp_in)) \
     initializer(omp_priv = BBox::empty())
 
-template <typename T, size_t Size>
-struct TraversalStack {
-    T elements[Size];
-    size_t size = 0;
-
-    void push(const T& t) { elements[size++] = t; }
-    T pop() { return elements[--size]; }
-    bool empty() const { return size == 0; }
-};
-
 inline float multiply_add(float x, float y, float z) {
 #ifdef FP_FAST_FMAF
     return std::fmaf(x, y, z);
@@ -688,6 +678,16 @@ struct BVH {
             cost = new_cost;
         }
     }
+
+    template <typename T, size_t Size>
+    struct TraversalStack {
+        T elements[Size];
+        size_t size = 0;
+
+        void push(const T& t) { elements[size++] = t; }
+        T pop() { return elements[--size]; }
+        bool empty() const { return size == 0; }
+    };
 
     /// Intersects the BVH with the given ray and intersector.
     template <bool AnyHit, typename Intersector>
