@@ -624,56 +624,62 @@ struct BVH {
         for (size_t iteration = 0; ; ++iteration) {
             size_t first_node = iteration % u + 1;
 
-            // Clear the locks and search for insertion candidates
-            #pragma omp parallel for
-            for (size_t i = first_node; i < node_count; i += u) {
-                locks[i] = 0;
-                outs[i] = optimizer.search(i);
-            }
+            #pragma omp parallel
+            {
+                // Clear the locks
+                #pragma omp for nowait
+                for (size_t i = 0; i < node_count; i++)
+                    locks[i] = 0;
 
-            // Resolve topological conflicts with locking
-            #pragma omp parallel for
-            for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].second <= 0)
-                    continue;
-                auto conflicts = optimizer.conflicts(i, outs[i].first);
-                // Encode locks into 64bits using the highest 32 bits for the cost and
-                // the lowest 32 bits for the index of the node requesting the re-insertion
-                auto lock = (int64_t(as<int32_t>(float(outs[i].second))) << 32) | (int64_t(i) & INT64_C(0xFFFFFFFF));
-                // This takes advantage of the fact that IEEE-754 floats can be compared with regular integer comparisons
-                for (auto c : conflicts)
-                    atomic_max(locks[c], lock);
-            }
+                // Search for insertion candidates
+                #pragma omp for
+                for (size_t i = first_node; i < node_count; i += u)
+                    outs[i] = optimizer.search(i);
 
-            // Check the locks to disable conflicting re-insertions
-            #pragma omp parallel for
-            for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].second <= 0)
-                    continue;
-                auto conflicts = optimizer.conflicts(i, outs[i].first);
-                // Make sure that this node owns all the locks for each and every conflicting node
-                if (!std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return (locks[j] & INT64_C(0xFFFFFFFF)) == i; }))
-                    outs[i] = Insertion { 0, 0 };
-            }
+                // Resolve topological conflicts with locking
+                #pragma omp for
+                for (size_t i = first_node; i < node_count; i += u) {
+                    if (outs[i].second <= 0)
+                        continue;
+                    auto conflicts = optimizer.conflicts(i, outs[i].first);
+                    // Encode locks into 64bits using the highest 32 bits for the cost and
+                    // the lowest 32 bits for the index of the node requesting the re-insertion
+                    auto lock = (int64_t(as<int32_t>(float(outs[i].second))) << 32) | (int64_t(i) & INT64_C(0xFFFFFFFF));
+                    // This takes advantage of the fact that IEEE-754 floats can be compared with regular integer comparisons
+                    for (auto c : conflicts)
+                        atomic_max(locks[c], lock);
+                }
 
-            // Perform the reinsertions
-            #pragma omp parallel for
-            for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].second > 0)
-                    optimizer.reinsert(i, outs[i].first);
-            }
+                // Check the locks to disable conflicting re-insertions
+                #pragma omp for
+                for (size_t i = first_node; i < node_count; i += u) {
+                    if (outs[i].second <= 0)
+                        continue;
+                    auto conflicts = optimizer.conflicts(i, outs[i].first);
+                    // Make sure that this node owns all the locks for each and every conflicting node
+                    if (!std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return (locks[j] & INT64_C(0xFFFFFFFF)) == i; }))
+                        outs[i] = Insertion { 0, 0 };
+                }
 
-            // Refit the nodes that have changed
-            #pragma omp parallel for
-            for (size_t i = first_node; i < node_count; i += u) {
-                if (outs[i].second > 0) {
-                    optimizer.refit(i);
-                    optimizer.refit(outs[i].first);
+                // Perform the reinsertions
+                #pragma omp for
+                for (size_t i = first_node; i < node_count; i += u) {
+                    if (outs[i].second > 0)
+                        optimizer.reinsert(i, outs[i].first);
+                }
+
+                // Refit the nodes that have changed
+                #pragma omp for
+                for (size_t i = first_node; i < node_count; i += u) {
+                    if (outs[i].second > 0) {
+                        optimizer.refit(i);
+                        optimizer.refit(outs[i].first);
+                    }
                 }
             }
 
             auto new_cost = optimizer.cost();
-            if (std::abs(new_cost - cost) < threshold || iteration == u) {
+            if (std::abs(new_cost - cost) <= threshold || iteration >= u) {
                 if (u <= 1)
                     break;
                 u = u - 1;
