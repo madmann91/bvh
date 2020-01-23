@@ -485,7 +485,7 @@ struct BVH {
 
         Scalar cost() {
             Scalar cost(0);
-#pragma omp parallel for reduction(+: cost)
+            #pragma omp parallel for reduction(+: cost)
             for (size_t i = 0; i < bvh->node_count; ++i) {
                 if (bvh->nodes[i].is_leaf)
                     cost += bvh->nodes[i].bbox.half_area() * bvh->nodes[i].primitive_count;
@@ -853,9 +853,9 @@ struct Accel {
             bboxes[i]  = primitives[i].bounding_box();
             centers[i] = primitives[i].center();
         }
+
         bvh.build(bboxes.get(), centers.get(), primitive_count);
-        if (!fast)
-            bvh.optimize();
+        if (!fast) bvh.optimize();
 
         // Remap primitives to avoid indirect access through primitive indices
         std::unique_ptr<Primitive[]> primitives_copy(new Primitive[primitive_count]);
