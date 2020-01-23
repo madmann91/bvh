@@ -692,25 +692,27 @@ struct BVH {
     /// Intersects the BVH with the given ray and intersector.
     template <bool AnyHit, typename Intersector>
     std::optional<std::pair<size_t, typename Intersector::Result>> intersect(Ray ray, const Intersector& intersector) const {
-        auto best_hit       = std::optional<std::pair<size_t, typename Intersector::Result>>(std::nullopt);
-        auto intersect_leaf = [&] (size_t first_primitive, size_t primitive_count) {
+        auto best_hit = std::optional<std::pair<size_t, typename Intersector::Result>>(std::nullopt);
+
+        auto intersect_leaf = [&] (const Node& node) {
+            assert(node.is_leaf);
+            auto primitive_count = node.primitive_count;
+            auto first_primitive = node.first_child_or_primitive;
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto hit = intersector(first_primitive + i, ray);
                 if (hit) {
                     best_hit = std::make_optional(std::make_pair(first_primitive + i, *hit));
                     if (AnyHit)
-                        return true;
+                        break;
                     ray.tmax = hit->distance;
                 }
             }
-            return false;
+            return best_hit;
         };
 
         // If the root is a leaf, intersect it and return
-        if (nodes[0].is_leaf) {
-            intersect_leaf(nodes[0].first_child_or_primitive, nodes[0].primitive_count);
-            return best_hit;
-        }
+        if (nodes[0].is_leaf)
+            return intersect_leaf(nodes[0]);
 
         // Precompute the inverse direction to avoid divisions and refactor
         // the computation to allow the use of FMA instructions (when available).
@@ -740,13 +742,13 @@ struct BVH {
             bool hit_right = distance_right.first <= distance_right.second;
 
             if (hit_left && left.is_leaf) {
-                if (intersect_leaf(left.first_child_or_primitive, left.primitive_count) && AnyHit)
+                if (intersect_leaf(left) && AnyHit)
                     break;
                 hit_left = false;
             }
 
             if (hit_right && right.is_leaf) {
-                if (intersect_leaf(right.first_child_or_primitive, right.primitive_count) && AnyHit)
+                if (intersect_leaf(right) && AnyHit)
                     break;
                 hit_right = false;
             }
