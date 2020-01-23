@@ -234,16 +234,16 @@ struct BVH {
     // The size of this structure is 32 bytes in single precision and 64 bytes in double precision.
     struct Node {
 #ifdef BVH_DOUBLE
-        using Size = uint64_t;
+        using Index = uint64_t;
 #else
-        using Size = uint32_t;
+        using Index = uint32_t;
 #endif
         BBox bbox;
         bool is_leaf : 1;
-        Size primitive_count : sizeof(Size) * CHAR_BIT - 1;
-        Size first_child_or_primitive;
+        Index primitive_count : sizeof(Index) * CHAR_BIT - 1;
+        Index first_child_or_primitive;
 
-        std::pair<Scalar, Scalar> intersect(const Vec3& inverse_origin, const Vec3& inverse_direction, Scalar tmin, Scalar tmax, unsigned ix, unsigned iy, unsigned iz) const {
+        std::pair<Scalar, Scalar> intersect(const Vec3& inverse_origin, const Vec3& inverse_direction, Scalar tmin, Scalar tmax, int ix, int iy, int iz) const {
             auto values = reinterpret_cast<const float*>(this);
             Scalar entry_x = multiply_add(values[    ix], inverse_direction.x, inverse_origin.x);
             Scalar entry_y = multiply_add(values[    iy], inverse_direction.y, inverse_origin.y);
@@ -720,14 +720,14 @@ struct BVH {
         static constexpr size_t stack_size = max_depth + 3;
 
         // Indices into the node bounding box values are precomputed based on the ray octant
-        auto ix = ray.direction.x > Scalar(0) ? 0 : 3;
-        auto iy = ray.direction.y > Scalar(0) ? 1 : 4;
-        auto iz = ray.direction.z > Scalar(0) ? 2 : 5;
+        int ix = ray.direction.x > Scalar(0) ? 0 : 3;
+        int iy = ray.direction.y > Scalar(0) ? 1 : 4;
+        int iz = ray.direction.z > Scalar(0) ? 2 : 5;
 
         // This traversal loop is eager, because it immediately processes leaves instead of pushing them on the stack.
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
-        TraversalStack<size_t, stack_size> stack;
+        TraversalStack<typename Node::Index, stack_size> stack;
         auto node = nodes.get();
         while (true) {
             auto first_child = node->first_child_or_primitive;
