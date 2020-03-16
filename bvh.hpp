@@ -437,7 +437,6 @@ struct BVH {
         // Allocate buffers
         nodes.reset(new Node[2 * primitive_count + 1]);
         primitive_indices.reset(new size_t[primitive_count]);
-        std::iota(primitive_indices.get(), primitive_indices.get() + primitive_count, 0);
 
         // Initialize root node
         BBox& root_bbox = nodes[0].bbox;
@@ -447,8 +446,11 @@ struct BVH {
         #pragma omp parallel
         {
             #pragma omp for reduction(bbox_extend: root_bbox)
-            for (size_t i = 0; i < primitive_count; ++i)
+            for (size_t i = 0; i < primitive_count; ++i) {
                 root_bbox.extend(bboxes[i]);
+                primitive_indices[i] = i;
+            }
+
             #pragma omp single
             { BuildTask(this, bboxes, centers).run(0, 0, primitive_count, 0); }
         }
