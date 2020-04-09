@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
 
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);
 
-    bvh::ClosestIntersector<pre_shuffle, Bvh, Triangle> intersector(&bvh, objects.data());
+    bvh::ClosestIntersector<pre_shuffle, Bvh, Triangle> intersector(bvh, objects.data());
     bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     // Camera tangent space
