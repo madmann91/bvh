@@ -1,11 +1,22 @@
 #include <vector>
 #include <iostream>
-#include "bvh.hpp"
+
+#include <bvh/bvh.hpp>
+#include <bvh/vector.hpp>
+#include <bvh/ray.hpp>
+#include <bvh/binned_sah_builder.hpp>
+#include <bvh/single_ray_traversal.hpp>
+#include <bvh/intersectors.hpp>
+
+using Scalar      = float;
+using Vector3     = bvh::Vector3<Scalar>;
+using BoundingBox = bvh::BoundingBox<Scalar>;
+using Ray         = bvh::Ray<Scalar>;
 
 int main() {
     // The input of the BVH construction algorithm is just bounding boxes and centers
-    std::vector<bvh::BBox> bboxes;
-    std::vector<bvh::Vec3> centers;
+    std::vector<BoundingBox> bboxes;
+    std::vector<Vector3> centers;
 
     // Fill the bboxes and centers with the proper values taken from the geometry of interest
     // ...
@@ -22,14 +33,12 @@ int main() {
     // Increasing this value increases the traversal stack size.
     static constexpr size_t max_depth = 64;
 
-    // The minimum number of primitives necessary to start a new builder task.
-    // This number should be high enough to avoid creating too many tasks, but
-    // low enough to ensure that there is enough parallelism. A value of 1024
-    // is good enough for most primitive types.
-    static constexpr size_t parallel_threshold = 1024;
+    using Bvh = bvh::Bvh<Scalar, max_depth>;
 
-    bvh::BVH<bin_count, max_depth, parallel_threshold> bvh;
-    bvh.build(bboxes.data(), centers.data(), bboxes.size());
+    Bvh bvh;
+
+    bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
+    builder.build(bboxes.data(), centers.data(), bboxes.size());
 
     // Boolean controlling whether the intersection routine exits
     // immediately after an intersection is found.
@@ -43,12 +52,17 @@ int main() {
     struct Intersector {
         // Required type: result of the intersection function
         struct Result {
+            // More members can be added here
+            int dummy = 42;
+
             // Required member: distance along the ray
-            bvh::Scalar distance;
+            Scalar distance() {
+                return std::numeric_limits<Scalar>::max();
+            }
         };
 
         // Required member: intersect the primitive at index `bvh.primitive_indices[index]`
-        std::optional<Result> operator () (size_t index, const bvh::Ray& ray) const {
+        std::optional<Result> operator () (size_t /*index*/, const Ray& /*ray*/) const {
             // Note: a common optimization is to reorder the primitives such that
             // there is no need for an indirection through `bvh.primitive_indices`.
             return std::nullopt;
@@ -56,16 +70,18 @@ int main() {
     };
 
     Intersector intersector;
+    bvh::SingleRayTraversal<Bvh> traversal(&bvh);
 
     // Setup the ray (see above for an example)
-    bvh::Ray ray(bvh::Vec3(0), bvh::Vec3(1), 0, 1);
-    auto hit = bvh.intersect<any_hit>(ray, intersector);
+    Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);
+    auto hit = traversal.intersect<any_hit>(ray, intersector);
     if (hit) {
-        auto primitive_index = hit->first;
-        auto intersection = hit->second;
+        auto dummy_value = hit->dummy;
 
         // Do something with the intersection here
         // ...
+
+        std::cout << "Dummy value: " << dummy_value << std::endl;
     }
     return 0;
 }

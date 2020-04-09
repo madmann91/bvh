@@ -6,8 +6,6 @@
 #include <optional>
 #include <fstream>
 
-#include "bvh.hpp"
-
 namespace obj {
 
 inline void remove_eol(char* ptr) {
@@ -55,12 +53,12 @@ inline std::optional<int> read_index(char** ptr) {
     return std::make_optional(index);
 }
 
-inline std::vector<bvh::Triangle> load_from_stream(std::istream& is) {
+inline std::vector<Triangle> load_from_stream(std::istream& is) {
     static constexpr size_t max_line = 1024;
     char line[max_line];
 
-    std::vector<bvh::Vec3> vertices;
-    std::vector<bvh::Triangle> triangles;
+    std::vector<Vector3> vertices;
+    std::vector<Triangle> triangles;
 
     while (is.getline(line, max_line)) {
         char* ptr = strip_spaces(line);
@@ -73,7 +71,7 @@ inline std::vector<bvh::Triangle> load_from_stream(std::istream& is) {
             auto z = std::strtof(ptr, &ptr);
             vertices.emplace_back(x, y, z);
         } else if (*ptr == 'f' && std::isspace(ptr[1])) {
-            bvh::Vec3 points[2];
+            Vector3 points[2];
             ptr += 2;
             for (size_t i = 0; ; ++i) {
                 if (auto index = read_index(&ptr)) {
@@ -96,13 +94,13 @@ inline std::vector<bvh::Triangle> load_from_stream(std::istream& is) {
     return triangles;
 }
 
-inline std::vector<bvh::Triangle> load_from_file(const std::string& file) {
+inline std::vector<Triangle> load_from_file(const std::string& file) {
     std::ifstream is(file);
     if (is)
         return load_from_stream(is);
-    return std::vector<bvh::Triangle>();
+    return std::vector<Triangle>();
 }
 
-}
+} // namespace obj
 
 #endif

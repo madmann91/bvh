@@ -1,81 +1,86 @@
 #include <vector>
 #include <iostream>
-#include "bvh.hpp"
 
-struct Sphere {
-    bvh::Vec3 origin;
-    bvh::Scalar radius;
+#include <bvh/bvh.hpp>
+#include <bvh/vector.hpp>
+#include <bvh/ray.hpp>
+#include <bvh/binned_sah_builder.hpp>
+#include <bvh/single_ray_traversal.hpp>
+#include <bvh/intersectors.hpp>
 
-    Sphere() = default;
-    Sphere(const bvh::Vec3& origin, bvh::Scalar radius)
-        : origin(origin), radius(radius)
-    {}
+using Scalar      = float;
+using Vector3     = bvh::Vector3<Scalar>;
+using BoundingBox = bvh::BoundingBox<Scalar>;
+using Ray         = bvh::Ray<Scalar>;
+using Bvh         = bvh::Bvh<Scalar>;
+
+struct CustomPrimitive  {
+    struct Intersection {
+        Scalar t;
+
+        // Required member: returns the distance along the ray
+        Scalar distance() const { return t; }
+    };
+
+    // Required type: the floating-point type used
+    using ScalarType = Scalar;
+    // Required type: the intersection data type returned by the intersect() method
+    using IntersectionType = Intersection;
+
+    CustomPrimitive() = default;
 
     // Required member: returns the center of the primitive
-    bvh::Vec3 center() const {
-        return origin;
+    Vector3 center() const {
+        return Vector3(0, 0, 0);
     }
 
     // Required member: returns a bounding box for the primitive (tighter is better)
-    bvh::BBox bounding_box() const {
-        return bvh::BBox(origin - bvh::Vec3(radius), origin + bvh::Vec3(radius));
+    BoundingBox bounding_box() const {
+        return BoundingBox(Vector3(-1, -1, -1), Vector3(1, 1, 1));
     }
 
-    // Required type: contains the result of intersection with a ray
-    struct Intersection {
-        // Required member: contains the distance along the ray
-        bvh::Scalar distance;
-
-        Intersection() = default;
-        Intersection(bvh::Scalar distance)
-            : distance(distance)
-        {}
-    };
-
-    std::optional<Intersection> intersect(const bvh::Ray& ray) const {
-        bvh::Vec3 oc = ray.origin - origin;
-        auto a = dot(ray.direction, ray.direction);
-        auto b = 2 * dot(ray.direction, oc);
-        auto c = dot(oc, oc) - radius * radius;
-
-        auto delta = b * b - 4 * a * c;
-        if (delta >= 0) {
-            auto inv = bvh::Scalar(0.5) / a;
-            auto t0 = -(b + std::sqrt(delta)) * inv;
-            auto t1 = -(b - std::sqrt(delta)) * inv;
-            auto t = std::fmin(t0 > ray.tmin ? t0 : t1, t1 > ray.tmin ? t1 : t0);
-            if (t > ray.tmin && t < ray.tmax) {
-                return std::make_optional(Intersection(t));
-            }
-        }
-
-        return std::nullopt;
+    // Required member: computes the intersection between a ray and the primitive
+    std::optional<Intersection> intersect(const Ray& ray) const {
+        return std::make_optional<Intersection>(Intersection { (ray.tmin + ray.tmax) * Scalar(0.5) });
     }
 };
 
 int main() {
     // Create an array of spheres 
-    std::vector<Sphere> spheres;
-    spheres.emplace_back(bvh::Vec3(0.0f, 0.0f, 0.0f), 1.0f);
-    spheres.emplace_back(bvh::Vec3(0.0f, 0.0f, 1.0f), 1.0f);
+    std::vector<CustomPrimitive> primitives;
+    primitives.emplace_back();
+    primitives.emplace_back();
+
+    static constexpr bool pre_shuffle = true;
+    static constexpr size_t bin_count = 32;
 
     // Create an acceleration data structure on those triangles
-    bvh::Accel<Sphere> accel(spheres.data(), spheres.size());
-    accel.build();
+    Bvh bvh;
+    bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
+    auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(primitives.data(), primitives.size());
+    builder.build(bboxes.get(), centers.get(), primitives.size());
+    if (pre_shuffle)
+        bvh::shuffle_primitives(primitives.data(), bvh.primitive_indices.get(), primitives.size());
 
     // Intersect a ray with the data structure
-    bvh::Ray ray(
-        bvh::Vec3(0.0f, 0.0f, 0.0f), // origin
-        bvh::Vec3(0.0f, 0.0f, 1.0f), // direction
-        0.0f,                        // minimum distance
-        100.0f                       // maximum distance
+    Ray ray(
+        Vector3(0.0, 0.0, 0.0), // origin
+        Vector3(0.0, 0.0, 1.0), // direction
+        0.0,                    // minimum distance
+        100.0                   // maximum distance
     );
-    auto hit = accel.intersect_closest(ray);
+    bvh::ClosestIntersector<pre_shuffle, Bvh, CustomPrimitive> intersector(&bvh, primitives.data());
+    bvh::SingleRayTraversal<Bvh> traversal(&bvh);
+
+    // Set to true to exit at the first intersection
+    static constexpr bool any_hit = false;
+
+    auto hit = traversal.intersect<any_hit>(ray, intersector);
     if (hit) {
-        auto sphere_index = hit->first;
-        auto intersection = hit->second;
-        std::cout << "Hit sphere " << sphere_index          << "\n"
-                  << "distance: "  << intersection.distance << std::endl;
+        auto primitive_index = hit->primitive_index;
+        auto intersection = hit->intersection;
+        std::cout << "Hit primitive " << primitive_index         << "\n"
+                  << "distance: "     << intersection.distance() << std::endl;
         return 0;
     }
     return 1;
