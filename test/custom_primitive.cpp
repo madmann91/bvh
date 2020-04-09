@@ -69,7 +69,7 @@ int main() {
         0.0,                    // minimum distance
         100.0                   // maximum distance
     );
-    bvh::ClosestIntersector<pre_shuffle, Bvh, CustomPrimitive> intersector(&bvh, primitives.data());
+    bvh::ClosestIntersector<pre_shuffle, Bvh, CustomPrimitive> intersector(bvh, primitives.data());
     bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     auto hit = traversal.intersect(ray, intersector);

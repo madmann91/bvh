@@ -1,4 +1,3 @@
-
 add_executable(simple_example simple_example.cpp)
 target_link_libraries(simple_example PUBLIC bvh)
 add_test(NAME simple_example_test COMMAND simple_example)

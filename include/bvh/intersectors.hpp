@@ -20,13 +20,12 @@ struct ClosestIntersector {
         Scalar distance() const { return intersection.distance(); }
     };
 
-    ClosestIntersector() = default;
-    ClosestIntersector(const Bvh* bvh, const Primitive* primitives)
+    ClosestIntersector(const Bvh& bvh, const Primitive* primitives)
         : bvh(bvh), primitives(primitives)
     {}
 
     std::optional<Result> operator () (size_t index, const Ray<Scalar>& ray) const {
-        index = PreShuffled ? index : bvh->primitive_indices[index];
+        index = PreShuffled ? index : bvh.primitive_indices[index];
         if (auto hit = primitives[index].intersect(ray))
             return std::make_optional(Result { index, *hit });
         return std::nullopt;
@@ -34,7 +33,7 @@ struct ClosestIntersector {
 
     static constexpr bool any_hit = false;
 
-    const Bvh* bvh = nullptr;
+    const Bvh& bvh;
     const Primitive* primitives = nullptr;
 };
 
@@ -48,13 +47,12 @@ struct AnyIntersector {
         Scalar distance() const { return t; }
     };
 
-    AnyIntersector() = default;
-    AnyIntersector(const Bvh* bvh, const Primitive* primitives)
+    AnyIntersector(const Bvh& bvh, const Primitive* primitives)
         : bvh(bvh), primitives(primitives)
     {}
 
     std::optional<Result> operator () (size_t index, const Ray<Scalar>& ray) const {
-        index = PreShuffled ? index : bvh->primitive_indices[index];
+        index = PreShuffled ? index : bvh.primitive_indices[index];
         if (auto hit = primitives[index].intersect(ray))
             return std::make_optional(Result { hit->t });
         return std::nullopt;
@@ -62,7 +60,7 @@ struct AnyIntersector {
 
     static constexpr bool any_hit = true;
 
-    const Bvh* bvh = nullptr;
+    const Bvh& bvh;
     const Primitive* primitives = nullptr;
 };
 
