@@ -8,6 +8,7 @@
 
 #include <bvh/bvh.hpp>
 #include <bvh/binned_sah_builder.hpp>
+#include <bvh/sweep_sah_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
@@ -119,15 +120,18 @@ int main(int argc, char** argv) {
     Bvh bvh;
 
     profile("BVH construction", [&] {
-        bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
         auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(objects.data(), objects.size());
-        builder.build(bboxes.get(), centers.get(), objects.size());
-        if (pre_shuffle)
-            bvh::shuffle_primitives(objects.data(), bvh.primitive_indices.get(), objects.size());
-        if (!fast_build) {
+        if (fast_build) {
+            bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
+            builder.build(bboxes.get(), centers.get(), objects.size());
+        } else {
+            bvh::SweepSahBuilder<Bvh> builder(bvh);
+            builder.build(bboxes.get(), centers.get(), objects.size());
             bvh::ParallelReinsertionOptimization<Bvh> optimization(&bvh);
             optimization.optimize();
         }
+        if (pre_shuffle)
+            bvh::shuffle_primitives(objects.data(), bvh.primitive_indices.get(), objects.size());
     });
 
     std::cout << bvh.node_count << " node(s)" << std::endl;
@@ -135,7 +139,7 @@ int main(int argc, char** argv) {
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);
 
     bvh::ClosestIntersector<pre_shuffle, Bvh, Triangle> intersector(&bvh, objects.data());
-    bvh::SingleRayTraversal<Bvh> traversal(&bvh);
+    bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     // Camera tangent space
     dir = bvh::normalize(dir);

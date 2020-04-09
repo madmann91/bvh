@@ -15,7 +15,7 @@ struct Bvh {
     using IndexType  = typename SimilarlySizedIndex<Scalar>::IndexType;
     using ScalarType = Scalar;
 
-    static constexpr size_t max_depth() { return MaxDepth; }
+    static constexpr size_t max_depth = MaxDepth;
 
     // The size of this structure is 32 bytes in single precision and 64 bytes in double precision.
     struct Node {

@@ -34,7 +34,7 @@ int main() {
 
     // Create an acceleration data structure on those triangles
     Bvh bvh;
-    bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
+    bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
     auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
     builder.build(bboxes.get(), centers.get(), triangles.size());
     if (pre_shuffle)
@@ -48,7 +48,7 @@ int main() {
         100.0                   // maximum distance
     );
     bvh::ClosestIntersector<pre_shuffle, Bvh, Triangle> intersector(&bvh, triangles.data());
-    bvh::SingleRayTraversal<Bvh> traversal(&bvh);
+    bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     auto hit = traversal.intersect(ray, intersector);
     if (hit) {

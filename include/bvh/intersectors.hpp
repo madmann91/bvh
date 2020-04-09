@@ -32,7 +32,7 @@ struct ClosestIntersector {
         return std::nullopt;
     }
 
-    static constexpr bool is_any_hit() { return false; }
+    static constexpr bool any_hit = false;
 
     const Bvh* bvh = nullptr;
     const Primitive* primitives = nullptr;
@@ -60,7 +60,7 @@ struct AnyIntersector {
         return std::nullopt;
     }
 
-    static constexpr bool is_any_hit() { return true; }
+    static constexpr bool any_hit = true;
 
     const Bvh* bvh = nullptr;
     const Primitive* primitives = nullptr;
