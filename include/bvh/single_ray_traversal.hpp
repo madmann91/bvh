@@ -72,7 +72,7 @@ private:
         for (size_t i = begin; i < end; ++i) {
             if (auto hit = intersector(i, ray)) {
                 best_hit = hit;
-                if (intersector.is_any_hit())
+                if (intersector.any_hit)
                     return best_hit;
                 ray.tmax = hit->distance();
             }
@@ -80,10 +80,10 @@ private:
         return best_hit;
     }
 
-    const Bvh* bvh;
+    const Bvh& bvh;
 
 public:
-    SingleRayTraversal(const Bvh* bvh)
+    SingleRayTraversal(const Bvh& bvh)
         : bvh(bvh)
     {}
 
@@ -93,15 +93,15 @@ public:
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
-        if (bvh->nodes[0].is_leaf)
-            return intersect_leaf(bvh->nodes[0], ray, best_hit, intersector);
+        if (bvh.nodes[0].is_leaf)
+            return intersect_leaf(bvh.nodes[0], ray, best_hit, intersector);
 
         // Precompute the inverse direction to avoid divisions and refactor
         // the computation to allow the use of FMA instructions (when available).
         auto inverse_direction = ray.direction.inverse();
         auto inverse_origin    = -ray.origin * inverse_direction;
 
-        static constexpr size_t stack_size = Bvh::max_depth() + 3;
+        static constexpr size_t stack_size = Bvh::max_depth + 3;
 
         // Precompute the octant of the ray to speed up the ray-node test
         Octant octant(ray);
@@ -110,25 +110,25 @@ public:
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
         Stack<typename Bvh::IndexType, stack_size> stack;
-        auto node = bvh->nodes.get();
+        auto node = bvh.nodes.get();
         while (true) {
             auto first_child = node->first_child_or_primitive;
 
-            auto& left  = bvh->nodes[first_child + 0];
-            auto& right = bvh->nodes[first_child + 1];
+            auto& left  = bvh.nodes[first_child + 0];
+            auto& right = bvh.nodes[first_child + 1];
             auto distance_left  = intersect_node(left,  inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
             auto distance_right = intersect_node(right, inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
             bool hit_left  = distance_left.first  <= distance_left.second;
             bool hit_right = distance_right.first <= distance_right.second;
 
             if (hit_left && left.is_leaf) {
-                if (intersect_leaf(left, ray, best_hit, intersector) && intersector.is_any_hit())
+                if (intersect_leaf(left, ray, best_hit, intersector) && intersector.any_hit)
                     break;
                 hit_left = false;
             }
 
             if (hit_right && right.is_leaf) {
-                if (intersect_leaf(right, ray, best_hit, intersector) && intersector.is_any_hit())
+                if (intersect_leaf(right, ray, best_hit, intersector) && intersector.any_hit)
                     break;
                 hit_right = false;
             }
@@ -136,13 +136,13 @@ public:
             if (hit_left && hit_right) {
                 int order = distance_left.first < distance_right.first ? 0 : 1;
                 stack.push(first_child + (1 - order));
-                node = &bvh->nodes[first_child + order];
+                node = &bvh.nodes[first_child + order];
             } else if (hit_left ^ hit_right) {
-                node = &bvh->nodes[first_child + (hit_left ? 0 : 1)];
+                node = &bvh.nodes[first_child + (hit_left ? 0 : 1)];
             } else {
                 if (stack.empty())
                     break;
-                node = &bvh->nodes[stack.pop()];
+                node = &bvh.nodes[stack.pop()];
             }
         }
 

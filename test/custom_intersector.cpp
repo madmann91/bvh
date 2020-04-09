@@ -13,6 +13,34 @@ using Vector3     = bvh::Vector3<Scalar>;
 using BoundingBox = bvh::BoundingBox<Scalar>;
 using Ray         = bvh::Ray<Scalar>;
 
+// Intersectors are used by the traversal algorithm to intersect the primitives
+// the BVH. Since the BVH itself has no knowledge of the primitives, this structure
+// does the role of a proxy between the traversal algorithm and the primitive data.
+// It can also be used to cache precomputed intersection data, so as to speed up
+// primitive intersection.
+struct Intersector {
+    // Required type: result of the intersection function
+    struct Result {
+        // More members can be added here
+        int dummy = 42;
+
+        // Required member: distance along the ray
+        Scalar distance() {
+            return std::numeric_limits<Scalar>::max();
+        }
+    };
+
+    // Required member: intersect the primitive at index `bvh.primitive_indices[index]`
+    std::optional<Result> operator () (size_t /*index*/, const Ray& /*ray*/) const {
+        // Note: a common optimization is to reorder the primitives such that
+        // there is no need for an indirection through `bvh.primitive_indices`.
+        return std::nullopt;
+    }
+
+    // Required member: flag to indicate whether this intersector should stop at the first intersection
+    static constexpr bool any_hit = false;
+};
+
 int main() {
     // The input of the BVH construction algorithm is just bounding boxes and centers
     std::vector<BoundingBox> bboxes;
@@ -37,39 +65,12 @@ int main() {
 
     Bvh bvh;
 
-    bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
+    bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
     builder.build(bboxes.data(), centers.data(), bboxes.size());
 
-    // Intersectors are used by the traversal algorithm to intersect the primitives
-    // the BVH. Since the BVH itself has no knowledge of the primitives, this structure
-    // does the role of a proxy between the traversal algorithm and the primitive data.
-    // It can also be used to cache precomputed intersection data, so as to speed up
-    // primitive intersection.
-    struct Intersector {
-        // Required type: result of the intersection function
-        struct Result {
-            // More members can be added here
-            int dummy = 42;
-
-            // Required member: distance along the ray
-            Scalar distance() {
-                return std::numeric_limits<Scalar>::max();
-            }
-        };
-
-        // Required member: intersect the primitive at index `bvh.primitive_indices[index]`
-        std::optional<Result> operator () (size_t /*index*/, const Ray& /*ray*/) const {
-            // Note: a common optimization is to reorder the primitives such that
-            // there is no need for an indirection through `bvh.primitive_indices`.
-            return std::nullopt;
-        }
-
-        // Required member: returns whether this intersector should stop at the first intersection
-        static constexpr bool is_any_hit() { return false; }
-    };
 
     Intersector intersector;
-    bvh::SingleRayTraversal<Bvh> traversal(&bvh);
+    bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     // Setup the ray (see above for an example)
     Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);
