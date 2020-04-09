@@ -2,6 +2,7 @@
 #define BVH_SWEEP_SAH_BUILDER_HPP
 
 #include <numeric>
+#include <optional>
 
 #include "bvh/bvh.hpp"
 #include "bvh/bounding_box.hpp"
