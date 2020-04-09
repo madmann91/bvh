@@ -1,6 +1,8 @@
 #ifndef BVH_TRIANGLE_HPP
 #define BVH_TRIANGLE_HPP
 
+#include <optional>
+
 #include "bvh/vector.hpp"
 #include "bvh/bounding_box.hpp"
 #include "bvh/ray.hpp"

@@ -1,6 +1,8 @@
 #ifndef BVH_BINNED_SAH_BUILDER_HPP
 #define BVH_BINNED_SAH_BUILDER_HPP
 
+#include <optional>
+
 #include "bvh/bvh.hpp"
 #include "bvh/bounding_box.hpp"
 #include "bvh/top_down_builder.hpp"
