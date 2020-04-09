@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
         } else {
             bvh::SweepSahBuilder<Bvh> builder(bvh);
             builder.build(bboxes.get(), centers.get(), objects.size());
-            bvh::ParallelReinsertionOptimization<Bvh> optimization(&bvh);
+            bvh::ParallelReinsertionOptimization<Bvh> optimization(bvh);
             optimization.optimize();
         }
         if (pre_shuffle)
