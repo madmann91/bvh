@@ -10,22 +10,22 @@ namespace bvh {
 template <typename Bvh>
 class ParallelReinsertionOptimization {
 public:
-    ParallelReinsertionOptimization(Bvh* bvh)
-        : bvh(bvh), parents(new size_t[bvh->node_count])
+    ParallelReinsertionOptimization(Bvh& bvh)
+        : bvh(bvh), parents(new size_t[bvh.node_count])
     {
         parents[0] = std::numeric_limits<size_t>::max();
         #pragma omp parallel for
-        for (size_t i = 0; i < bvh->node_count; ++i) {
-            if (bvh->nodes[i].is_leaf)
+        for (size_t i = 0; i < bvh.node_count; ++i) {
+            if (bvh.nodes[i].is_leaf)
                 continue;
-            auto first_child = bvh->nodes[i].first_child_or_primitive;
+            auto first_child = bvh.nodes[i].first_child_or_primitive;
             parents[first_child + 0] = i;
             parents[first_child + 1] = i;
         }
     }
 
 private:
-    Bvh* bvh;
+    Bvh& bvh;
     std::unique_ptr<size_t[]> parents;
 
     using Scalar    = typename Bvh::ScalarType;
@@ -34,20 +34,20 @@ private:
     Scalar cost() {
         Scalar cost(0);
         #pragma omp parallel for reduction(+: cost)
-        for (size_t i = 0; i < bvh->node_count; ++i) {
-            if (bvh->nodes[i].is_leaf)
-                cost += bvh->nodes[i].bounding_box_proxy().half_area() * bvh->nodes[i].primitive_count;
+        for (size_t i = 0; i < bvh.node_count; ++i) {
+            if (bvh.nodes[i].is_leaf)
+                cost += bvh.nodes[i].bounding_box_proxy().half_area() * bvh.nodes[i].primitive_count;
             else
-                cost += bvh->traversal_cost * bvh->nodes[i].bounding_box_proxy().half_area();
+                cost += bvh.traversal_cost * bvh.nodes[i].bounding_box_proxy().half_area();
         }
         return cost;
     }
 
     void refit(size_t child) {
-        auto bbox = bvh->nodes[child].bounding_box_proxy().to_bounding_box();
+        auto bbox = bvh.nodes[child].bounding_box_proxy().to_bounding_box();
         while (child != 0) {
             auto parent = parents[child];
-            bvh->nodes[parent].bounding_box_proxy() = bbox.extend(bvh->nodes[sibling(child)].bounding_box_proxy());
+            bvh.nodes[parent].bounding_box_proxy() = bbox.extend(bvh.nodes[sibling(child)].bounding_box_proxy());
             child = parent;
         }
     }
@@ -67,15 +67,15 @@ private:
     void reinsert(size_t in, size_t out) {
         auto sibling_in   = sibling(in);
         auto parent_in    = parents[in];
-        auto sibling_node = bvh->nodes[sibling_in];
-        auto out_node     = bvh->nodes[out];
+        auto sibling_node = bvh.nodes[sibling_in];
+        auto out_node     = bvh.nodes[out];
 
         // Re-insert it into the destination
-        bvh->nodes[out].bounding_box_proxy().extend(bvh->nodes[in].bounding_box_proxy());
-        bvh->nodes[out].first_child_or_primitive = std::min(in, sibling_in);
-        bvh->nodes[out].is_leaf = false;
-        bvh->nodes[sibling_in] = out_node;
-        bvh->nodes[parent_in] = sibling_node;
+        bvh.nodes[out].bounding_box_proxy().extend(bvh.nodes[in].bounding_box_proxy());
+        bvh.nodes[out].first_child_or_primitive = std::min(in, sibling_in);
+        bvh.nodes[out].is_leaf = false;
+        bvh.nodes[sibling_in] = out_node;
+        bvh.nodes[parent_in] = sibling_node;
 
         // Update parent-child indices
         if (!out_node.is_leaf) {
@@ -101,15 +101,15 @@ private:
         size_t out   = sibling(in);
         size_t out_best = out;
 
-        auto bbox_in = bvh->nodes[in].bounding_box_proxy();
-        auto bbox_parent = bvh->nodes[pivot].bounding_box_proxy();
+        auto bbox_in = bvh.nodes[in].bounding_box_proxy();
+        auto bbox_parent = bvh.nodes[pivot].bounding_box_proxy();
         auto bbox_pivot = BoundingBox<Scalar>::empty();
 
         Scalar d = 0;
         Scalar d_best = 0;
         const Scalar d_bound = bbox_parent.half_area() - bbox_in.half_area();
         while (true) {
-            auto bbox_out = bvh->nodes[out].bounding_box_proxy().to_bounding_box();
+            auto bbox_out = bvh.nodes[out].bounding_box_proxy().to_bounding_box();
             auto bbox_merged = BoundingBox<Scalar>(bbox_in).extend(bbox_out);
             if (down) {
                 auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
@@ -118,16 +118,16 @@ private:
                     out_best = out;
                 }
                 d = d + bbox_out.half_area() - bbox_merged.half_area();
-                if (bvh->nodes[out].is_leaf || d_bound + d <= d_best)
+                if (bvh.nodes[out].is_leaf || d_bound + d <= d_best)
                     down = false;
                 else
-                    out = bvh->nodes[out].first_child_or_primitive;
+                    out = bvh.nodes[out].first_child_or_primitive;
             } else {
                 d = d - bbox_out.half_area() + bbox_merged.half_area();
                 if (pivot == parents[out]) {
                     bbox_pivot.extend(bbox_out);
                     out = pivot;
-                    bbox_out = bvh->nodes[out].bounding_box_proxy();
+                    bbox_out = bvh.nodes[out].bounding_box_proxy();
                     if (out != parents[in]) {
                         bbox_merged = BoundingBox<Scalar>(bbox_in).extend(bbox_pivot);
                         auto d_direct = bbox_parent.half_area() - bbox_merged.half_area();
@@ -161,8 +161,8 @@ private:
 
 public:
     void optimize(size_t u = 9, Scalar threshold = 0.1) {
-        auto locks = std::make_unique<std::atomic<int64_t>[]>(bvh->node_count);
-        auto outs  = std::make_unique<Insertion[]>(bvh->node_count);
+        auto locks = std::make_unique<std::atomic<int64_t>[]>(bvh.node_count);
+        auto outs  = std::make_unique<Insertion[]>(bvh.node_count);
 
         auto old_cost = cost();
         for (size_t iteration = 0; ; ++iteration) {
@@ -172,17 +172,17 @@ public:
             {
                 // Clear the locks
                 #pragma omp for nowait
-                for (size_t i = 0; i < bvh->node_count; i++)
+                for (size_t i = 0; i < bvh.node_count; i++)
                     locks[i] = 0;
 
                 // Search for insertion candidates
                 #pragma omp for
-                for (size_t i = first_node; i < bvh->node_count; i += u)
+                for (size_t i = first_node; i < bvh.node_count; i += u)
                     outs[i] = search(i);
 
                 // Resolve topological conflicts with locking
                 #pragma omp for
-                for (size_t i = first_node; i < bvh->node_count; i += u) {
+                for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second <= 0)
                         continue;
                     // Encode locks into 64bits using the highest 32 bits for the cost and
@@ -195,7 +195,7 @@ public:
 
                 // Check the locks to disable conflicting re-insertions
                 #pragma omp for
-                for (size_t i = first_node; i < bvh->node_count; i += u) {
+                for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second <= 0)
                         continue;
                     auto conflict_list = conflicts(i, outs[i].first);
@@ -209,14 +209,14 @@ public:
 
                 // Perform the reinsertions
                 #pragma omp for
-                for (size_t i = first_node; i < bvh->node_count; i += u) {
+                for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second > 0)
                         reinsert(i, outs[i].first);
                 }
 
                 // Refit the nodes that have changed
                 #pragma omp for
-                for (size_t i = first_node; i < bvh->node_count; i += u) {
+                for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second > 0) {
                         refit(i);
                         refit(outs[i].first);

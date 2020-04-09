@@ -68,7 +68,6 @@ int main() {
     bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
     builder.build(bboxes.data(), centers.data(), bboxes.size());
 
-
     Intersector intersector;
     bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
