@@ -132,7 +132,7 @@ public:
         Scalar half_total_area  = node.bounding_box_proxy().half_area();
 
         // Check that the split is useful
-        if (best_split[best_axis] != 0 && best_cost[best_axis] + bvh.traversal_cost * half_total_area < total_primitives * half_total_area) {
+        if (best_split[best_axis] != 0 && best_cost[best_axis] < (total_primitives - bvh.traversal_cost) * half_total_area) {
             // Split primitives according to split position
             size_t begin_right = std::partition(primitive_indices + item.begin, primitive_indices + item.end, [&] (size_t i) {
                 return bin_index(centers[i], best_axis) < best_split[best_axis];
