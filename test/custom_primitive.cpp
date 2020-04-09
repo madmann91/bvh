@@ -72,10 +72,7 @@ int main() {
     bvh::ClosestIntersector<pre_shuffle, Bvh, CustomPrimitive> intersector(&bvh, primitives.data());
     bvh::SingleRayTraversal<Bvh> traversal(&bvh);
 
-    // Set to true to exit at the first intersection
-    static constexpr bool any_hit = false;
-
-    auto hit = traversal.intersect<any_hit>(ray, intersector);
+    auto hit = traversal.intersect(ray, intersector);
     if (hit) {
         auto primitive_index = hit->primitive_index;
         auto intersection = hit->intersection;

@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 
                 Ray ray(eye, bvh::normalize(image_u * u + image_v * v + dir));
 
-                auto hit = traversal.intersect<false>(ray, intersector);
+                auto hit = traversal.intersect(ray, intersector);
                 if(!hit) {
                     pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
                 } else {

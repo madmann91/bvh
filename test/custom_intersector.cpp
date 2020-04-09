@@ -40,10 +40,6 @@ int main() {
     bvh::BinnedSahBuilder<Bvh, bin_count> builder(&bvh);
     builder.build(bboxes.data(), centers.data(), bboxes.size());
 
-    // Boolean controlling whether the intersection routine exits
-    // immediately after an intersection is found.
-    static constexpr bool any_hit = false;
-
     // Intersectors are used by the traversal algorithm to intersect the primitives
     // the BVH. Since the BVH itself has no knowledge of the primitives, this structure
     // does the role of a proxy between the traversal algorithm and the primitive data.
@@ -67,6 +63,9 @@ int main() {
             // there is no need for an indirection through `bvh.primitive_indices`.
             return std::nullopt;
         }
+
+        // Required member: returns whether this intersector should stop at the first intersection
+        static constexpr bool is_any_hit() { return false; }
     };
 
     Intersector intersector;
@@ -74,7 +73,7 @@ int main() {
 
     // Setup the ray (see above for an example)
     Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);
-    auto hit = traversal.intersect<any_hit>(ray, intersector);
+    auto hit = traversal.intersect(ray, intersector);
     if (hit) {
         auto dummy_value = hit->dummy;
 
