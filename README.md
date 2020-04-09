@@ -90,36 +90,13 @@ To build the tests, type:
 
 # Usage
 
-The API comes in two flavours: A low level version where the build algorithm
-can be fine-tuned, and a high-level version.
-
-## High-level API
-
-The high-level API hides the details of the construction or traversal algorithms.
-Default values are used for the builder and indirections are avoided in intersectors
-by shuffling primitive data. For an example of how to use the high-level API,
-see [this simple example](test/simple_example.cpp).
-
-## Low-level API
-
-The low-level API allows direct access to the building algorithm and allows to create custom intersectors.
-See [this example](test/custom_intersector.cpp).
-
-## Custom primitive types
-
-Custom primitives types can be implemented, but some members are required to maintain compatibility with the high-level API.
-See [this file](test/custom_primitive.cpp) for an example.
-
-## Double precision
-
-Double precision can be enabled by defining `BVH_DOUBLE` before including `bvh.hpp`:
-
-```cpp
-// Uncomment to enable double precision
-//#define BVH_DOUBLE
-#include "bvh.hpp"
-```
+For a basic example of how to use the API, see [this simple example](test/simple_example.cpp).
+If you need to library to read your primitive data from another source (if you want to avoid
+copying existing primitive data, for instance), take a look at [this example](test/custom_intersector.cpp).
+Finally, if triangles are not enough for you, refer to [this file](test/custom_primitive.cpp)
+in order to understand how to implement your own primitive type so that it is compatible
+with the rest of the API.
 
 # License
 
-This library is distributed under the MIT license. See [bvh.hpp](bvh.hpp) for details.
+This library is distributed under the [MIT](LICENSE.txt) license.
