@@ -59,7 +59,7 @@ private:
         );
     }
 
-    template <bool AnyHit, typename Intersector>
+    template <typename Intersector>
     std::optional<typename Intersector::Result>& intersect_leaf(
         const typename Bvh::Node& node,
         Ray<Scalar>& ray,
@@ -72,7 +72,7 @@ private:
         for (size_t i = begin; i < end; ++i) {
             if (auto hit = intersector(i, ray)) {
                 best_hit = hit;
-                if (AnyHit)
+                if (intersector.is_any_hit())
                     return best_hit;
                 ray.tmax = hit->distance();
             }
@@ -88,13 +88,13 @@ public:
     {}
 
     /// Intersects the BVH with the given ray and intersector.
-    template <bool AnyHit, typename Intersector>
+    template <typename Intersector>
     std::optional<typename Intersector::Result> intersect(Ray<Scalar> ray, Intersector& intersector) const {
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
         if (bvh->nodes[0].is_leaf)
-            return intersect_leaf<AnyHit>(bvh->nodes[0], ray, best_hit, intersector);
+            return intersect_leaf(bvh->nodes[0], ray, best_hit, intersector);
 
         // Precompute the inverse direction to avoid divisions and refactor
         // the computation to allow the use of FMA instructions (when available).
@@ -122,13 +122,13 @@ public:
             bool hit_right = distance_right.first <= distance_right.second;
 
             if (hit_left && left.is_leaf) {
-                if (intersect_leaf<AnyHit>(left, ray, best_hit, intersector) && AnyHit)
+                if (intersect_leaf(left, ray, best_hit, intersector) && intersector.is_any_hit())
                     break;
                 hit_left = false;
             }
 
             if (hit_right && right.is_leaf) {
-                if (intersect_leaf<AnyHit>(right, ray, best_hit, intersector) && AnyHit)
+                if (intersect_leaf(right, ray, best_hit, intersector) && intersector.is_any_hit())
                     break;
                 hit_right = false;
             }
