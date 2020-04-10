@@ -24,7 +24,7 @@ struct VectorSetter<N, N> {
     static void set(Vector&) {}
 };
 
-/// A simple 3D vector class.
+/// An N-dimensional vector class.
 template <typename Scalar, size_t N>
 struct Vector {
     Scalar values[N];
