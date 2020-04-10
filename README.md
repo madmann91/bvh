@@ -65,16 +65,18 @@ several options that can be used to target real-time, interactive, or offline re
 
 This library contains several construction algorithms, all parallelized using OpenMP.
 
- - `bvh::BinnedSahBuilder`: Top-down builder using binning to compute the SAH.
-   Fast and produces medium- to high-quality trees. Can be configured by setting the number of bins.
-   (see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald).
+ - `bvh::BinnedSahBuilder`: Top-down builder using binning to compute the SAH (see
+   _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald). Relatively fast
+   and produces medium- to high-quality trees. Can be configured by setting the number of bins.
  - `bvh::SweepSahBuilder`: Top-down builder that sorts primitives on all axes and sweeps them
    to find the split with the lowest SAH. Relatively slow but produces high-quality trees.
  - `bvh::LocallyOrderedClusteringBuilder`: Bottom-up builder that produces trees by sorting
-   primitives on a Morton curve and performing a local search to merge them into nodes. Very fast
-   algorithm but produces medium-quality trees only. The search radius can be configured to change
-   the quality/speed ratio. Additionally, the integer type used to compute Morton codes can also be
-   changed when more precision is required.
+   primitives on a Morton curve and performing a local search to merge them into nodes (see
+   _Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction_,
+   by D. Meister and J. Bittner). Very fast algorithm but produces medium-quality trees only.
+   The search radius can be configured to change the quality/speed ratio. Additionally,
+   the integer type used to compute Morton codes can also be changed when more precision
+   is required.
 
 Those algorithms only require a bounding box and center for each primitive.
 
