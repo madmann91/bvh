@@ -74,13 +74,33 @@ compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive
     return std::make_pair(std::move(bboxes), std::move(centers));
 }
 
-/// Template that is used to select the appropriate index
-/// type of size equivalent to the given type.
-template <typename T>
-struct SimilarlySizedIndex {};
+/// Templates that contains signed and unsigned integer types of the given number of bits.
+template <size_t Bits>
+struct SizedIntegerType {};
 
-template <> struct SimilarlySizedIndex<float>  { using IndexType = uint32_t; };
-template <> struct SimilarlySizedIndex<double> { using IndexType = uint64_t; };
+template <>
+struct SizedIntegerType<64> {
+    using Signed   = int64_t;
+    using Unsigned = uint64_t;
+};
+
+template <>
+struct SizedIntegerType<32> {
+    using Signed   = int32_t;
+    using Unsigned = uint32_t;
+};
+
+template <>
+struct SizedIntegerType<16> {
+    using Signed   = int16_t;
+    using Unsigned = uint16_t;
+};
+
+template <>
+struct SizedIntegerType<8> {
+    using Signed   = int8_t;
+    using Unsigned = uint8_t;
+};
 
 /// Computes the (rounded-up) compile-time log in base-2 of an unsigned integer.
 template <size_t P, size_t I = 0, bool Found = P == 0>
