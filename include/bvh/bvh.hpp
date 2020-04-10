@@ -12,7 +12,7 @@ namespace bvh {
 /// This structure represents a BVH with a list of nodes and primitives indices.
 template <typename Scalar, size_t MaxDepth = 64> 
 struct Bvh {
-    using IndexType  = typename SimilarlySizedIndex<Scalar>::IndexType;
+    using IndexType  = typename SizedIntegerType<sizeof(Scalar) * CHAR_BIT>::Unsigned;
     using ScalarType = Scalar;
 
     static constexpr size_t max_depth = MaxDepth;
