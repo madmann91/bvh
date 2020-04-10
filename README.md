@@ -98,14 +98,13 @@ This library provides the following traversal algorithms:
     
 Traversal algorithms can work in two modes: closest intersection,
 or any intersection (for shadow rays, usually around 20% faster).
-It only requires an intersection routine for the primitives.
+They only requires an intersector to compute primitive-ray intersections.
 
 ### Intersectors
 
 Intersectors contained in the libray support linear collections of primitives (i.e. arrays/vectors),
 and allow permuting the primitive data in such a way that no indirection is done during traversal.
-Custom intersectors can be introduced when the primitive data is in another form (and copy is not
-an option, if the primitive data uses indices, for instance).
+Custom intersectors can be introduced when the primitive data is in another form.
 
 ## Building
 
