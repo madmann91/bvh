@@ -9,11 +9,11 @@
 
 namespace bvh {
 
+/// Sphere primitive defined by a center and a radius.
 template <typename Scalar>
 struct Sphere  {
     struct Intersection {
         Scalar  t;
-        Vector3<Scalar> normal;
 
         Scalar distance() const { return t; }
     };
@@ -49,10 +49,8 @@ struct Sphere  {
             auto t0 = -(b + std::sqrt(delta)) * inv;
             auto t1 = -(b - std::sqrt(delta)) * inv;
             auto t = std::fmin(t0 > ray.tmin ? t0 : t1, t1 > ray.tmin ? t1 : t0);
-            if (t > ray.tmin && t < ray.tmax) {
-                auto normal = normalize(ray.origin + t * ray.direction - origin);
-                return std::make_optional(Intersection(t, normal));
-            }
+            if (t > ray.tmin && t < ray.tmax)
+                return std::make_optional(Intersection(t));
         }
 
         return std::nullopt;

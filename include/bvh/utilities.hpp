@@ -12,6 +12,7 @@
 
 namespace bvh {
 
+/// Safe function to reinterpret the bits of the given value as another type.
 template <typename To, typename From>
 To as(From from) {
     To to;
@@ -19,10 +20,12 @@ To as(From from) {
     return to;
 }
 
+/// Equivalent to copysign(x, x * y).
 inline float product_sign(float x, float y) {
     return as<float>(as<uint32_t>(x) ^ (as<uint32_t>(y) & UINT32_C(0x80000000)));
 }
 
+/// Equivalent to copysign(x, x * y).
 inline double product_sign(double x, double y) {
     return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
 }
@@ -49,6 +52,7 @@ void atomic_max(std::atomic<Scalar>& x, Scalar y) {
     while (z < y && !x.compare_exchange_weak(z, y)) ;
 }
 
+/// Shuffles primitives such that the primitive at index i is `primitives[indices[i]]`.
 template <typename Primitive>
 void shuffle_primitives(Primitive* primitives, const size_t* indices, size_t primitive_count) {
     auto primitives_copy = std::make_unique<Primitive[]>(primitive_count);

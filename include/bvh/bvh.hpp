@@ -17,13 +17,16 @@ struct Bvh {
 
     static constexpr size_t max_depth = MaxDepth;
 
-    // The size of this structure is 32 bytes in single precision and 64 bytes in double precision.
+    // The size of this structure should be 32 bytes in
+    // single precision and 64 bytes in double precision.
     struct Node {
         Scalar bounds[6];
         bool is_leaf : 1;
         IndexType primitive_count : sizeof(IndexType) * CHAR_BIT - 1;
         IndexType first_child_or_primitive;
 
+        /// Accessor to simplify the manipulation of the bounding box of a node.
+        /// This type is convertible to a `BoundingBox`.
         struct BoundingBoxProxy {
             Node& node;
 
@@ -73,8 +76,13 @@ struct Bvh {
 
     std::unique_ptr<Node[]>   nodes;
     std::unique_ptr<size_t[]> primitive_indices;
-    size_t                    node_count = 0;
-    Scalar                    traversal_cost = 1;
+
+    size_t node_count = 0;
+
+    /// Cost of intersecting a ray with a node of the data structure.
+    /// This cost is relative to the cost of intersecting a primitive,
+    /// which is assumed to be equal to 1.
+    Scalar traversal_cost = 1;
 };
 
 } // namespace bvh

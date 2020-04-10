@@ -9,6 +9,7 @@
 
 namespace bvh {
 
+/// Helper class to set the elements of a vector.
 template <size_t I, size_t N>
 struct VectorSetter {
     template <typename Vector, typename Scalar, typename... Args>
