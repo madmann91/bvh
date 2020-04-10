@@ -10,6 +10,8 @@ class TopDownBuilder {
 public:
     using WorkItem = typename BuildTask::WorkItem;
 
+    /// Threshold (number of primitives) under which the builder
+    /// doesn't spawn any more OpenMP tasks.
     size_t parallel_threshold = 1024;
     Bvh& bvh;
 

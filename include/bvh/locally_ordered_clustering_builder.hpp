@@ -17,7 +17,7 @@ public:
 
     /// Parameter of the algorithm. The larger the search radius,
     /// the longer the search for neighboring nodes lasts.
-    size_t search_radius = 25;
+    size_t search_radius = 14;
 
     LocallyOrderedClusteringBuilder(Bvh& bvh)
         : bvh(bvh)
@@ -49,9 +49,9 @@ public:
             #pragma omp for
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto& node = nodes[begin + i];
-                node.bounding_box_proxy() = bboxes[primitive_indices[i]];
-                node.is_leaf = true;
-                node.primitive_count = 1;
+                node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
+                node.is_leaf                  = true;
+                node.primitive_count          = 1;
                 node.first_child_or_primitive = i;
             }
 
