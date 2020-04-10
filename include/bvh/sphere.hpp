@@ -29,12 +29,10 @@ struct Sphere  {
         : origin(origin), radius(radius)
     {}
 
-    // Required member: returns the center of the primitive
     Vector3<Scalar> center() const {
         return origin;
     }
 
-    // Required member: returns a bounding box for the primitive (tighter is better)
     BoundingBox<Scalar> bbox() const {
         return BoundingBox<Scalar>(origin - Vector3<Scalar>(radius), origin + Vector3<Scalar>(radius));
     }
