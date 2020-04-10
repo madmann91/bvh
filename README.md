@@ -6,31 +6,9 @@ BVH holds no data and only holds nodes. There is no hardware- or platform-specif
 intrinsic used. Parallelization is done using OpenMP tasks. There is no dependency
 except the C++ standard library.
 
-The construction algorithm is very fast and produces high-quality, SAH-optimized trees
-(see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald).
-It only requires a bounding box and center for each primitive.
+## Performance
 
-Additionally, the BVH structure can be further improved by running a post-build re-insertion
-optimization (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
-by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
-at the cost of longer build times.
-
-The traversal algorithm is optimized in several ways:
-
-  - Rays are classified by octant, to make the ray-box test more efficient,
-  - The order of traversal is such that the closest node is chosen first,
-  - The ray-box test does not use divisions, and uses FMA instructions
-    when possible,
-  - The primitive data of the client is permuted in such a way that no
-    indirection is done when looking up primitives.
-
-The traversal algorithm can work in two modes: closest intersection,
-or any intersection (for shadow rays, usually around 20% faster).
-It only requires an intersection routine for the primitives.
-
-# Performance
-
-This library is carefully crafted to ensure good single-ray performance, while still
+This library is carefully crafted to ensure good performance, while still
 being simple, portable and high-level. These are performance results versus another
 simple library available on GitHub, [brandonpelfrey/Fast-BVH](https://github.com/brandonpelfrey/Fast-BVH)
 (top of the list for the search "bvh"):
@@ -78,7 +56,58 @@ simplicity and portability followed by this library and will most likely never b
 improvements such as post-build optimizations will be investigated, as long as they offer a good compromise
 between implementation complexity and performance improvements.
 
-# Building
+## Detailed Description
+
+Since there are various algorithms for BVH traversal and construction, this library provides
+several options that can be used to target real-time, interactive, or offline rendering.
+
+### Construction Algorithms
+
+This library contains several construction algorithms, all parallelized using OpenMP.
+
+ - `bvh::BinnedSahBuilder<Bvh, BinCount>`: Top-down builder using binning to compute the SAH.
+   Fast and produces medium- to high-quality trees. Can be configured by setting the number of bins.
+   (see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald).
+ - `bvh::SweepSahBuilder<Bvh>`: Top-down builder that sorts primitives on all axes and sweeps them
+   to find the split with the lowest SAH. Relatively slow but produces high-quality trees.
+ - `bvh::LocallyOrderedClusteringBuilder<Bvh, Morton>`: Bottom-up builder that produces trees by sorting
+   primitives on a Morton curve and performing a local search to merge them into nodes. Very fast
+   algorithm but produces medium-quality trees only. The search radius can be configured to change
+   the quality/speed ratio. Additionally, the integer type used to compute Morton codes can also be
+   changed when more precision is required.
+
+Those algorithms only requires a bounding box and center for each primitive.
+
+### Optimization Algorithms
+
+Additionally, the BVH structure can be further improved by running post-build optimizations.
+
+ - `bvh::ParallelReinsertionOptimization<Bvh>`: This optimization tries to re-insert BVH nodes
+   in a way that minimizes the SAH (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
+   by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
+   at the cost of longer build times.
+
+### Traversal Algorithms
+
+This library provides the following traversal algorithms:
+
+ - `bvh::SingleRayTraversal<Bvh>`: A traversal algorithm optimized for single rays.
+    Rays are classified by octant, to make the ray-box test more efficient, the order
+    of traversal is chosen such that the closest node is taken first, the ray-box test
+    does not use divisions, and uses FMA instructions when possible.
+    
+Traversal algorithms can work in two modes: closest intersection,
+or any intersection (for shadow rays, usually around 20% faster).
+It only requires an intersection routine for the primitives.
+
+### Intersectors
+
+Intersectors contained in the libray support linear collections of primitives (i.e. arrays/vectors),
+and allow permuting the primitive data in such a way that no indirection is done during traversal.
+Custom intersectors can be introduced when the primitive data is in another form, and copy is not
+an option (e.g. if the primitive data uses indices).
+
+## Building
 
 There is no need to build anything, since this library is header-only.
 To build the tests, type:
@@ -88,7 +117,7 @@ To build the tests, type:
     cmake ..
     cmake --build .
 
-# Usage
+## Usage
 
 For a basic example of how to use the API, see [this simple example](test/simple_example.cpp).
 If you need to library to read your primitive data from another source (if you want to avoid
@@ -97,6 +126,6 @@ Finally, if triangles are not enough for you, refer to [this file](test/custom_p
 in order to understand how to implement your own primitive type so that it is compatible
 with the rest of the API.
 
-# License
+## License
 
 This library is distributed under the [MIT](LICENSE.txt) license.
