@@ -155,7 +155,7 @@ class SweepSahBuilder : public TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>> {
 
     using ParentBuilder = TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>>;
     using ParentBuilder::bvh;
-    using ParentBuilder::run;
+    using ParentBuilder::run_task;
 
 public:
     SweepSahBuilder(Bvh& bvh)
@@ -208,7 +208,7 @@ public:
             {
                 bvh.nodes[0].bounding_box_proxy() = root_bbox;
                 SweepSahBuildTask<Bvh> first_task(*this, bboxes, centers, references, costs);
-                run(first_task, 0, 0, primitive_count, 0);
+                run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
     }

@@ -183,7 +183,7 @@ class BinnedSahBuilder : public TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinC
 
     using ParentBuilder = TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinCount>>;
     using ParentBuilder::bvh;
-    using ParentBuilder::run;
+    using ParentBuilder::run_task;
 
 public:
     BinnedSahBuilder(Bvh& bvh)
@@ -192,8 +192,8 @@ public:
 
     void build(const BoundingBox<Scalar>* bboxes, const Vector3<Scalar>* centers, size_t primitive_count) {
         // Allocate buffers
-        bvh.nodes.reset(new typename Bvh::Node[2 * primitive_count + 1]);
-        bvh.primitive_indices.reset(new size_t[primitive_count]);
+        bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * primitive_count + 1);
+        bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);
 
         // Initialize root node
         auto root_bbox = BoundingBox<Scalar>::empty();
@@ -215,7 +215,7 @@ public:
             {
                 bvh.nodes[0].bounding_box_proxy() = root_bbox;
                 BinnedSahBuildTask first_task(*this, bboxes, centers);
-                run(first_task, 0, 0, primitive_count, 0);
+                run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
     }
