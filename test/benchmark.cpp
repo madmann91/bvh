@@ -191,13 +191,15 @@ int main(int argc, char** argv) {
     }
 
     std::function<void(Bvh&)> optimizer;
-    if (optimizer_name && !strcmp(optimizer_name, "parallel_reinsertion")) {
+    if (!optimizer_name) {
+        optimizer = [] (Bvh&) {};
+    } else if (!strcmp(optimizer_name, "parallel_reinsertion")) {
         optimizer = [] (Bvh& bvh) {
             bvh::ParallelReinsertionOptimization<Bvh> optimization(bvh);
             optimization.optimize();
         };
     } else {
-        optimizer = [] (Bvh&) {};
+        std::cerr << "Unknow BVH optimizer name" << std::endl;
     }
 
     // Load mesh from file
