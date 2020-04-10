@@ -65,12 +65,12 @@ several options that can be used to target real-time, interactive, or offline re
 
 This library contains several construction algorithms, all parallelized using OpenMP.
 
- - `bvh::BinnedSahBuilder<Bvh, BinCount>`: Top-down builder using binning to compute the SAH.
+ - `bvh::BinnedSahBuilder`: Top-down builder using binning to compute the SAH.
    Fast and produces medium- to high-quality trees. Can be configured by setting the number of bins.
    (see _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald).
- - `bvh::SweepSahBuilder<Bvh>`: Top-down builder that sorts primitives on all axes and sweeps them
+ - `bvh::SweepSahBuilder`: Top-down builder that sorts primitives on all axes and sweeps them
    to find the split with the lowest SAH. Relatively slow but produces high-quality trees.
- - `bvh::LocallyOrderedClusteringBuilder<Bvh, Morton>`: Bottom-up builder that produces trees by sorting
+ - `bvh::LocallyOrderedClusteringBuilder`: Bottom-up builder that produces trees by sorting
    primitives on a Morton curve and performing a local search to merge them into nodes. Very fast
    algorithm but produces medium-quality trees only. The search radius can be configured to change
    the quality/speed ratio. Additionally, the integer type used to compute Morton codes can also be
@@ -82,7 +82,7 @@ Those algorithms only requires a bounding box and center for each primitive.
 
 Additionally, the BVH structure can be further improved by running post-build optimizations.
 
- - `bvh::ParallelReinsertionOptimization<Bvh>`: This optimization tries to re-insert BVH nodes
+ - `bvh::ParallelReinsertionOptimization`: An optimization that tries to re-insert BVH nodes
    in a way that minimizes the SAH (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
    by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
    at the cost of longer build times.
@@ -91,7 +91,7 @@ Additionally, the BVH structure can be further improved by running post-build op
 
 This library provides the following traversal algorithms:
 
- - `bvh::SingleRayTraversal<Bvh>`: A traversal algorithm optimized for single rays.
+ - `bvh::SingleRayTraversal`: A traversal algorithm optimized for single rays.
     Rays are classified by octant, to make the ray-box test more efficient, the order
     of traversal is chosen such that the closest node is taken first, the ray-box test
     does not use divisions, and uses FMA instructions when possible.
