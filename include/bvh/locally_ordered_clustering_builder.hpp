@@ -38,7 +38,6 @@ public:
         auto next_index  = std::make_unique<size_t[]>(node_count);
         auto child_index = std::make_unique<size_t[]>(node_count);
 
-        static constexpr size_t search_radius = 25;
         size_t begin = node_count - primitive_count, end = node_count;
         size_t unmerged_count = 0;
         size_t children_count = 0;
