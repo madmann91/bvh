@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
+#include <functional>
 
 #include <bvh/bvh.hpp>
 #include <bvh/binned_sah_builder.hpp>
