@@ -9,16 +9,18 @@
 #include <bvh/bvh.hpp>
 #include <bvh/binned_sah_builder.hpp>
 #include <bvh/sweep_sah_builder.hpp>
+#include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
 
-using Scalar   = float;
-using Vector3  = bvh::Vector3<Scalar>;
-using Triangle = bvh::Triangle<Scalar>;
-using Ray      = bvh::Ray<Scalar>;
-using Bvh      = bvh::Bvh<Scalar>;
+using Scalar      = float;
+using Vector3     = bvh::Vector3<Scalar>;
+using Triangle    = bvh::Triangle<Scalar>;
+using BoundingBox = bvh::BoundingBox<Scalar>;
+using Ray         = bvh::Ray<Scalar>;
+using Bvh         = bvh::Bvh<Scalar>;
 
 #include "obj.hpp"
 
@@ -31,64 +33,122 @@ void profile(const char* task, F f) {
     std::cout << task << " took " << ms << "ms" << std::endl;
 }
 
+static int not_enough_arguments(const char* option) {
+    std::cerr << "Not enough arguments for '" << option << "'" << std::endl;
+    return 1;
+}
+
+static void usage() {
+    std::cout <<
+        "Usage: benchmark\n"
+        "    [--builder name]\n"
+        "    [--optimizer name]\n"
+        "    [--pre-shuffle]\n"
+        "    [--eye x y z]\n"
+        "    [--dir x y z]\n"
+        "    [--up x y z]\n"
+        "    [--fov d]\n"
+        "    [--width pixels]\n"
+        "    [--height pixels]\n"
+        "    file.obj"
+        << std::endl;
+}
+
+struct Camera {
+    Vector3 eye;
+    Vector3 dir;
+    Vector3 up;
+    Scalar  fov;
+};
+
+template <bool PreShuffle>
+void render(const Camera& camera, Bvh& bvh, const Triangle* triangles, Scalar* pixels, size_t width, size_t height) {
+    auto dir = bvh::normalize(camera.dir);
+    auto image_u = bvh::normalize(bvh::cross(dir, camera.up));
+    auto image_v = bvh::normalize(bvh::cross(image_u, dir));
+    auto image_w = std::tan(camera.fov * Scalar(3.14159265 * (1.0 / 180.0) * 0.5));
+    auto ratio = Scalar(height) / Scalar(width);
+    image_u = image_u * image_w;
+    image_v = image_v * image_w * ratio;
+
+    bvh::ClosestIntersector<PreShuffle, Bvh, Triangle> intersector(bvh, triangles);
+    bvh::SingleRayTraversal<Bvh> traversal(bvh);
+
+    #pragma omp parallel for collapse(2)
+    for(size_t i = 0; i < width; ++i) {
+        for(size_t j = 0; j < height; ++j) {
+            size_t index = 3 * (width * j + i);
+
+            auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
+            auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
+
+            Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
+
+            auto hit = traversal.intersect(ray, intersector);
+            if(!hit) {
+                pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
+            } else {
+                auto normal = bvh::normalize(triangles[hit->primitive_index].n);
+                pixels[index    ] = std::fabs(normal[0]);
+                pixels[index + 1] = std::fabs(normal[1]);
+                pixels[index + 2] = std::fabs(normal[2]);
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cout <<
-            "Usage: benchmark"
-            "    [--fast-bvh-build]"
-            "    [--eye x y z]"
-            "    [--dir x y z]"
-            "    [--up x y z]"
-            "    [--fov d]"
-            "    [--width pixels]"
-            "    [--height pixels]"
-            "    file.obj"
-            << std::endl;
+        usage();
         return 1;
     }
 
-    bool fast_build = false;
     const char* input_file = NULL;
-    Scalar fov = 60;
-    Vector3 eye(0, 0, -10);
-    Vector3 dir(0, 0, 1);
-    Vector3 up (0, 1, 0);
+    const char* builder_name = NULL;
+    const char* optimizer_name = NULL;
+    Camera camera = {
+        Vector3(0, 0, -10),
+        Vector3(0, 0, 1),
+        Vector3(0, 1, 0),
+        60
+    };
+    bool pre_shuffle = false;
     size_t width  = 1080;
     size_t height = 720;
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
-            if (!strcmp(argv[i], "--fast-bvh-build"))
-                fast_build = true;
-            else if (!strcmp(argv[i], "--eye") ||
-                     !strcmp(argv[i], "--dir") ||
-                     !strcmp(argv[i], "--up")) {
-                if (i + 3 >= argc) {
-                    std::cerr << "Not enough arguments for '" << argv[i] << "'" << std::endl;
-                    return 1;
-                }
+            if (!strcmp(argv[i], "--eye") ||
+                !strcmp(argv[i], "--dir") ||
+                !strcmp(argv[i], "--up")) {
+                if (i + 3 >= argc)
+                    return not_enough_arguments(argv[i]);
                 Vector3* destination;
                 switch (argv[i][2]) {
-                    case 'd': destination = &dir; break;
-                    case 'u': destination = &up;  break;
-                    default:  destination = &eye; break;
+                    case 'd': destination = &camera.dir; break;
+                    case 'u': destination = &camera.up;  break;
+                    default:  destination = &camera.eye; break;
                 }
                 (*destination)[0] = strtof(argv[++i], NULL);
                 (*destination)[1] = strtof(argv[++i], NULL);
                 (*destination)[2] = strtof(argv[++i], NULL);
             } else if (!strcmp(argv[i], "--fov")) {
-                if (i + 1 >= argc) {
-                    std::cerr << "Not enough arguments for '" << argv[i] << "'" << std::endl;
-                    return 1;
-                }
-                fov = strtof(argv[++i], NULL);
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                camera.fov = strtof(argv[++i], NULL);
             } else if (!strcmp(argv[i], "--width") ||
                        !strcmp(argv[i], "--height")) {
-                if (i + 1 >= argc) {
-                    std::cerr << "Not enough arguments for '" << argv[i] << "'" << std::endl;
-                    return 1;
-                }
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
                 size_t* destination = argv[i][2] == 'w' ? &width : &height;
                 *destination = strtoull(argv[++i], NULL, 10);
+            } else if (!strcmp(argv[i], "--builder") ||
+                       !strcmp(argv[i], "--optimizer")) {
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                const char** name = argv[i][2] == 'b' ? &builder_name : &optimizer_name;
+                *name = argv[++i];
+            } else if (!strcmp(argv[i], "--pre-shuffle")) {
+                pre_shuffle = true;
             } else {
                 std::cerr << "Unknown option: '" << argv[i] << "'" << std::endl;
                 return 1;
@@ -107,71 +167,67 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    std::function<void(Bvh&, const BoundingBox*, const Vector3*, size_t)> builder;
+    if (!builder_name || !strcmp(builder_name, "binned_sah")) {
+        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+            static constexpr size_t bin_count = 32;
+            bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
+            builder.build(bboxes, centers, primitive_count);
+        };
+    } else if (!strcmp(builder_name, "sweep_sah")) {
+        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+            bvh::SweepSahBuilder<Bvh> builder(bvh);
+            builder.build(bboxes, centers, primitive_count);
+        };
+    } else if (!strcmp(builder_name, "locally_ordered_clustering")) {
+        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+            using Morton = uint32_t;
+            bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
+            builder.build(bboxes, centers, primitive_count);
+        };
+    } else {
+        std::cerr << "Unknow BVH builder name" << std::endl;
+    }
+
+    std::function<void(Bvh&)> optimizer;
+    if (optimizer_name && !strcmp(optimizer_name, "parallel_reinsertion")) {
+        optimizer = [] (Bvh& bvh) {
+            bvh::ParallelReinsertionOptimization<Bvh> optimization(bvh);
+            optimization.optimize();
+        };
+    } else {
+        optimizer = [] (Bvh&) {};
+    }
+
     // Load mesh from file
-    auto objects = obj::load_from_file(input_file);
-    if (objects.size() == 0) {
+    auto triangles = obj::load_from_file(input_file);
+    if (triangles.size() == 0) {
         std::cerr << "The given scene is empty or cannot be loaded" << std::endl;
         return 1;
     }
 
-    // Build an acceleration data structure for this object set
-    static constexpr bool pre_shuffle = true;
-    static constexpr size_t bin_count = 32;
     Bvh bvh;
 
+    // Build an acceleration data structure for this object set
+    std::cout << "Building BVH..." << std::endl;
     profile("BVH construction", [&] {
-        auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(objects.data(), objects.size());
-        if (fast_build) {
-            bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
-            builder.build(bboxes.get(), centers.get(), objects.size());
-        } else {
-            bvh::SweepSahBuilder<Bvh> builder(bvh);
-            builder.build(bboxes.get(), centers.get(), objects.size());
-            bvh::ParallelReinsertionOptimization<Bvh> optimization(bvh);
-            optimization.optimize();
-        }
+        auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
+        builder(bvh, bboxes.get(), centers.get(), triangles.size());
+        optimizer(bvh);
         if (pre_shuffle)
-            bvh::shuffle_primitives(objects.data(), bvh.primitive_indices.get(), objects.size());
+            bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), triangles.size());
     });
 
     std::cout << bvh.node_count << " node(s)" << std::endl;
 
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);
 
-    bvh::ClosestIntersector<pre_shuffle, Bvh, Triangle> intersector(bvh, objects.data());
-    bvh::SingleRayTraversal<Bvh> traversal(bvh);
-
-    // Camera tangent space
-    dir = bvh::normalize(dir);
-    auto image_u = bvh::normalize(bvh::cross(dir, up));
-    auto image_v = bvh::normalize(bvh::cross(image_u, dir));
-    auto image_w = std::tan(fov * Scalar(3.14159265 * (1.0 / 180.0) * 0.5));
-    auto ratio = Scalar(height) / Scalar(width);
-    image_u = image_u * image_w;
-    image_v = image_v * image_w * ratio;
     std::cout << "Rendering image (" << width << "x" << height << ")..." << std::endl;
-
     profile("Rendering", [&] {
-        #pragma omp parallel for collapse(2)
-        for(size_t i = 0; i < width; ++i) {
-            for(size_t j = 0; j < height; ++j) {
-                size_t index = 3 * (width * j + i);
-
-                auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
-                auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
-
-                Ray ray(eye, bvh::normalize(image_u * u + image_v * v + dir));
-
-                auto hit = traversal.intersect(ray, intersector);
-                if(!hit) {
-                    pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
-                } else {
-                    auto normal = bvh::normalize(objects[hit->primitive_index].n);
-                    pixels[index    ] = std::fabs(normal[0]);
-                    pixels[index + 1] = std::fabs(normal[1]);
-                    pixels[index + 2] = std::fabs(normal[2]);
-                }
-            }
+        if (pre_shuffle) {
+            render<true>(camera, bvh, triangles.data(), pixels.get(), width, height);
+        } else {
+            render<false>(camera, bvh, triangles.data(), pixels.get(), width, height);
         }
     });
 

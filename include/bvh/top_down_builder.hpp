@@ -19,7 +19,7 @@ protected:
     {}
 
     template <typename... Args>
-    void run(BuildTask& task, Args&&... args) {
+    void run_task(BuildTask& task, Args&&... args) {
         std::stack<WorkItem> stack;
         stack.emplace(std::forward<Args&&>(args)...);
         while (!stack.empty()) {
@@ -36,7 +36,7 @@ protected:
                 if (first_item.work_size() > parallel_threshold) {
                     BuildTask new_task(task);
                     #pragma omp task firstprivate(new_task, first_item)
-                    { run(new_task, first_item); }
+                    { run_task(new_task, first_item); }
                 } else {
                     stack.push(first_item);
                 }
