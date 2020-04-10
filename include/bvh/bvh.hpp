@@ -74,7 +74,7 @@ struct Bvh {
     std::unique_ptr<Node[]>   nodes;
     std::unique_ptr<size_t[]> primitive_indices;
     size_t                    node_count = 0;
-    Scalar                    traversal_cost = 1.5;
+    Scalar                    traversal_cost = 1;
 };
 
 } // namespace bvh
