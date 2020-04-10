@@ -76,7 +76,7 @@ This library contains several construction algorithms, all parallelized using Op
    the quality/speed ratio. Additionally, the integer type used to compute Morton codes can also be
    changed when more precision is required.
 
-Those algorithms only requires a bounding box and center for each primitive.
+Those algorithms only require a bounding box and center for each primitive.
 
 ### Optimization Algorithms
 
@@ -92,9 +92,9 @@ Additionally, the BVH structure can be further improved by running post-build op
 This library provides the following traversal algorithms:
 
  - `bvh::SingleRayTraversal`: A traversal algorithm optimized for single rays.
-    Rays are classified by octant, to make the ray-box test more efficient, the order
-    of traversal is chosen such that the closest node is taken first, the ray-box test
-    does not use divisions, and uses FMA instructions when possible.
+    Rays are classified by octant, to make the ray-box test more efficient. The
+    traversal order is such that the closest node is taken first. The ray-box
+    test does not use divisions, and uses FMA instructions when possible.
     
 Traversal algorithms can work in two modes: closest intersection,
 or any intersection (for shadow rays, usually around 20% faster).
@@ -104,8 +104,8 @@ It only requires an intersection routine for the primitives.
 
 Intersectors contained in the libray support linear collections of primitives (i.e. arrays/vectors),
 and allow permuting the primitive data in such a way that no indirection is done during traversal.
-Custom intersectors can be introduced when the primitive data is in another form, and copy is not
-an option (e.g. if the primitive data uses indices).
+Custom intersectors can be introduced when the primitive data is in another form (and copy is not
+an option, if the primitive data uses indices, for instance).
 
 ## Building
 

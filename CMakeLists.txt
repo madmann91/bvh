@@ -13,7 +13,7 @@ if (OpenMP_CXX_FOUND)
 endif()
 
 # Make sure to only build tests when building this project,
-# and not when importing this project into another one.
+# and not when importing it into another one.
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     include(CTest)
     if (BUILD_TESTING)
