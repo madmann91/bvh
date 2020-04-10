@@ -34,6 +34,7 @@ private:
     Builder& builder;
     const BoundingBox<Scalar>* bboxes;
     const Vector3<Scalar>* centers;
+
     std::array<size_t*, 3> references;
     std::array<Scalar*, 3> costs;
 
@@ -47,17 +48,17 @@ public:
         : builder(builder), bboxes(bboxes), centers(centers), references(references), costs(costs)
     {}
 
-    std::pair<Scalar, size_t> find_split(const size_t* references, float* costs, size_t begin, size_t end) {
+    std::pair<Scalar, size_t> find_split(int axis, size_t begin, size_t end) {
         auto bbox = BoundingBox<Scalar>::empty();
         for (size_t i = end - 1; i > begin; --i) {
-            bbox.extend(bboxes[references[i]]);
-            costs[i] = bbox.half_area() * (end - i);
+            bbox.extend(bboxes[references[axis][i]]);
+            costs[axis][i] = bbox.half_area() * (end - i);
         }
         bbox = BoundingBox<Scalar>::empty();
         auto best_split = std::pair<Scalar, size_t>(std::numeric_limits<Scalar>::max(), end);
         for (size_t i = begin; i < end - 1; ++i) {
-            bbox.extend(bboxes[references[i]]);
-            auto cost = bbox.half_area() * (i + 1 - begin) + costs[i + 1];
+            bbox.extend(bboxes[references[axis][i]]);
+            auto cost = bbox.half_area() * (i + 1 - begin) + costs[axis][i + 1];
             if (cost < best_split.first)
                 best_split = std::make_pair(cost, i + 1);
         }
@@ -84,7 +85,7 @@ public:
         // Sweep primitives to find the best cost
         #pragma omp taskloop if (is_parallelizable) grainsize(1) default(shared)
         for (int axis = 0; axis < 3; ++axis)
-            best_splits[axis] = find_split(references[axis], costs[axis], item.begin, item.end);
+            best_splits[axis] = find_split(axis, item.begin, item.end);
 
         int best_axis = 0;
         if (best_splits[0].first > best_splits[1].first)
@@ -168,8 +169,16 @@ public:
         auto reference_data = std::make_unique<size_t[]>(primitive_count * 2);
         auto cost_data      = std::make_unique<Scalar[]>(primitive_count * 3);
 
-        std::array<Scalar*, 3> costs = { cost_data.get(), cost_data.get() + primitive_count, cost_data.get() + 2 * primitive_count };
-        std::array<size_t*, 3> references = { reference_data.get(), reference_data.get() + primitive_count, bvh.primitive_indices.get() };
+        std::array<Scalar*, 3> costs = {
+            cost_data.get(),
+            cost_data.get() + primitive_count,
+            cost_data.get() + 2 * primitive_count
+        };
+        std::array<size_t*, 3> references = {
+            reference_data.get(),
+            reference_data.get() + primitive_count,
+            bvh.primitive_indices.get()
+        };
 
         // Initialize root node
         auto root_bbox = BoundingBox<Scalar>::empty();
