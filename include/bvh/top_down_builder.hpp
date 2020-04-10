@@ -10,7 +10,7 @@ class TopDownBuilder {
 public:
     using WorkItem = typename BuildTask::WorkItem;
 
-    size_t parallel_threshold;
+    size_t parallel_threshold = 1024;
     Bvh& bvh;
 
 protected:
