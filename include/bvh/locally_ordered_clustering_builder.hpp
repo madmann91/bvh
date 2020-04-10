@@ -75,7 +75,8 @@ public:
                     neighbors[i] = best_neighbor;
                 }
 
-                // Mark nodes that are the closest as merged, but keep the one with lowest index act as the parent
+                // Mark nodes that are the closest as merged, but keep
+                // the one with lowest index to act as the parent
                 #pragma omp for
                 for (size_t i = begin; i < end; ++i) {
                     auto j = neighbors[i];
