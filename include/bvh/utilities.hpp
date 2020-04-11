@@ -7,6 +7,7 @@
 #include <memory>
 #include <algorithm>
 #include <cmath>
+#include <climits>
 
 #include "bvh/bounding_box.hpp"
 
@@ -76,7 +77,11 @@ compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive
 
 /// Templates that contains signed and unsigned integer types of the given number of bits.
 template <size_t Bits>
-struct SizedIntegerType {};
+struct SizedIntegerType {
+    static_assert(Bits <= 8);
+    using Signed   = int8_t;
+    using Unsigned = uint8_t;
+};
 
 template <>
 struct SizedIntegerType<64> {
@@ -96,25 +101,36 @@ struct SizedIntegerType<16> {
     using Unsigned = uint16_t;
 };
 
-template <>
-struct SizedIntegerType<8> {
-    using Signed   = int8_t;
-    using Unsigned = uint8_t;
-};
-
 /// Computes the (rounded-up) compile-time log in base-2 of an unsigned integer.
 template <size_t P, size_t I = 0, bool Found = P == 0>
-struct RoundedUpLog2 {};
+struct RoundUpLog2 {};
 
 template <size_t P, size_t I>
-struct RoundedUpLog2<P, I, false> {
-    static constexpr size_t value = RoundedUpLog2<P, I + 1, (1 << (I + 1)) >= P>::value;
+struct RoundUpLog2<P, I, false> {
+    static constexpr size_t value = RoundUpLog2<P, I + 1, (1 << (I + 1)) >= P>::value;
 };
 
 template <size_t P, size_t I>
-struct RoundedUpLog2<P, I, true> {
+struct RoundUpLog2<P, I, true> {
     static constexpr size_t value = I;
 };
+
+// Returns the number of bits that are equal to zero,
+// starting from the most significant one.
+template <typename T>
+size_t count_leading_zeros(T value) {
+    static constexpr size_t bit_count = sizeof(T) * CHAR_BIT;
+    size_t a = 0;
+    size_t b = bit_count;
+    auto all = T(-1);
+    for (size_t i = 0; i < RoundUpLog2<bit_count>::value; i++) {
+        auto m = (a + b) / 2;
+        auto mask = all << m;
+        if (value & mask) a = m + 1;
+        else              b = m;
+    }
+    return bit_count - b;
+}
 
 } // namespace bvh
 

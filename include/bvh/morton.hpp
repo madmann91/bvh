@@ -12,7 +12,7 @@ namespace bvh {
 /// For instance, morton_split(0b00110010) = 0b000000001001000000001000.
 template <typename T>
 T morton_split(T x) {
-    constexpr size_t log_bits = RoundedUpLog2<sizeof(T) * CHAR_BIT>::value;
+    constexpr size_t log_bits = RoundUpLog2<sizeof(T) * CHAR_BIT>::value;
     auto mask = T(-1);
     for (size_t i = log_bits, n = 1 << log_bits; i > 0; --i, n >>= 1) {
         mask = (mask | (mask << n)) & ~(mask << (n / 2));
