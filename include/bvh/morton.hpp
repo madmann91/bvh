@@ -9,7 +9,7 @@
 namespace bvh {
 
 /// Split an unsigned integer such that its bits are spaced by 2 zeros.
-/// For instance, morton_split(0b00110010, 3) = 0b000000001001000000001000.
+/// For instance, morton_split(0b00110010) = 0b000000001001000000001000.
 template <typename T>
 T morton_split(T x) {
     constexpr size_t log_bits = RoundedUpLog2<sizeof(T) * CHAR_BIT>::value;
