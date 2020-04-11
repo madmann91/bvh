@@ -111,6 +111,8 @@ public:
                 size_t children_begin = end - children_count;
                 size_t next_begin = children_begin - unmerged_count;
 
+                // Finally, merge nodes that are marked for merging and create
+                // their parents using the indices computed previously.
                 #pragma omp for nowait
                 for (size_t i = begin; i < end; ++i) {
                     auto j = neighbors[i];
@@ -129,6 +131,7 @@ public:
                     }
                 }
 
+                // Copy the nodes of the previous level into the current array of nodes.
                 #pragma omp for
                 for (size_t i = end; i < previous_end; ++i)
                     nodes_copy[i] = nodes[i];

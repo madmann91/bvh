@@ -13,13 +13,15 @@ class SingleRayTraversal {
 private:
     using Scalar = typename Bvh::ScalarType;
 
-    template <typename T, size_t Size>
     struct Stack {
-        T elements[Size];
+        using Element = typename Bvh::IndexType;
+        static constexpr size_t max_size = Bvh::max_depth + 3;
+
+        Element elements[max_size];
         size_t size = 0;
 
-        void push(const T& t) { elements[size++] = t; }
-        T pop() { return elements[--size]; }
+        void push(const Element& t) { elements[size++] = t; }
+        Element pop() { return elements[--size]; }
         bool empty() const { return size == 0; }
     };
 
@@ -101,15 +103,13 @@ public:
         auto inverse_direction = ray.direction.inverse();
         auto inverse_origin    = -ray.origin * inverse_direction;
 
-        static constexpr size_t stack_size = Bvh::max_depth + 3;
-
         // Precompute the octant of the ray to speed up the ray-node test
         Octant octant(ray);
 
         // This traversal loop is eager, because it immediately processes leaves instead of pushing them on the stack.
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
-        Stack<typename Bvh::IndexType, stack_size> stack;
+        Stack stack;
         auto node = bvh.nodes.get();
         while (true) {
             auto first_child = node->first_child_or_primitive;
