@@ -4,6 +4,7 @@
 #include <numeric>
 
 #include "bvh/morton_code_based_builder.hpp"
+#include "bvh/utilities.hpp"
 
 namespace bvh {
 
@@ -31,8 +32,8 @@ public:
     {}
 
     std::pair<size_t, size_t> cluster(
-        const Node* __restrict input,
-        Node* __restrict output,
+        const Node* restrict input,
+        Node* restrict output,
         size_t* auxiliary_data,
         size_t data_size,
         size_t begin, size_t end,
@@ -131,7 +132,7 @@ public:
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
-        auto primitive_indices = sort_primitives_by_morton_code(bboxes, centers, primitive_count);
+        auto [primitive_indices, _] = sort_primitives_by_morton_code(bboxes, centers, primitive_count);
 
         auto node_count     = 2 * primitive_count - 1;
         auto nodes          = std::make_unique<Node[]>(node_count);

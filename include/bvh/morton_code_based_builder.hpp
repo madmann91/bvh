@@ -24,7 +24,9 @@ public:
     /// Number of bits to use per dimension.
     size_t bit_count = max_bit_count;
 
-    std::unique_ptr<size_t[]> sort_primitives_by_morton_code(
+    using SortedPairs = std::pair<std::unique_ptr<size_t[]>, std::unique_ptr<Morton[]>>;
+
+    SortedPairs sort_primitives_by_morton_code(
         const BoundingBox<Scalar>* bboxes,
         const Vector3<Scalar>* centers,
         size_t primitive_count) const
@@ -64,11 +66,14 @@ public:
         {
             auto morton_codes_copy      = std::make_unique<uint32_t[]>(primitive_count);
             auto primitive_indices_copy = std::make_unique<size_t[]>(primitive_count);
-            radix_sort(morton_codes, primitive_indices, morton_codes_copy, primitive_indices_copy, primitive_count, bit_count * 3);
+            radix_sort(
+                morton_codes, primitive_indices,
+                morton_codes_copy, primitive_indices_copy,
+                primitive_count, bit_count * 3);
             assert(std::is_sorted(morton_codes.get(), morton_codes.get() + primitive_count));
         }
 
-        return primitive_indices;
+        return std::make_pair(std::move(primitive_indices), std::move(morton_codes));
     }
 };
 
