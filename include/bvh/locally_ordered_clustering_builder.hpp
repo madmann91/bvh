@@ -32,16 +32,16 @@ public:
     {}
 
     std::pair<size_t, size_t> cluster(
-        const Node* restrict input,
-        Node* restrict output,
+        const Node* bvh__restrict__ input,
+        Node* bvh__restrict__ output,
         size_t* auxiliary_data,
         size_t data_size,
         size_t begin, size_t end,
         size_t previous_end)
     {
-        size_t* __restrict neighbors   = auxiliary_data;
-        size_t* __restrict next_index  = auxiliary_data + data_size;
-        size_t* __restrict child_index = auxiliary_data + data_size * 2;
+        size_t* bvh__restrict__ neighbors   = auxiliary_data;
+        size_t* bvh__restrict__ next_index  = auxiliary_data + data_size;
+        size_t* bvh__restrict__ child_index = auxiliary_data + data_size * 2;
 
         size_t unmerged_count = 0;
         size_t children_count = 0;

@@ -12,9 +12,9 @@ if (OpenMP_CXX_FOUND)
     target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
 endif ()
 
-include(cmake/TestRestrict.cmake)
+include(cmake/FindRestrictKeyword.cmake)
 find_restrict_keyword(restrict_keyword)
-target_compile_definitions(bvh INTERFACE -Drestrict=${restrict_keyword})
+target_compile_definitions(bvh INTERFACE -Dbvh__restrict__=${restrict_keyword})
 
 # Make sure to only build tests when building this project,
 # and not when importing it into another one.
