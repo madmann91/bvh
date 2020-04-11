@@ -22,7 +22,7 @@ public:
 
     /// Threshold (number of nodes) under which the algorithm
     /// executes loops serially.
-    size_t parallel_threshold = 1024;
+    size_t parallel_threshold = 256;
 
     LocallyOrderedClusteringBuilder(Bvh& bvh)
         : bvh(bvh)
@@ -39,9 +39,6 @@ public:
         size_t* __restrict neighbors   = auxiliary_data;
         size_t* __restrict next_index  = auxiliary_data + data_size;
         size_t* __restrict child_index = auxiliary_data + data_size * 2;
-
-        size_t next_begin;
-        size_t next_end;
 
         size_t unmerged_count = 0;
         size_t children_count = 0;
@@ -105,7 +102,7 @@ public:
             }
 
             size_t children_begin = end - children_count;
-            size_t unmerged_begin = children_begin - unmerged_count;
+            size_t unmerged_begin = end - (children_count + unmerged_count);
 
             // Finally, merge nodes that are marked for merging and create
             // their parents using the indices computed previously.
@@ -134,14 +131,10 @@ public:
             #pragma omp for nowait
             for (size_t i = end; i < previous_end; ++i)
                 output[i] = input[i];
-
-            #pragma omp single nowait
-            {
-                next_begin = unmerged_begin;
-                next_end   = children_begin;
-            }
         }
 
+        size_t next_end   = end - children_count;
+        size_t next_begin = end - (unmerged_count + children_count);
         return std::make_pair(next_begin, next_end);
     }
 
@@ -182,9 +175,9 @@ public:
 
             std::swap(nodes_copy, nodes);
 
+            previous_end = end;
             begin        = next_begin;
             end          = next_end;
-            previous_end = end;
         }
 
         std::swap(bvh.nodes, nodes);
