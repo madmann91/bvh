@@ -1,6 +1,8 @@
 #ifndef BVH_LOCALLY_ORDERED_CLUSTERING_BUILDER_HPP
 #define BVH_LOCALLY_ORDERED_CLUSTERING_BUILDER_HPP
 
+#include <vector>
+
 #include "bvh/morton_code_based_builder.hpp"
 
 namespace bvh {
@@ -41,7 +43,9 @@ public:
         size_t begin = node_count - primitive_count, end = node_count;
         size_t unmerged_count = 0;
         size_t children_count = 0;
-        size_t previous_end = end;
+
+        std::vector<std::pair<size_t, size_t>> levels;
+        levels.reserve(Bvh::max_depth);
 
         #pragma omp parallel
         {
@@ -66,7 +70,11 @@ public:
                     for (size_t j = search_begin; j < search_end; ++j) {
                         if (j == i)
                             continue;
-                        auto distance = nodes[i].bounding_box_proxy().to_bounding_box().extend(nodes[j].bounding_box_proxy()).half_area();
+                        auto distance = nodes[i]
+                            .bounding_box_proxy()
+                            .to_bounding_box()
+                            .extend(nodes[j].bounding_box_proxy())
+                            .half_area();
                         if (distance < best_distance) {
                             best_distance = distance;
                             best_neighbor = j;
@@ -113,14 +121,17 @@ public:
 
                 // Finally, merge nodes that are marked for merging and create
                 // their parents using the indices computed previously.
-                #pragma omp for nowait
+                #pragma omp for
                 for (size_t i = begin; i < end; ++i) {
                     auto j = neighbors[i];
                     if (neighbors[j] == i) {
                         if (i < j) {
                             auto& merged_node = nodes_copy[next_begin + next_index[i]];
                             auto first_child = children_begin + child_index[i];
-                            merged_node.bounding_box_proxy() = nodes[j].bounding_box_proxy().to_bounding_box().extend(nodes[i].bounding_box_proxy());
+                            merged_node.bounding_box_proxy() = nodes[j]
+                                .bounding_box_proxy()
+                                .to_bounding_box()
+                                .extend(nodes[i].bounding_box_proxy());
                             merged_node.is_leaf = false;
                             merged_node.first_child_or_primitive = first_child;
                             nodes_copy[first_child + 0] = nodes[i];
@@ -131,18 +142,23 @@ public:
                     }
                 }
 
-                // Copy the nodes of the previous level into the current array of nodes.
-                #pragma omp for
-                for (size_t i = end; i < previous_end; ++i)
-                    nodes_copy[i] = nodes[i];
-
                 #pragma omp single
                 {
                     std::swap(nodes_copy, nodes);
-                    previous_end = end;
-                    begin        = next_begin;
-                    end          = children_begin;
+                    levels.emplace_back(children_begin, end);
+                    begin = next_begin;
+                    end   = children_begin;
                 }
+            }
+
+            // Copy the nodes of the previous levels into the current array of nodes.
+            #pragma omp for
+            for (size_t i = 0; i < levels.size(); ++i) {
+                if (i % 2 == 0)
+                    continue;
+                auto [begin, end] = levels[levels.size() - i - 1];
+                for (size_t j = begin; j < end; ++j)
+                    nodes[j] = nodes_copy[j];
             }
         }
 
