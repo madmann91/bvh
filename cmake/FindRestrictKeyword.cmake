@@ -1,3 +1,5 @@
+include(CheckCXXSourceCompiles)
+
 # Finds the "restrict" keyword that is accepted by the compiler, if any.
 # The arguments are:
 #
@@ -5,8 +7,8 @@
 #                      If no such keyword exists, returns the empty string. 
 function (find_restrict_keyword restrict_keyword)
     foreach (keyword "restrict" "__restrict" "__restrict__")
-        try_compile(status ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/cmake/test_restrict.cpp COMPILE_DEFINITIONS -Drestrict=${keyword} CXX_EXTENSIONS ON)
-        if (status)
+        check_cxx_source_compiles("void f(int* ${keyword} p) { (void)p; } int main() { return 0; }" HAS_RESTRICT_KEYWORD_${keyword})
+        if (HAS_RESTRICT_KEYWORD_${keyword})
             set(${restrict_keyword} ${keyword} PARENT_SCOPE)
             return()
         endif ()
