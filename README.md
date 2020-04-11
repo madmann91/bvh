@@ -3,7 +3,7 @@
 This is a modern C++17 header-only BVH library optimized for ray-tracing. Traversal and
 construction routines support different primitive types. The design is such that the
 BVH holds no data and only holds nodes. There is no hardware- or platform-specific
-intrinsic used. Parallelization is done using OpenMP tasks. There is no dependency
+intrinsic used. Parallelization is done using OpenMP. There is no dependency
 except the C++ standard library.
 
 ## Performance

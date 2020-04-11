@@ -13,6 +13,7 @@ public:
     ParallelReinsertionOptimization(Bvh& bvh)
         : bvh(bvh), parents(new size_t[bvh.node_count])
     {
+        // Compute the index of the parent of each node
         parents[0] = std::numeric_limits<size_t>::max();
         #pragma omp parallel for
         for (size_t i = 0; i < bvh.node_count; ++i) {
@@ -32,6 +33,7 @@ private:
     using Insertion = std::pair<size_t, Scalar>;
 
     Scalar cost() {
+        // Compute the SAH cost for the entire BVH
         Scalar cost(0);
         #pragma omp parallel for reduction(+: cost)
         for (size_t i = 0; i < bvh.node_count; ++i) {
@@ -44,6 +46,7 @@ private:
     }
 
     void refit(size_t child) {
+        // Refit all nodes that are on the path between the given node and the root
         auto bbox = bvh.nodes[child].bounding_box_proxy().to_bounding_box();
         while (child != 0) {
             auto parent = parents[child];
@@ -53,6 +56,7 @@ private:
     }
 
     std::array<size_t, 6> conflicts(size_t in, size_t out) {
+        // Return an array of re-insertion conflicts for the given nodes
         auto parent_in = parents[in];
         return std::array<size_t, 6> {
             in,
@@ -108,6 +112,8 @@ private:
         Scalar d = 0;
         Scalar d_best = 0;
         const Scalar d_bound = bbox_parent.half_area() - bbox_in.half_area();
+
+        // Perform a search to find a re-insertion position for the given node
         while (true) {
             auto bbox_out = bvh.nodes[out].bounding_box_proxy().to_bounding_box();
             auto bbox_merged = BoundingBox<Scalar>(bbox_in).extend(bbox_out);
@@ -224,6 +230,9 @@ public:
                 }
             }
 
+            // Compare the old SAH cost to the new one and decrease the number
+            // of nodes that are ignored during the optimization if the change
+            // in cost is below the threshold.
             auto new_cost = cost();
             if (std::abs(new_cost - old_cost) <= threshold || iteration >= u) {
                 if (u <= 1)
