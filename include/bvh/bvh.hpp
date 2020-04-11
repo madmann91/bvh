@@ -70,7 +70,7 @@ struct Bvh {
         }
 
         const BoundingBoxProxy bounding_box_proxy() const {
-            return BoundingBoxProxy(const_cast<Node>(*this));
+            return BoundingBoxProxy(*const_cast<Node*>(this));
         }
     };
 
