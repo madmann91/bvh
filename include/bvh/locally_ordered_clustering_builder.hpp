@@ -1,6 +1,8 @@
 #ifndef BVH_LOCALLY_ORDERED_CLUSTERING_BUILDER_HPP
 #define BVH_LOCALLY_ORDERED_CLUSTERING_BUILDER_HPP
 
+#include <numeric>
+
 #include "bvh/morton_code_based_builder.hpp"
 
 namespace bvh {
@@ -82,23 +84,9 @@ public:
             #pragma omp sections
             {
                 #pragma omp section
-                {
-                    unmerged_count = 0;
-                    for (size_t i = begin; i < end; ++i) {
-                        size_t count = unmerged_count;
-                        unmerged_count += next_index[i];
-                        next_index[i] = count;
-                    }
-                }
+                { unmerged_count = *std::prev(std::partial_sum(next_index + begin, next_index + end, next_index + begin)); }
                 #pragma omp section
-                {
-                    children_count = 0;
-                    for (size_t i = begin; i < end; ++i) {
-                        size_t count = children_count;
-                        children_count += child_index[i];
-                        child_index[i] = count;
-                    }
-                }
+                { children_count = *std::prev(std::partial_sum(child_index + begin, child_index + end, child_index + begin)); }
             }
 
             size_t children_begin = end - children_count;
@@ -111,8 +99,8 @@ public:
                 auto j = neighbors[i];
                 if (neighbors[j] == i) {
                     if (i < j) {
-                        auto& merged_node = output[unmerged_begin + next_index[i]];
-                        auto first_child = children_begin + child_index[i];
+                        auto& merged_node = output[unmerged_begin + next_index[i] - 1];
+                        auto first_child = children_begin + child_index[i] - 2;
                         merged_node.bounding_box_proxy() = input[j]
                             .bounding_box_proxy()
                             .to_bounding_box()
@@ -123,7 +111,7 @@ public:
                         output[first_child + 1] = input[j];
                     }
                 } else {
-                    output[unmerged_begin + next_index[i]] = input[i];
+                    output[unmerged_begin + next_index[i] - 1] = input[i];
                 }
             }
 
