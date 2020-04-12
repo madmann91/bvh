@@ -72,7 +72,7 @@ protected:
 
         // Sort primitives by morton code
         {
-            auto morton_codes_copy      = std::make_unique<uint32_t[]>(primitive_count);
+            auto morton_codes_copy      = std::make_unique<Morton[]>(primitive_count);
             auto primitive_indices_copy = std::make_unique<size_t[]>(primitive_count);
             radix_sort(
                 morton_codes, primitive_indices,
