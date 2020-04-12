@@ -42,7 +42,7 @@ static int not_enough_arguments(const char* option) {
 static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
-        "Options:\n"
+        "\nOptions:\n"
         "    --help                        Shows this message.\n"
         "    --builder <name>              Sets the BVH builder to use (defaults to 'binned_sah').\n"
         "    --optimizer <name>            Sets the BVH optimizer to use (none by default).\n"
@@ -54,12 +54,12 @@ static void usage() {
         "    --fov <degrees>               Sets the field of view.\n"
         "    --width <pixels>              Sets the image width.\n"
         "    --height <pixels>             Sets the image height.\n"
-        "Builders:\n"
+        "\nBuilders:\n"
         "    binned_sah,\n"
         "    sweep_sah,\n"
         "    locally_ordered_clustering\n"
-        "Optimizers:\n"
-        "    parallel_reinsertion"
+        "\nOptimizers:\n"
+        "    parallel_reinsertion\n"
         << std::endl;
 }
 
