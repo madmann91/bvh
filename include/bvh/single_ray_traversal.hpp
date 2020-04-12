@@ -155,14 +155,6 @@ private:
         return best_hit;
     }
 
-    struct NoStatistics {
-        struct Empty {
-            Empty& operator ++ (int)    { return *this; }
-            Empty& operator ++ ()       { return *this; }
-            Empty& operator += (size_t) { return *this; }
-        } traversal_steps, intersections;
-    };
-
     const Bvh& bvh;
 
 public:
@@ -179,7 +171,13 @@ public:
     /// Intersects the BVH with the given ray and intersector.
     template <typename Intersector>
     std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector) const {
-        NoStatistics statistics;
+        struct {
+            struct Empty {
+                Empty& operator ++ (int)    { return *this; }
+                Empty& operator ++ ()       { return *this; }
+                Empty& operator += (size_t) { return *this; }
+            } traversal_steps, intersections;
+        } statistics;
         return intersect_bvh(ray, intersector, statistics);
     }
 
