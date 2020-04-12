@@ -8,20 +8,30 @@
 
 namespace bvh {
 
-template <typename Bvh>
+template <typename Bvh, size_t StackSize = 64>
 class SingleRayTraversal {
+public:
+    static constexpr size_t stack_size = StackSize;
+
 private:
     using Scalar = typename Bvh::ScalarType;
 
     struct Stack {
         using Element = typename Bvh::IndexType;
-        static constexpr size_t max_size = Bvh::max_depth + 3;
 
-        Element elements[max_size];
+        Element elements[stack_size];
         size_t size = 0;
 
-        void push(const Element& t) { elements[size++] = t; }
-        Element pop() { return elements[--size]; }
+        void push(const Element& t) {
+            assert(size < stack_size);
+            elements[size++] = t;
+        }
+
+        Element pop() {
+            assert(!empty());
+            return elements[--size];
+        }
+
         bool empty() const { return size == 0; }
     };
 
@@ -61,16 +71,18 @@ private:
         );
     }
 
-    template <typename Intersector>
+    template <typename Intersector, typename Statistics>
     std::optional<typename Intersector::Result>& intersect_leaf(
         const typename Bvh::Node& node,
         Ray<Scalar>& ray,
         std::optional<typename Intersector::Result>& best_hit,
-        Intersector& intersector) const
+        Intersector& intersector,
+        Statistics& statistics) const
     {
         assert(node.is_leaf);
         size_t begin = node.first_child_or_primitive;
         size_t end   = begin + node.primitive_count;
+        statistics.intersections += end - begin;
         for (size_t i = begin; i < end; ++i) {
             if (auto hit = intersector(i, ray)) {
                 best_hit = hit;
@@ -82,21 +94,13 @@ private:
         return best_hit;
     }
 
-    const Bvh& bvh;
-
-public:
-    SingleRayTraversal(const Bvh& bvh)
-        : bvh(bvh)
-    {}
-
-    /// Intersects the BVH with the given ray and intersector.
-    template <typename Intersector>
-    std::optional<typename Intersector::Result> intersect(Ray<Scalar> ray, Intersector& intersector) const {
+    template <typename Intersector, typename Statistics>
+    std::optional<typename Intersector::Result> intersect_bvh(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
         if (bvh.nodes[0].is_leaf)
-            return intersect_leaf(bvh.nodes[0], ray, best_hit, intersector);
+            return intersect_leaf(bvh.nodes[0], ray, best_hit, intersector, statistics);
 
         // Precompute the inverse direction to avoid divisions and refactor
         // the computation to allow the use of FMA instructions (when available).
@@ -112,6 +116,8 @@ public:
         Stack stack;
         auto node = bvh.nodes.get();
         while (true) {
+            statistics.traversal_steps++;
+
             auto first_child = node->first_child_or_primitive;
 
             auto& left  = bvh.nodes[first_child + 0];
@@ -122,13 +128,13 @@ public:
             bool hit_right = distance_right.first <= distance_right.second;
 
             if (hit_left && left.is_leaf) {
-                if (intersect_leaf(left, ray, best_hit, intersector) && intersector.any_hit)
+                if (intersect_leaf(left, ray, best_hit, intersector, statistics) && intersector.any_hit)
                     break;
                 hit_left = false;
             }
 
             if (hit_right && right.is_leaf) {
-                if (intersect_leaf(right, ray, best_hit, intersector) && intersector.any_hit)
+                if (intersect_leaf(right, ray, best_hit, intersector, statistics) && intersector.any_hit)
                     break;
                 hit_right = false;
             }
@@ -147,6 +153,41 @@ public:
         }
 
         return best_hit;
+    }
+
+    struct NoStatistics {
+        struct Empty {
+            Empty& operator ++ (int)    { return *this; }
+            Empty& operator ++ ()       { return *this; }
+            Empty& operator += (size_t) { return *this; }
+        } traversal_steps, intersections;
+    };
+
+    const Bvh& bvh;
+
+public:
+    /// Statistics collected during traversal.
+    struct Statistics {
+        size_t traversal_steps = 0;
+        size_t intersections   = 0;
+    };
+
+    SingleRayTraversal(const Bvh& bvh)
+        : bvh(bvh)
+    {}
+
+    /// Intersects the BVH with the given ray and intersector.
+    template <typename Intersector>
+    std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector) const {
+        NoStatistics statistics;
+        return intersect_bvh(ray, intersector, statistics);
+    }
+
+    /// Intersects the BVH with the given ray and intersector.
+    /// Record statistics on the number of traversal and intersection steps.
+    template <typename Intersector>
+    std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
+        return intersect_bvh(ray, intersector, statistics);
     }
 };
 

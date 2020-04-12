@@ -7,15 +7,22 @@ namespace bvh {
 
 template <typename Bvh, typename BuildTask>
 class TopDownBuilder {
+    friend BuildTask;
+
 public:
     using WorkItem = typename BuildTask::WorkItem;
 
     /// Threshold (number of primitives) under which the builder
     /// doesn't spawn any more OpenMP tasks.
     size_t parallel_threshold = 1024;
-    Bvh& bvh;
+
+    /// Maximum depth of the generated tree. This can be used to make
+    /// sure the required traversal stack size is under a given constant.
+    size_t max_depth = 64;
 
 protected:
+    Bvh& bvh;
+
     TopDownBuilder(Bvh& bvh)
         : bvh(bvh)
     {}

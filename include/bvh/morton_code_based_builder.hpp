@@ -14,8 +14,9 @@ namespace bvh {
 
 template <typename Bvh, typename Morton>
 class MortonCodeBasedBuilder {
-public:
     using Scalar = typename Bvh::ScalarType;
+
+public:
     using MortonType = Morton;
 
     /// Maximum number of bits available per dimension.
@@ -24,6 +25,13 @@ public:
     /// Number of bits to use per dimension.
     size_t bit_count = max_bit_count;
 
+    /// Threshold (number of nodes) under which the loops execute serially.
+    size_t parallel_threshold = 256;
+
+    /// Threshold (number of primitives) under which the radix sort executes serially.
+    size_t radix_sort_parallel_threshold = 1024;
+
+protected:
     using SortedPairs = std::pair<std::unique_ptr<size_t[]>, std::unique_ptr<Morton[]>>;
 
     SortedPairs sort_primitives_by_morton_code(
@@ -38,7 +46,7 @@ public:
         auto dim = Morton(1) << bit_count;
         auto global_bbox = BoundingBox<Scalar>::empty();
 
-        #pragma omp parallel
+        #pragma omp parallel if (primitive_count > parallel_threshold)
         {
             #pragma omp declare reduction \
                 (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
@@ -69,7 +77,8 @@ public:
             radix_sort(
                 morton_codes, primitive_indices,
                 morton_codes_copy, primitive_indices_copy,
-                primitive_count, bit_count * 3);
+                primitive_count, bit_count * 3,
+                radix_sort_parallel_threshold);
             assert(std::is_sorted(morton_codes.get(), morton_codes.get() + primitive_count));
         }
 

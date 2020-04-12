@@ -4,11 +4,20 @@
 #include <cassert>
 
 #include "bvh/bvh.hpp"
+#include "bvh/sah_based_algorithm.hpp"
 
 namespace bvh {
 
 template <typename Bvh>
-class ParallelReinsertionOptimization {
+class ParallelReinsertionOptimization : public SahBasedAlgorithm<Bvh> {
+    using Scalar    = typename Bvh::ScalarType;
+    using Insertion = std::pair<size_t, Scalar>;
+
+    using SahBasedAlgorithm<Bvh>::cost;
+
+    Bvh& bvh;
+    std::unique_ptr<size_t[]> parents;
+
 public:
     ParallelReinsertionOptimization(Bvh& bvh)
         : bvh(bvh), parents(new size_t[bvh.node_count])
@@ -26,25 +35,6 @@ public:
     }
 
 private:
-    Bvh& bvh;
-    std::unique_ptr<size_t[]> parents;
-
-    using Scalar    = typename Bvh::ScalarType;
-    using Insertion = std::pair<size_t, Scalar>;
-
-    Scalar cost() {
-        // Compute the SAH cost for the entire BVH
-        Scalar cost(0);
-        #pragma omp parallel for reduction(+: cost)
-        for (size_t i = 0; i < bvh.node_count; ++i) {
-            if (bvh.nodes[i].is_leaf)
-                cost += bvh.nodes[i].bounding_box_proxy().half_area() * bvh.nodes[i].primitive_count;
-            else
-                cost += bvh.traversal_cost * bvh.nodes[i].bounding_box_proxy().half_area();
-        }
-        return cost;
-    }
-
     void refit(size_t child) {
         // Refit all nodes that are on the path between the given node and the root
         auto bbox = bvh.nodes[child].bounding_box_proxy().to_bounding_box();
@@ -170,7 +160,7 @@ public:
         auto locks = std::make_unique<std::atomic<int64_t>[]>(bvh.node_count);
         auto outs  = std::make_unique<Insertion[]>(bvh.node_count);
 
-        auto old_cost = cost();
+        auto old_cost = cost(bvh);
         for (size_t iteration = 0; ; ++iteration) {
             size_t first_node = iteration % u + 1;
 
@@ -233,7 +223,7 @@ public:
             // Compare the old SAH cost to the new one and decrease the number
             // of nodes that are ignored during the optimization if the change
             // in cost is below the threshold.
-            auto new_cost = cost();
+            auto new_cost = cost(bvh);
             if (std::abs(new_cost - old_cost) <= threshold || iteration >= u) {
                 if (u <= 1)
                     break;
