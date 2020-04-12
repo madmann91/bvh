@@ -41,17 +41,25 @@ static int not_enough_arguments(const char* option) {
 
 static void usage() {
     std::cout <<
-        "Usage: benchmark\n"
-        "    [--builder name]\n"
-        "    [--optimizer name]\n"
-        "    [--pre-shuffle]\n"
-        "    [--eye x y z]\n"
-        "    [--dir x y z]\n"
-        "    [--up x y z]\n"
-        "    [--fov d]\n"
-        "    [--width pixels]\n"
-        "    [--height pixels]\n"
-        "    file.obj"
+        "Usage: benchmark [options] file.obj\n"
+        "Options:\n"
+        "    --help                        Shows this message.\n"
+        "    --builder <name>              Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "    --optimizer <name>            Sets the BVH optimizer to use (none by default).\n"
+        "    --pre-shuffle                 Activates the pre-shuffling optimization.\n"
+        "    --collect-statistics <t> <i>  Collects traversal statistics (traversal steps * t, intersections * i) per pixel.\n"
+        "    --eye <x> <y> <z>             Sets the position of the camera.\n"
+        "    --dir <x> <y> <z>             Sets the direction of the camera.\n"
+        "    --up  <x> <y> <z>             Sets the up vector of the camera.\n"
+        "    --fov <degrees>               Sets the field of view.\n"
+        "    --width <pixels>              Sets the image width.\n"
+        "    --height <pixels>             Sets the image height.\n"
+        "Builders:\n"
+        "    binned_sah,\n"
+        "    sweep_sah,\n"
+        "    locally_ordered_clustering\n"
+        "Optimizers:\n"
+        "    parallel_reinsertion"
         << std::endl;
 }
 
@@ -62,8 +70,16 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool PreShuffle>
-void render(const Camera& camera, Bvh& bvh, const Triangle* triangles, Scalar* pixels, size_t width, size_t height) {
+template <bool PreShuffle, bool ShowComplexity>
+void render(
+    const Camera& camera,
+    const Bvh& bvh,
+    const Triangle* triangles,
+    Scalar* pixels,
+    size_t width, size_t height,
+    Scalar traversal_steps_scale = Scalar(1.0),
+    Scalar intersections_scale   = Scalar(1.0))
+{
     auto dir = bvh::normalize(camera.dir);
     auto image_u = bvh::normalize(bvh::cross(dir, camera.up));
     auto image_v = bvh::normalize(bvh::cross(image_u, dir));
@@ -85,14 +101,23 @@ void render(const Camera& camera, Bvh& bvh, const Triangle* triangles, Scalar* p
 
             Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
 
-            auto hit = traversal.intersect(ray, intersector);
+            bvh::SingleRayTraversal<Bvh>::Statistics statistics;
+            auto hit = ShowComplexity
+                ? traversal.intersect(ray, intersector, statistics)
+                : traversal.intersect(ray, intersector);
             if(!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             } else {
-                auto normal = bvh::normalize(triangles[hit->primitive_index].n);
-                pixels[index    ] = std::fabs(normal[0]);
-                pixels[index + 1] = std::fabs(normal[1]);
-                pixels[index + 2] = std::fabs(normal[2]);
+                if (ShowComplexity) {
+                    pixels[index    ] = std::min(statistics.traversal_steps * traversal_steps_scale, 1.0f);
+                    pixels[index + 1] = std::min(statistics.intersections   * intersections_scale,   1.0f);
+                    pixels[index + 2] = 0.0f;
+                } else {
+                    auto normal = bvh::normalize(triangles[hit->primitive_index].n);
+                    pixels[index    ] = std::fabs(normal[0]);
+                    pixels[index + 1] = std::fabs(normal[1]);
+                    pixels[index + 2] = std::fabs(normal[2]);
+                }
             }
         }
     }
@@ -114,11 +139,17 @@ int main(int argc, char** argv) {
         60
     };
     bool pre_shuffle = false;
+    bool collect_statistics = false;
+    auto traversal_steps_scale = Scalar(0.001);
+    auto intersections_scale   = Scalar(0.01);
     size_t width  = 1080;
     size_t height = 720;
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
-            if (!strcmp(argv[i], "--eye") ||
+            if (!strcmp(argv[i], "--help")) {
+                usage();
+                return 1;
+            } else if (!strcmp(argv[i], "--eye") ||
                 !strcmp(argv[i], "--dir") ||
                 !strcmp(argv[i], "--up")) {
                 if (i + 3 >= argc)
@@ -150,6 +181,12 @@ int main(int argc, char** argv) {
                 *name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
+            } else if (!strcmp(argv[i], "--collect-statistics")) {
+                if (i + 2 >= argc)
+                    return not_enough_arguments(argv[i]);
+                collect_statistics = true;
+                traversal_steps_scale = strtof(argv[++i], NULL);
+                intersections_scale   = strtof(argv[++i], NULL);
             } else {
                 std::cerr << "Unknown option: '" << argv[i] << "'" << std::endl;
                 return 1;
@@ -228,9 +265,15 @@ int main(int argc, char** argv) {
     std::cout << "Rendering image (" << width << "x" << height << ")..." << std::endl;
     profile("Rendering", [&] {
         if (pre_shuffle) {
-            render<true>(camera, bvh, triangles.data(), pixels.get(), width, height);
+            if (collect_statistics)
+                render<true, true>(camera, bvh, triangles.data(), pixels.get(), width, height, traversal_steps_scale, intersections_scale);
+            else
+                render<true, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
         } else {
-            render<false>(camera, bvh, triangles.data(), pixels.get(), width, height);
+            if (collect_statistics)
+                render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, traversal_steps_scale, intersections_scale);
+            else
+                render<false, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
         }
     });
 

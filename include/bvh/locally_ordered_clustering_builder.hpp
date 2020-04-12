@@ -10,7 +10,6 @@ namespace bvh {
 
 template <typename Bvh, typename Morton>
 class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
-public:
     using Scalar = typename Bvh::ScalarType;
     using Node   = typename Bvh::Node;
 
@@ -18,18 +17,6 @@ public:
     using ParentBuilder::sort_primitives_by_morton_code;
 
     Bvh& bvh;
-
-    /// Parameter of the algorithm. The larger the search radius,
-    /// the longer the search for neighboring nodes lasts.
-    size_t search_radius = 14;
-
-    /// Threshold (number of nodes) under which the algorithm
-    /// executes loops serially.
-    size_t parallel_threshold = 256;
-
-    LocallyOrderedClusteringBuilder(Bvh& bvh)
-        : bvh(bvh)
-    {}
 
     std::pair<size_t, size_t> cluster(
         const Node* bvh__restrict__ input,
@@ -126,6 +113,18 @@ public:
         size_t next_begin = end - (unmerged_count + children_count);
         return std::make_pair(next_begin, next_end);
     }
+
+public:
+    using ParentBuilder::parallel_threshold;
+    using ParentBuilder::radix_sort_parallel_threshold;
+
+    /// Parameter of the algorithm. The larger the search radius,
+    /// the longer the search for neighboring nodes lasts.
+    size_t search_radius = 14;
+
+    LocallyOrderedClusteringBuilder(Bvh& bvh)
+        : bvh(bvh)
+    {}
 
     void build(
         const BoundingBox<Scalar>* bboxes,

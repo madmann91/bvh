@@ -18,7 +18,8 @@ template <typename Key, typename Value>
 void radix_sort(
     std::unique_ptr<Key[]>& keys,      std::unique_ptr<Value[]>& values,
     std::unique_ptr<Key[]>& keys_copy, std::unique_ptr<Value[]>& values_copy,
-    size_t count, size_t bit_count)
+    size_t count, size_t bit_count,
+    size_t parallel_threshold)
 {
     static constexpr size_t bits_per_iteration = 8;
     static constexpr size_t bucket_count = 1 << bits_per_iteration;
@@ -27,7 +28,7 @@ void radix_sort(
     // Allocate temporary storage
     std::unique_ptr<size_t[]> per_thread_buckets;
 
-    #pragma omp parallel
+    #pragma omp parallel if (count > parallel_threshold)
     {
         size_t thread_count = omp_get_num_threads();
         size_t thread_id = omp_get_thread_num();

@@ -61,15 +61,16 @@ int main() {
     // Increasing this value increases the traversal stack size.
     static constexpr size_t max_depth = 64;
 
-    using Bvh = bvh::Bvh<Scalar, max_depth>;
+    using Bvh = bvh::Bvh<Scalar>;
 
     Bvh bvh;
 
     bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
+    builder.max_depth = max_depth;
     builder.build(bboxes.data(), centers.data(), bboxes.size());
 
     Intersector intersector;
-    bvh::SingleRayTraversal<Bvh> traversal(bvh);
+    bvh::SingleRayTraversal<Bvh, max_depth> traversal(bvh);
 
     // Setup the ray (see above for an example)
     Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);
