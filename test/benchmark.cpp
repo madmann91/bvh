@@ -43,23 +43,29 @@ static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
         "\nOptions:\n"
-        "    --help                        Shows this message.\n"
-        "    --builder <name>              Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "    --optimizer <name>            Sets the BVH optimizer to use (none by default).\n"
-        "    --pre-shuffle                 Activates the pre-shuffling optimization.\n"
-        "    --collect-statistics <t> <i>  Collects traversal statistics (traversal steps * t, intersections * i) per pixel.\n"
-        "    --eye <x> <y> <z>             Sets the position of the camera.\n"
-        "    --dir <x> <y> <z>             Sets the direction of the camera.\n"
-        "    --up  <x> <y> <z>             Sets the up vector of the camera.\n"
-        "    --fov <degrees>               Sets the field of view.\n"
-        "    --width <pixels>              Sets the image width.\n"
-        "    --height <pixels>             Sets the image height.\n"
+        "  --help               Shows this message.\n"
+        "  --builder <name>     Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "  --optimizer <name>   Sets the BVH optimizer to use (none by default).\n"
+        "  --pre-shuffle        Activates the pre-shuffling optimization.\n\n"
+        "  --collect-statistics <t> <i> <c>\n\n"
+        "    Collects traversal statistics per pixel.\n"
+        "    The arguments represent the weight of traversal steps (t),\n"
+        "    primitive intersections (i), and the sum of the two (s).\n"
+        "    These statistics are then converted to bytes and stored in\n"
+        "    the red, green, and blue channels of the image, respectively.\n\n"
+        "  --eye <x> <y> <z>    Sets the position of the camera.\n"
+        "  --dir <x> <y> <z>    Sets the direction of the camera.\n"
+        "  --up  <x> <y> <z>    Sets the up vector of the camera.\n"
+        "  --fov <degrees>      Sets the field of view.\n"
+        "  --width <pixels>     Sets the image width.\n"
+        "  --height <pixels>    Sets the image height.\n"
+        "  -o <file.ppm>        Sets the output file name (defaults to 'render.ppm').\n"
         "\nBuilders:\n"
-        "    binned_sah,\n"
-        "    sweep_sah,\n"
-        "    locally_ordered_clustering\n"
+        "  binned_sah,\n"
+        "  sweep_sah,\n"
+        "  locally_ordered_clustering\n"
         "\nOptimizers:\n"
-        "    parallel_reinsertion\n"
+        "  parallel_reinsertion\n"
         << std::endl;
 }
 
@@ -70,15 +76,14 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool PreShuffle, bool ShowComplexity>
+template <bool PreShuffle, bool CollectStatistics>
 void render(
     const Camera& camera,
     const Bvh& bvh,
     const Triangle* triangles,
     Scalar* pixels,
     size_t width, size_t height,
-    Scalar traversal_steps_scale = Scalar(1.0),
-    Scalar intersections_scale   = Scalar(1.0))
+    const Scalar* statistics_weights = NULL)
 {
     auto dir = bvh::normalize(camera.dir);
     auto image_u = bvh::normalize(bvh::cross(dir, camera.up));
@@ -91,7 +96,9 @@ void render(
     bvh::ClosestIntersector<PreShuffle, Bvh, Triangle> intersector(bvh, triangles);
     bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
-    #pragma omp parallel for collapse(2)
+    size_t traversal_steps = 0, intersections = 0;
+
+    #pragma omp parallel for collapse(2) reduction(+: traversal_steps, intersections)
     for(size_t i = 0; i < width; ++i) {
         for(size_t j = 0; j < height; ++j) {
             size_t index = 3 * (width * j + i);
@@ -102,16 +109,21 @@ void render(
             Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
 
             bvh::SingleRayTraversal<Bvh>::Statistics statistics;
-            auto hit = ShowComplexity
+            auto hit = CollectStatistics
                 ? traversal.intersect(ray, intersector, statistics)
                 : traversal.intersect(ray, intersector);
+            if (CollectStatistics) {
+                traversal_steps += statistics.traversal_steps;
+                intersections   += statistics.intersections;
+            }
             if(!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             } else {
-                if (ShowComplexity) {
-                    pixels[index    ] = std::min(statistics.traversal_steps * traversal_steps_scale, 1.0f);
-                    pixels[index + 1] = std::min(statistics.intersections   * intersections_scale,   1.0f);
-                    pixels[index + 2] = 0.0f;
+                if (CollectStatistics) {
+                    auto combined = statistics.traversal_steps + statistics.intersections; 
+                    pixels[index    ] = std::min(statistics.traversal_steps * statistics_weights[0], 1.0f);
+                    pixels[index + 1] = std::min(statistics.intersections   * statistics_weights[1], 1.0f);
+                    pixels[index + 2] = std::min(combined                   * statistics_weights[2], 1.0f);
                 } else {
                     auto normal = bvh::normalize(triangles[hit->primitive_index].n);
                     pixels[index    ] = std::fabs(normal[0]);
@@ -121,6 +133,11 @@ void render(
             }
         }
     }
+
+    if (CollectStatistics) {
+        std::cout << intersections << " total primitive intersection(s)" << std::endl;
+        std::cout << traversal_steps << " total traversal step(s)" << std::endl;
+    }
 }
 
 int main(int argc, char** argv) {
@@ -129,8 +146,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const char* input_file = NULL;
-    const char* builder_name = NULL;
+    const char* output_file    = "render.ppm";
+    const char* input_file     = NULL;
+    const char* builder_name   = "binned_sah";
     const char* optimizer_name = NULL;
     Camera camera = {
         Vector3(0, 0, -10),
@@ -140,8 +158,7 @@ int main(int argc, char** argv) {
     };
     bool pre_shuffle = false;
     bool collect_statistics = false;
-    auto traversal_steps_scale = Scalar(0.001);
-    auto intersections_scale   = Scalar(0.01);
+    Scalar statistics_weights[3];
     size_t width  = 1080;
     size_t height = 720;
     for (int i = 1; i < argc; ++i) {
@@ -185,8 +202,13 @@ int main(int argc, char** argv) {
                 if (i + 2 >= argc)
                     return not_enough_arguments(argv[i]);
                 collect_statistics = true;
-                traversal_steps_scale = strtof(argv[++i], NULL);
-                intersections_scale   = strtof(argv[++i], NULL);
+                statistics_weights[0] = strtof(argv[++i], NULL);
+                statistics_weights[1] = strtof(argv[++i], NULL);
+                statistics_weights[2] = strtof(argv[++i], NULL);
+            } else if (!strcmp(argv[i], "-o")) {
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                output_file = argv[++i];
             } else {
                 std::cerr << "Unknown option: '" << argv[i] << "'" << std::endl;
                 return 1;
@@ -206,7 +228,7 @@ int main(int argc, char** argv) {
     }
 
     std::function<void(Bvh&, const BoundingBox*, const Vector3*, size_t)> builder;
-    if (!builder_name || !strcmp(builder_name, "binned_sah")) {
+    if (!strcmp(builder_name, "binned_sah")) {
         builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             static constexpr size_t bin_count = 32;
             bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
@@ -249,7 +271,7 @@ int main(int argc, char** argv) {
     Bvh bvh;
 
     // Build an acceleration data structure for this object set
-    std::cout << "Building BVH..." << std::endl;
+    std::cout << "Building BVH (" << builder_name << ")..." << std::endl;
     profile("BVH construction", [&] {
         auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
         builder(bvh, bboxes.get(), centers.get(), triangles.size());
@@ -266,18 +288,18 @@ int main(int argc, char** argv) {
     profile("Rendering", [&] {
         if (pre_shuffle) {
             if (collect_statistics)
-                render<true, true>(camera, bvh, triangles.data(), pixels.get(), width, height, traversal_steps_scale, intersections_scale);
+                render<true, true>(camera, bvh, triangles.data(), pixels.get(), width, height, statistics_weights);
             else
                 render<true, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
         } else {
             if (collect_statistics)
-                render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, traversal_steps_scale, intersections_scale);
+                render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, statistics_weights);
             else
                 render<false, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
         }
     });
 
-    std::ofstream out("render.ppm", std::ofstream::binary);
+    std::ofstream out(output_file, std::ofstream::binary);
     out << "P6 " << width << " " << height << " " << 255 << "\n";
     for(size_t j = height; j > 0; --j) {
         for(size_t i = 0; i < width; ++i) {
