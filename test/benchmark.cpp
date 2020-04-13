@@ -11,6 +11,7 @@
 #include <bvh/binned_sah_builder.hpp>
 #include <bvh/sweep_sah_builder.hpp>
 #include <bvh/locally_ordered_clustering_builder.hpp>
+#include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
@@ -63,7 +64,8 @@ static void usage() {
         "\nBuilders:\n"
         "  binned_sah,\n"
         "  sweep_sah,\n"
-        "  locally_ordered_clustering\n"
+        "  locally_ordered_clustering,\n"
+        "  linear\n"
         "\nOptimizers:\n"
         "  parallel_reinsertion\n"
         << std::endl;
@@ -243,6 +245,12 @@ int main(int argc, char** argv) {
         builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             using Morton = uint32_t;
             bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
+            builder.build(bboxes, centers, primitive_count);
+        };
+    } else if (!strcmp(builder_name, "linear")) {
+        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+            using Morton = uint32_t;
+            bvh::LinearBvhBuilder<Bvh, Morton> builder(bvh);
             builder.build(bboxes, centers, primitive_count);
         };
     } else {
