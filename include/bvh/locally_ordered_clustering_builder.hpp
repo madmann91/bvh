@@ -26,7 +26,8 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
         size_t begin, size_t end,
         size_t previous_end)
     {
-        size_t merged_count = 0;
+        size_t children_begin = 0;
+        size_t unmerged_begin = 0;
 
         #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
@@ -64,12 +65,14 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
 
             // Perform a prefix sum to compute the insertion indices
             #pragma omp single
-            { merged_count = *std::prev(std::partial_sum(merged_index + begin, merged_index + end, merged_index + begin)); }
+            {
+                size_t merged_count = *std::prev(std::partial_sum(merged_index + begin, merged_index + end, merged_index + begin));
+                size_t unmerged_count = end - begin - merged_count;
+                size_t children_count = merged_count * 2;
+                children_begin = end - children_count;
+                unmerged_begin = end - (children_count + unmerged_count);
+            }
 
-            size_t unmerged_count = end - begin - merged_count;
-            size_t children_count = merged_count * 2;
-            size_t children_begin = end - children_count;
-            size_t unmerged_begin = end - (children_count + unmerged_count);
 
             // Finally, merge nodes that are marked for merging and create
             // their parents using the indices computed previously.
@@ -100,12 +103,7 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
                 output[i] = input[i];
         }
 
-        size_t unmerged_count = end - begin - merged_count;
-        size_t children_count = merged_count * 2;
-
-        size_t next_end   = end - children_count;
-        size_t next_begin = end - (unmerged_count + children_count);
-        return std::make_pair(next_begin, next_end);
+        return std::make_pair(unmerged_begin, children_begin);
     }
 
 public:
