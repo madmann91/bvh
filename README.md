@@ -105,7 +105,7 @@ This library provides the following traversal algorithms:
     
 Traversal algorithms can work in two modes: closest intersection,
 or any intersection (for shadow rays, usually around 20% faster).
-They only requires an intersector to compute primitive-ray intersections.
+They only require an intersector to compute primitive-ray intersections.
 
 ### Intersectors
 
