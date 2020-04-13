@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
     std::function<void(Bvh&, const BoundingBox*, const Vector3*, size_t)> builder;
     if (!strcmp(builder_name, "binned_sah")) {
         builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
-            static constexpr size_t bin_count = 32;
+            static constexpr size_t bin_count = 16;
             bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
             builder.build(bboxes, centers, primitive_count);
         };
