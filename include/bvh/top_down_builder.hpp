@@ -2,6 +2,7 @@
 #define BVH_TOP_DOWN_BUILDER_HPP
 
 #include <stack>
+#include <cassert>
 
 namespace bvh {
 
@@ -10,11 +11,23 @@ class TopDownBuilder {
     friend BuildTask;
 
 public:
-    using WorkItem = typename BuildTask::WorkItem;
+    struct WorkItem {
+        size_t node_index;
+        size_t begin;
+        size_t end;
+        size_t depth;
+
+        WorkItem() = default;
+        WorkItem(size_t node_index, size_t begin, size_t end, size_t depth)
+            : node_index(node_index), begin(begin), end(end), depth(depth)
+        {}
+
+        size_t work_size() const { return end - begin; }
+    };
 
     /// Threshold (number of primitives) under which the builder
     /// doesn't spawn any more OpenMP tasks.
-    size_t parallel_threshold = 1024;
+    size_t task_spawn_threshold = 1024;
 
     /// Maximum depth of the generated tree. This can be used to make
     /// sure the required traversal stack size is under a given constant.
@@ -33,6 +46,7 @@ protected:
         stack.emplace(std::forward<Args&&>(args)...);
         while (!stack.empty()) {
             auto work_item = stack.top();
+            assert(work_item.depth < max_depth);
             stack.pop();
 
             auto more_work = task.build(work_item);
@@ -42,7 +56,7 @@ protected:
                     std::swap(first_item, second_item);
 
                 stack.push(second_item);
-                if (first_item.work_size() > parallel_threshold) {
+                if (first_item.work_size() > task_spawn_threshold) {
                     BuildTask new_task(task);
                     #pragma omp task firstprivate(new_task, first_item)
                     { run_task(new_task, first_item); }

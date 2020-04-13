@@ -115,7 +115,7 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
     }
 
 public:
-    using ParentBuilder::parallel_threshold;
+    using ParentBuilder::loop_parallel_threshold;
     using ParentBuilder::radix_sort_parallel_threshold;
 
     /// Parameter of the algorithm. The larger the search radius,

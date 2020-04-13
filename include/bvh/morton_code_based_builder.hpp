@@ -26,7 +26,7 @@ public:
     size_t bit_count = max_bit_count;
 
     /// Threshold (number of nodes) under which the loops execute serially.
-    size_t parallel_threshold = 256;
+    size_t loop_parallel_threshold = 256;
 
     /// Threshold (number of primitives) under which the radix sort executes serially.
     size_t radix_sort_parallel_threshold = 1024;
@@ -46,7 +46,7 @@ protected:
         auto dim = Morton(1) << bit_count;
         auto global_bbox = BoundingBox<Scalar>::empty();
 
-        #pragma omp parallel if (primitive_count > parallel_threshold)
+        #pragma omp parallel if (primitive_count > loop_parallel_threshold)
         {
             #pragma omp declare reduction \
                 (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
