@@ -118,6 +118,17 @@ To build the tests, type:
     cmake ..
     cmake --build .
 
+## Installing
+
+In order to use this library in an existing project using CMake, you can clone, add as submodule, or
+even copy the source tree into some subdirectory of your project, say `my-project/contrib/bvh`.
+Then, instruct CMake to visit this directory and link against the `bvh` target:
+
+    add_subdirectory(contrib/bvh)
+    target_link_libraries(my-project PUBLIC bvh)
+
+That's all that you need to do. Dependencies will be automatically added (e.g. OpenMP, if available).
+
 ## Usage
 
 For a basic example of how to use the API, see [this simple example](test/simple_example.cpp).
