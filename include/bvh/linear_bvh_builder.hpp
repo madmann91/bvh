@@ -38,7 +38,7 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
         merged_index[end - 1] = 0;
         needs_merge [end - 1] = 0;
 
-        #pragma omp parallel if (end - begin > ParentBuilder::loop_parallel_threshold)
+        #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
             // Determine, for each node, if it should be merged with the one on the right.
             #pragma omp for
@@ -101,6 +101,9 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     }
 
 public:
+    using ParentBuilder::loop_parallel_threshold;
+    using ParentBuilder::radix_sort_parallel_threshold;
+
     LinearBvhBuilder(Bvh& bvh)
         : bvh(bvh)
     {}
@@ -129,10 +132,10 @@ public:
         auto input_levels  = level_data.get();
         auto output_levels = level_data.get() + node_count;
 
-        #pragma omp parallel
+        #pragma omp parallel if (primitive_count > loop_parallel_threshold)
         {
             // Create the leaves
-            #pragma omp for
+            #pragma omp for nowait
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto& node = nodes[begin + i];
                 node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
@@ -142,14 +145,12 @@ public:
             }
 
             // Compute the level of the tree where the current node is joined with the next.
-            #pragma omp for
+            #pragma omp for nowait
             for (size_t i = 0; i < primitive_count - 1; ++i)
                 input_levels[begin + i] = count_leading_zeros(morton_codes[i] ^ morton_codes[i + 1]);
         }
 
         while (end - begin > 1) {
-            input_levels[end - 1] = 0;
-
             auto [next_begin, next_end] = merge(
                 nodes.get(),
                 nodes_copy.get(),
