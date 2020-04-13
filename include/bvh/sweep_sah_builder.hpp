@@ -88,25 +88,10 @@ public:
 
 template <typename Bvh>
 struct SweepSahBuildTask {
-    using Scalar  = typename Bvh::ScalarType;
-    using Builder = TopDownBuilder<Bvh, SweepSahBuildTask>;
+    using Scalar   = typename Bvh::ScalarType;
+    using Builder  = TopDownBuilder<Bvh, SweepSahBuildTask>;
+    using WorkItem = typename Builder::WorkItem;
 
-public:
-    struct WorkItem {
-        size_t node_index;
-        size_t begin;
-        size_t end;
-        size_t depth;
-
-        WorkItem() = default;
-        WorkItem(size_t node_index, size_t begin, size_t end, size_t depth)
-            : node_index(node_index), begin(begin), end(end), depth(depth)
-        {}
-
-        size_t work_size() const { return end - begin; }
-    };
-
-private:
     Builder& builder;
     const BoundingBox<Scalar>* bboxes;
     const Vector3<Scalar>* centers;
@@ -157,10 +142,10 @@ public:
         }
 
         std::pair<Scalar, size_t> best_splits[3];
-        bool is_parallelizable = item.work_size() > builder.parallel_threshold;
+        bool should_spawn_tasks = item.work_size() > builder.task_spawn_threshold;
 
         // Sweep primitives to find the best cost
-        #pragma omp taskloop if (is_parallelizable) grainsize(1) default(shared)
+        #pragma omp taskloop if (should_spawn_tasks) grainsize(1) default(shared)
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis, item.begin, item.end);
 
@@ -193,16 +178,16 @@ public:
         // Partition reference arrays and compute bounding boxes
         #pragma omp taskgroup
         {
-            #pragma omp task if (is_parallelizable) default(shared)
+            #pragma omp task if (should_spawn_tasks) default(shared)
             { std::stable_partition(references[other_axis[0]] + item.begin, references[other_axis[0]] + item.end, partition_predicate); }
-            #pragma omp task if (is_parallelizable) default(shared)
+            #pragma omp task if (should_spawn_tasks) default(shared)
             { std::stable_partition(references[other_axis[1]] + item.begin, references[other_axis[1]] + item.end, partition_predicate); }
-            #pragma omp task if (is_parallelizable) default(shared)
+            #pragma omp task if (should_spawn_tasks) default(shared)
             {
                 for (size_t i = item.begin; i < best_split.second; ++i)
                     left_bbox.extend(bboxes[references[best_axis][i]]);
             }
-            #pragma omp task if (is_parallelizable) default(shared)
+            #pragma omp task if (should_spawn_tasks) default(shared)
             {
                 for (size_t i = item.end - 1; i >= best_split.second; --i)
                     right_bbox.extend(bboxes[references[best_axis][i]]);

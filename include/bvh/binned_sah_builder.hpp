@@ -68,23 +68,8 @@ template <typename Bvh, size_t BinCount>
 class BinnedSahBuildTask {
     using Scalar  = typename Bvh::ScalarType;
     using Builder = TopDownBuilder<Bvh, BinnedSahBuildTask>;
+    using WorkItem = typename Builder::WorkItem;
 
-public:
-    struct WorkItem {
-        size_t node_index;
-        size_t begin;
-        size_t end;
-        size_t depth;
-
-        WorkItem() = default;
-        WorkItem(size_t node_index, size_t begin, size_t end, size_t depth)
-            : node_index(node_index), begin(begin), end(end), depth(depth)
-        {}
-
-        size_t work_size() const { return end - begin; }
-    };
-
-private:
     struct Bin {
         BoundingBox<Scalar> bbox;
         size_t primitive_count;
@@ -176,7 +161,7 @@ public:
             return std::min(size_t(multiply_add(center[axis], inverse[axis], base[axis])), size_t(bin_count - 1));
         };
 
-        #pragma omp taskloop if (item.work_size() > builder.parallel_threshold) grainsize(1) default(shared)
+        #pragma omp taskloop if (item.work_size() > builder.task_spawn_threshold) grainsize(1) default(shared)
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis, item.begin, item.end, bin_index);
 
