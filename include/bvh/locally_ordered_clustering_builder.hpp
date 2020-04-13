@@ -73,7 +73,6 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
                 unmerged_begin = end - (children_count + unmerged_count);
             }
 
-
             // Finally, merge nodes that are marked for merging and create
             // their parents using the indices computed previously.
             #pragma omp for nowait
