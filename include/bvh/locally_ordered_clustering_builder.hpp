@@ -21,19 +21,14 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
     std::pair<size_t, size_t> cluster(
         const Node* bvh__restrict__ input,
         Node* bvh__restrict__ output,
-        size_t* auxiliary_data,
-        size_t data_size,
+        size_t* bvh__restrict__ neighbors,
+        size_t* bvh__restrict__ merged_index,
         size_t begin, size_t end,
         size_t previous_end)
     {
-        size_t* bvh__restrict__ neighbors   = auxiliary_data;
-        size_t* bvh__restrict__ next_index  = auxiliary_data + data_size;
-        size_t* bvh__restrict__ child_index = auxiliary_data + data_size * 2;
+        size_t merged_count = 0;
 
-        size_t unmerged_count = 0;
-        size_t children_count = 0;
-
-        #pragma omp parallel if (end - begin > parallel_threshold)
+        #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
             // Nearest neighbor search
             #pragma omp for
@@ -64,19 +59,15 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
             for (size_t i = begin; i < end; ++i) {
                 auto j = neighbors[i];
                 bool is_mergeable = neighbors[j] == i;
-                next_index[i]  = i > j && is_mergeable ? 0 : 1;
-                child_index[i] = i < j && is_mergeable ? 2 : 0;
+                merged_index[i] = i < j && is_mergeable ? 1 : 0;
             }
 
             // Perform a prefix sum to compute the insertion indices
-            #pragma omp sections
-            {
-                #pragma omp section
-                { unmerged_count = *std::prev(std::partial_sum(next_index + begin, next_index + end, next_index + begin)); }
-                #pragma omp section
-                { children_count = *std::prev(std::partial_sum(child_index + begin, child_index + end, child_index + begin)); }
-            }
+            #pragma omp single
+            { merged_count = *std::prev(std::partial_sum(merged_index + begin, merged_index + end, merged_index + begin)); }
 
+            size_t unmerged_count = end - begin - merged_count;
+            size_t children_count = merged_count * 2;
             size_t children_begin = end - children_count;
             size_t unmerged_begin = end - (children_count + unmerged_count);
 
@@ -87,19 +78,19 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
                 auto j = neighbors[i];
                 if (neighbors[j] == i) {
                     if (i < j) {
-                        auto& merged_node = output[unmerged_begin + next_index[i] - 1];
-                        auto first_child = children_begin + child_index[i] - 2;
-                        merged_node.bounding_box_proxy() = input[j]
+                        auto& unmerged_node = output[unmerged_begin + j - begin - merged_index[j]];
+                        auto first_child = children_begin + (merged_index[i] - 1) * 2;
+                        unmerged_node.bounding_box_proxy() = input[j]
                             .bounding_box_proxy()
                             .to_bounding_box()
                             .extend(input[i].bounding_box_proxy());
-                        merged_node.is_leaf = false;
-                        merged_node.first_child_or_primitive = first_child;
+                        unmerged_node.is_leaf = false;
+                        unmerged_node.first_child_or_primitive = first_child;
                         output[first_child + 0] = input[i];
                         output[first_child + 1] = input[j];
                     }
                 } else {
-                    output[unmerged_begin + next_index[i] - 1] = input[i];
+                    output[unmerged_begin + i - begin - merged_index[i]] = input[i];
                 }
             }
 
@@ -108,6 +99,9 @@ class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
             for (size_t i = end; i < previous_end; ++i)
                 output[i] = input[i];
         }
+
+        size_t unmerged_count = end - begin - merged_count;
+        size_t children_count = merged_count * 2;
 
         size_t next_end   = end - children_count;
         size_t next_begin = end - (unmerged_count + children_count);
@@ -157,7 +151,7 @@ public:
                 nodes.get(),
                 nodes_copy.get(),
                 auxiliary_data.get(),
-                node_count,
+                auxiliary_data.get() + node_count,
                 begin, end,
                 previous_end);
 
