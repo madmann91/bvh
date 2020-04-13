@@ -9,7 +9,7 @@
 namespace bvh {
 
 template <typename Bvh, typename Morton>
-class LocallyOrderedClusteringBuilder : MortonCodeBasedBuilder<Bvh, Morton> {
+class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     using Scalar = typename Bvh::ScalarType;
     using Node   = typename Bvh::Node;
 
