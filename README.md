@@ -77,6 +77,11 @@ This library contains several construction algorithms, all parallelized using Op
    The search radius can be configured to change the quality/speed ratio. Additionally,
    the integer type used to compute Morton codes can also be changed when more precision
    is required.
+ - `bvh::LinearBvhBuilder`: Bottom-up LBVH builder. Very fast and produces low-quality trees.
+   Not substantially faster than `bvh::LocallyOrderedClusteringBuilder`, particularly when the
+   search radius of that algorithm is small. Since the BVHs built by this algorithm are significantly
+   worse than those produced by other algorithms, do not use this builder unless you absolutely
+   need the fastest construction algorithm.
 
 Those algorithms only require a bounding box and center for each primitive.
 
