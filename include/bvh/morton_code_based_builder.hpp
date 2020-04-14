@@ -17,8 +17,6 @@ class MortonCodeBasedBuilder {
     using Scalar = typename Bvh::ScalarType;
 
     /// Number of bits processed by every iteration of the radix sort.
-    /// This number has been chosen as a good compromise between speed
-    /// and memory usage.
     static constexpr size_t bits_per_iteration = 10;
 
 public:
