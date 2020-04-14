@@ -37,7 +37,7 @@ protected:
     RadixSort<bits_per_iteration> radix_sort;
 
     SortedPairs sort_primitives_by_morton_code(
-        const BoundingBox<Scalar>* bboxes,
+        const BoundingBox<Scalar>& global_bbox,
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
@@ -53,18 +53,9 @@ protected:
         size_t* unsorted_primitive_indices = primitive_indices_copy.get();
 
         auto dim = Morton(1) << bit_count;
-        auto global_bbox = BoundingBox<Scalar>::empty();
 
         #pragma omp parallel if (primitive_count > loop_parallel_threshold)
         {
-            #pragma omp declare reduction \
-                (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
-                initializer(omp_priv = BoundingBox<Scalar>::empty())
-
-            #pragma omp for reduction(bbox_extend: global_bbox)
-            for (size_t i = 0; i < primitive_count; ++i)
-                global_bbox.extend(bboxes[i]);
-
             auto world_to_grid = Scalar(dim) * global_bbox.diagonal().inverse();
             auto grid_offset = -global_bbox.min * world_to_grid;
 

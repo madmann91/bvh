@@ -12,6 +12,10 @@ namespace bvh {
 
 template <typename, size_t> class BinnedSahBuildTask;
 
+/// This is a top-down, classic binned SAH BVH builder. It works by approximating
+/// the SAH with bins of fixed size at every step of the recursion.
+/// See "On fast Construction of SAH-based Bounding Volume Hierarchies",
+/// by I. Wald.
 template <typename Bvh, size_t BinCount>
 class BinnedSahBuilder :
     public TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinCount>>,
@@ -33,30 +37,27 @@ public:
         : ParentBuilder(bvh)
     {}
 
-    void build(const BoundingBox<Scalar>* bboxes, const Vector3<Scalar>* centers, size_t primitive_count) {
+    void build(
+        const BoundingBox<Scalar>& global_bbox,
+        const BoundingBox<Scalar>* bboxes,
+        const Vector3<Scalar>* centers,
+        size_t primitive_count)
+    {
         // Allocate buffers
         bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * primitive_count + 1);
         bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);
 
-        // Initialize root node
-        auto root_bbox = BoundingBox<Scalar>::empty();
         bvh.node_count = 1;
 
         #pragma omp parallel
         {
-            #pragma omp declare reduction \
-                (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
-                initializer(omp_priv = BoundingBox<Scalar>::empty())
-
-            #pragma omp for reduction(bbox_extend: root_bbox)
-            for (size_t i = 0; i < primitive_count; ++i) {
-                root_bbox.extend(bboxes[i]);
+            #pragma omp for
+            for (size_t i = 0; i < primitive_count; ++i)
                 bvh.primitive_indices[i] = i;
-            }
 
             #pragma omp single
             {
-                bvh.nodes[0].bounding_box_proxy() = root_bbox;
+                bvh.nodes[0].bounding_box_proxy() = global_bbox;
                 BinnedSahBuildTask first_task(*this, bboxes, centers);
                 run_task(first_task, 0, 0, primitive_count, 0);
             }

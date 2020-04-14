@@ -11,6 +11,9 @@
 
 namespace bvh {
 
+/// Bottom-up BVH builder that uses Morton codes to create the hierarchy.
+/// This implementation is vaguely inspired from the original LBVH publication:
+/// "Fast BVH Construction on GPUs", by C. Lauterbach et al.
 template <typename Bvh, typename Morton>
 class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     using Scalar = typename Bvh::ScalarType;
@@ -114,6 +117,7 @@ public:
     {}
 
     void build(
+        const BoundingBox<Scalar>& global_bbox,
         const BoundingBox<Scalar>* bboxes,
         const Vector3<Scalar>* centers,
         size_t primitive_count)
@@ -121,7 +125,7 @@ public:
         assert(primitive_count > 0);
 
         auto [primitive_indices, morton_codes] =
-            sort_primitives_by_morton_code(bboxes, centers, primitive_count);
+            sort_primitives_by_morton_code(global_bbox, centers, primitive_count);
 
         auto node_count = 2 * primitive_count - 1;
 

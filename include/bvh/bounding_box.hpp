@@ -31,8 +31,13 @@ struct BoundingBox {
     }
 
     Scalar half_area() const {
-        Vector3<Scalar> d = diagonal();
+        auto d = diagonal();
         return (d[0] + d[1]) * d[2] + d[0] * d[1];
+    }
+
+    Scalar volume() const {
+        auto d = diagonal();
+        return d[0] * d[1] * d[2];
     }
 
     static BoundingBox full() {

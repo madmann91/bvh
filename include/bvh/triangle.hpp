@@ -2,6 +2,7 @@
 #define BVH_TRIANGLE_HPP
 
 #include <optional>
+#include <cassert>
 
 #include "bvh/vector.hpp"
 #include "bvh/bounding_box.hpp"
@@ -41,6 +42,12 @@ struct Triangle {
 
     Vector3<Scalar> center() const {
         return (p0 + p1() + p2()) * (Scalar(1.0) / Scalar(3.0));
+    }
+
+    std::pair<Vector3<Scalar>, Vector3<Scalar>> edge(size_t i) const {
+        assert(i < 3);
+        Vector3<Scalar> p[] { p0, p1(), p2() };
+        return std::make_pair(p[i], p[(i + 1) % 3]);
     }
 
     std::optional<Intersection> intersect(const Ray<Scalar>& ray) const {

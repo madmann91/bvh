@@ -4,7 +4,7 @@
 #include <bvh/bvh.hpp>
 #include <bvh/vector.hpp>
 #include <bvh/ray.hpp>
-#include <bvh/binned_sah_builder.hpp>
+#include <bvh/sweep_sah_builder.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 
@@ -12,6 +12,7 @@ using Scalar      = float;
 using Vector3     = bvh::Vector3<Scalar>;
 using BoundingBox = bvh::BoundingBox<Scalar>;
 using Ray         = bvh::Ray<Scalar>;
+using Bvh         = bvh::Bvh<Scalar>;
 
 // Intersectors are used by the traversal algorithm to intersect the primitives
 // the BVH. Since the BVH itself has no knowledge of the primitives, this structure
@@ -51,26 +52,16 @@ int main() {
 
     assert(bboxes.size() == centers.size());
 
-    // Number of bins to evaluate the SAH.
-    // Higher values means a more precise estimate of the SAH,
-    // at a higher memory and computation cost. Values of 32 or
-    // 64 are good enough for most scenes.
-    static constexpr size_t bin_count = 64;
-
-    // Maximum depth of the tree.
-    // Increasing this value increases the traversal stack size.
-    static constexpr size_t max_depth = 64;
-
-    using Bvh = bvh::Bvh<Scalar>;
+    // Compute the union of all the bounding boxes
+    auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.data(), bboxes.size());
 
     Bvh bvh;
 
-    bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
-    builder.max_depth = max_depth;
-    builder.build(bboxes.data(), centers.data(), bboxes.size());
+    bvh::SweepSahBuilder<Bvh> builder(bvh);
+    builder.build(global_bbox, bboxes.data(), centers.data(), bboxes.size());
 
     Intersector intersector;
-    bvh::SingleRayTraversal<Bvh, max_depth> traversal(bvh);
+    bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     // Setup the ray (see above for an example)
     Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);

@@ -13,6 +13,9 @@ namespace bvh {
 
 template <typename> class SweepSahBuildTask;
 
+/// This is a top-down, full-sweep SAH-based BVH builder. Primitives are only
+/// sorted once, and a stable partitioning algorithm is used when splitting,
+/// so as to keep the relative order of primitives within each partition intact.
 template <typename Bvh>
 class SweepSahBuilder :
     public TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>>,
@@ -34,10 +37,16 @@ public:
         : ParentBuilder(bvh)
     {}
 
-    void build(const BoundingBox<Scalar>* bboxes, const Vector3<Scalar>* centers, size_t primitive_count) {
+    void build(
+        const BoundingBox<Scalar>& global_bbox,
+        const BoundingBox<Scalar>* bboxes,
+        const Vector3<Scalar>* centers,
+        size_t primitive_count)
+    {
         // Allocate buffers
         bvh.nodes.reset(new typename Bvh::Node[2 * primitive_count + 1]);
         bvh.primitive_indices.reset(new size_t[primitive_count]);
+
         auto reference_data = std::make_unique<size_t[]>(primitive_count * 2);
         auto cost_data      = std::make_unique<Scalar[]>(primitive_count * 3);
 
@@ -46,14 +55,13 @@ public:
             cost_data.get() + primitive_count,
             cost_data.get() + 2 * primitive_count
         };
+
         std::array<size_t*, 3> references = {
             reference_data.get(),
             reference_data.get() + primitive_count,
             bvh.primitive_indices.get()
         };
 
-        // Initialize root node
-        auto root_bbox = BoundingBox<Scalar>::empty();
         bvh.node_count = 1;
 
         #pragma omp parallel
@@ -68,17 +76,9 @@ public:
                 });
             }
 
-            #pragma omp declare reduction \
-                (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
-                initializer(omp_priv = BoundingBox<Scalar>::empty())
-
-            #pragma omp for reduction(bbox_extend: root_bbox)
-            for (size_t i = 0; i < primitive_count; ++i)
-                root_bbox.extend(bboxes[i]);
-
             #pragma omp single
             {
-                bvh.nodes[0].bounding_box_proxy() = root_bbox;
+                bvh.nodes[0].bounding_box_proxy() = global_bbox;
                 SweepSahBuildTask<Bvh> first_task(*this, bboxes, centers, references, costs);
                 run_task(first_task, 0, 0, primitive_count, 0);
             }

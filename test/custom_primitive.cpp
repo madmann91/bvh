@@ -4,7 +4,7 @@
 #include <bvh/bvh.hpp>
 #include <bvh/vector.hpp>
 #include <bvh/ray.hpp>
-#include <bvh/binned_sah_builder.hpp>
+#include <bvh/sweep_sah_builder.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 
@@ -51,16 +51,13 @@ int main() {
     primitives.emplace_back();
     primitives.emplace_back();
 
-    static constexpr bool pre_shuffle = true;
-    static constexpr size_t bin_count = 32;
+    Bvh bvh;
 
     // Create an acceleration data structure on those triangles
-    Bvh bvh;
-    bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
+    bvh::SweepSahBuilder<Bvh> builder(bvh);
     auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(primitives.data(), primitives.size());
-    builder.build(bboxes.get(), centers.get(), primitives.size());
-    if (pre_shuffle)
-        bvh::shuffle_primitives(primitives.data(), bvh.primitive_indices.get(), primitives.size());
+    auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), primitives.size());
+    builder.build(global_bbox, bboxes.get(), centers.get(), primitives.size());
 
     // Intersect a ray with the data structure
     Ray ray(
@@ -69,7 +66,7 @@ int main() {
         0.0,                    // minimum distance
         100.0                   // maximum distance
     );
-    bvh::ClosestIntersector<pre_shuffle, Bvh, CustomPrimitive> intersector(bvh, primitives.data());
+    bvh::ClosestIntersector<false, Bvh, CustomPrimitive> intersector(bvh, primitives.data());
     bvh::SingleRayTraversal<Bvh> traversal(bvh);
 
     auto hit = traversal.intersect(ray, intersector);
