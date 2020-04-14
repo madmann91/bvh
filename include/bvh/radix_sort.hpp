@@ -14,16 +14,15 @@
 
 namespace bvh {
 
-template <typename Key, typename Value>
+template <size_t BitsPerIteration = 10, typename Key, typename Value>
 void radix_sort(
     std::unique_ptr<Key[]>& keys,      std::unique_ptr<Value[]>& values,
     std::unique_ptr<Key[]>& keys_copy, std::unique_ptr<Value[]>& values_copy,
     size_t count, size_t bit_count,
     size_t parallel_threshold)
 {
-    static constexpr size_t bits_per_iteration = 8;
-    static constexpr size_t bucket_count = 1 << bits_per_iteration;
-    static constexpr Key mask = (Key(1) << bits_per_iteration) - 1;
+    static constexpr size_t bucket_count = 1 << BitsPerIteration;
+    static constexpr Key mask = (Key(1) << BitsPerIteration) - 1;
 
     // Allocate temporary storage
     std::unique_ptr<size_t[]> per_thread_buckets;
@@ -36,7 +35,7 @@ void radix_sort(
         #pragma omp single
         { per_thread_buckets = std::make_unique<size_t[]>((thread_count + 1) * bucket_count); }
 
-        for (size_t bit = 0; bit < bit_count; bit += bits_per_iteration) {
+        for (size_t bit = 0; bit < bit_count; bit += BitsPerIteration) {
             auto buckets = &per_thread_buckets[thread_id * bucket_count];
             std::fill(buckets, buckets + bucket_count, 0);
 
