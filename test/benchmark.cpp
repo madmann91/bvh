@@ -339,7 +339,14 @@ int main(int argc, char** argv) {
     std::unique_ptr<Triangle[]> shuffled_triangles;
 
     // Build an acceleration data structure for this object set
-    std::cout << "Building BVH (" << builder_name << ")..." << std::endl;
+    std::cout << "Building BVH (" << builder_name;
+    if (optimizer_name)
+        std::cout << " + " << optimizer_name;
+    if (pre_split_exponent > 0)
+        std::cout << " + pre-split";
+    if (pre_shuffle)
+        std::cout << " + pre-shuffle";
+    std::cout << ")..." << std::endl;
     profile("BVH construction", [&] {
         size_t max_reference_count = pre_split_exponent > 0 ? triangles.size() * 3 / 2 : triangles.size();
         auto [bboxes, centers] =
