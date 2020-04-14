@@ -85,14 +85,20 @@ This library contains several construction algorithms, all parallelized using Op
 
 Those algorithms only require a bounding box and center for each primitive.
 
-### Optimization Algorithms
+### Optimization/Splitting Algorithms
 
-Additionally, the BVH structure can be further improved by running post-build optimizations.
+Additionally, the BVH structure can be further improved by running post-build optimizations,
+or pre-build triangle splitting.
 
  - `bvh::ParallelReinsertionOptimization`: An optimization that tries to re-insert BVH nodes
    in a way that minimizes the SAH (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
    by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
    at the cost of longer build times.
+ - `bvh::EdgeVolumeHeuristic`: A pre-build pass that splits triangles that are difficult to handle
+   for BVH builders. Only really bad triangles are subdivided, which means that this pass is economical
+   and fast. The subdivision is watertight, which guarantees that there will be no leak. See the paper
+   _The Edge Volume Heuristic - Robust Triangle Subdivision for Improved BVH Performance_, by H. Dammertz
+   and A. Keller.
 
 ### Traversal Algorithms
 
