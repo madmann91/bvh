@@ -95,10 +95,10 @@ or pre-build triangle splitting.
    by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
    at the cost of longer build times.
  - `bvh::EdgeVolumeHeuristic`: A pre-build pass that splits triangles that are difficult to handle
-   for BVH builders. Only really bad triangles are subdivided, which means that this pass is economical
-   and fast. The subdivision is watertight, which guarantees that there will be no leak. See the paper
-   _The Edge Volume Heuristic - Robust Triangle Subdivision for Improved BVH Performance_, by H. Dammertz
-   and A. Keller.
+   for BVH builders. Only really bad triangles are subdivided, which means that this pass is both economical
+   and fast. The subdivision is watertight, which guarantees that there will be no leak between neighboring
+   triangles. See _The Edge Volume Heuristic - Robust Triangle Subdivision for Improved BVH Performance_,
+   by H. Dammertz and A. Keller.
 
 ### Traversal Algorithms
 
