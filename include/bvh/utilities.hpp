@@ -69,24 +69,44 @@ void atomic_max(std::atomic<Scalar>& x, Scalar y) {
 
 /// Shuffles primitives such that the primitive at index i is `primitives[indices[i]]`.
 template <typename Primitive>
-void shuffle_primitives(Primitive* primitives, const size_t* indices, size_t primitive_count) {
+std::unique_ptr<Primitive[]> shuffle_primitives(const Primitive* primitives, const size_t* indices, size_t primitive_count) {
     auto primitives_copy = std::make_unique<Primitive[]>(primitive_count);
-    std::move(primitives, primitives + primitive_count, primitives_copy.get());
     for (size_t i = 0; i < primitive_count; ++i)
-        primitives[i] = std::move(primitives_copy[indices[i]]);
+        primitives_copy[i] = primitives[indices[i]];
+    return primitives_copy;
 }
 
+/// Computes the bounding box and the center of each primitive in given array.
 template <typename Primitive, typename Scalar = typename Primitive::ScalarType>
 std::pair<std::unique_ptr<BoundingBox<Scalar>[]>, std::unique_ptr<Vector3<Scalar>[]>>
-compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive_count) {
-    auto bboxes  = std::make_unique<BoundingBox<Scalar>[]>(primitive_count);
-    auto centers = std::make_unique<Vector3<Scalar>[]>(primitive_count);
+compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive_count, size_t reference_count = 0) {
+    auto allocation_size = std::max(primitive_count, reference_count);
+    auto bounding_boxes  = std::make_unique<BoundingBox<Scalar>[]>(allocation_size);
+    auto centers         = std::make_unique<Vector3<Scalar>[]>(allocation_size);
+
     #pragma omp parallel for
     for (size_t i = 0; i < primitive_count; ++i) {
-        bboxes[i]  = primitives[i].bounding_box();
-        centers[i] = primitives[i].center();
+        bounding_boxes[i] = primitives[i].bounding_box();
+        centers[i]        = primitives[i].center();
     }
-    return std::make_pair(std::move(bboxes), std::move(centers));
+
+    return std::make_pair(std::move(bounding_boxes), std::move(centers));
+}
+
+/// Computes the union of all the bounding boxes in the given array.
+template <typename Scalar>
+BoundingBox<Scalar> compute_bounding_boxes_union(const BoundingBox<Scalar>* bboxes, size_t count) {
+    auto bbox = BoundingBox<Scalar>::empty();
+
+    #pragma omp declare reduction \
+        (bbox_extend:BoundingBox<Scalar>:omp_out.extend(omp_in)) \
+        initializer(omp_priv = BoundingBox<Scalar>::empty())
+
+    #pragma omp parallel for reduction(bbox_extend: bbox)
+    for (size_t i = 0; i < count; ++i)
+        bbox.extend(bboxes[i]);
+
+    return bbox;
 }
 
 /// Templates that contains signed and unsigned integer types of the given number of bits.

@@ -61,32 +61,32 @@ struct Vector {
 
 template <typename Scalar, size_t N, size_t M>
 inline Vector<Scalar, std::min(N, M)> operator + (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([&] (size_t i) { return a[i] + b[i]; });
+    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] + b[i]; });
 }
 
 template <typename Scalar, size_t N, size_t M>
 inline Vector<Scalar, std::min(N, M)> operator - (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([&] (size_t i) { return a[i] - b[i]; });
+    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] - b[i]; });
 }
 
 template <typename Scalar, size_t N, size_t M>
 inline Vector<Scalar, std::min(N, M)> operator * (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([&] (size_t i) { return a[i] * b[i]; });
+    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] * b[i]; });
 }
 
 template <typename Scalar, size_t N, size_t M>
 inline Vector<Scalar, std::min(N, M)> min(const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([&] (size_t i) { return std::min(a[i], b[i]); });
+    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return std::min(a[i], b[i]); });
 }
 
 template <typename Scalar, size_t N, size_t M>
 inline Vector<Scalar, std::min(N, M)> max(const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([&] (size_t i) { return std::max(a[i], b[i]); });
+    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return std::max(a[i], b[i]); });
 }
 
 template <typename Scalar, size_t N>
 inline Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, Scalar s) {
-    return Vector<Scalar, N>([&] (size_t i) { return a[i] * s; });
+    return Vector<Scalar, N>([=] (size_t i) { return a[i] * s; });
 }
 
 template <typename Scalar, size_t N>
@@ -118,7 +118,7 @@ using Vector3 = Vector<Scalar, 3>;
 
 template <typename Scalar>
 inline Vector3<Scalar> cross(const Vector3<Scalar>& a, const Vector3<Scalar>& b) {
-    return Vector3<Scalar>([&] (size_t i) {
+    return Vector3<Scalar>([=] (size_t i) {
         size_t j = (i + 1) % 3;
         size_t k = (i + 2) % 3;
         return a[j] * b[k] - a[k] * b[j];

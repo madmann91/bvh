@@ -9,6 +9,14 @@
 
 namespace bvh {
 
+/// Bottom-up BVH builder based on agglomerative clustering. The algorithm starts
+/// by sorting primitives by their Morton code, and then clusters them iteratively
+/// to form the BVH nodes. Clusters are built starting from each primitive, by
+/// agglomerating nearby clusters that minimize a distance metric. The distance
+/// metric is in this case the area of the union of the bounding boxes of the two
+/// clusters of interest.
+/// See "Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction",
+/// by D. Meister and J. Bittner.
 template <typename Bvh, typename Morton>
 class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     using Scalar = typename Bvh::ScalarType;
@@ -124,11 +132,13 @@ public:
     {}
 
     void build(
+        const BoundingBox<Scalar>& global_bbox,
         const BoundingBox<Scalar>* bboxes,
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
-        auto [primitive_indices, _] = sort_primitives_by_morton_code(bboxes, centers, primitive_count);
+        auto [primitive_indices, _] =
+            sort_primitives_by_morton_code(global_bbox, centers, primitive_count);
 
         auto node_count     = 2 * primitive_count - 1;
         auto nodes          = std::make_unique<Node[]>(node_count);

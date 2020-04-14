@@ -6,6 +6,7 @@
 
 namespace bvh {
 
+/// Base class for top-down BVH builders.
 template <typename Bvh, typename BuildTask>
 class TopDownBuilder {
     friend BuildTask;

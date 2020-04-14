@@ -13,6 +13,7 @@
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
+#include <bvh/edge_volume_heuristic.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
@@ -44,23 +45,31 @@ static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
         "\nOptions:\n"
-        "  --help               Shows this message.\n"
-        "  --builder <name>     Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --optimizer <name>   Sets the BVH optimizer to use (none by default).\n"
-        "  --pre-shuffle        Activates the pre-shuffling optimization.\n\n"
+        "  --help              Shows this message.\n"
+        "  --builder <name>    Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "  --optimizer <name>  Sets the BVH optimizer to use (none by default).\n"
+        "  --pre-shuffle       Activates the pre-shuffling optimization.\n"
+        "  --eye <x> <y> <z>   Sets the position of the camera.\n"
+        "  --dir <x> <y> <z>   Sets the direction of the camera.\n"
+        "  --up  <x> <y> <z>   Sets the up vector of the camera.\n"
+        "  --fov <degrees>     Sets the field of view.\n"
+        "  --width <pixels>    Sets the image width.\n"
+        "  --height <pixels>   Sets the image height.\n"
+        "  -o <file.ppm>       Sets the output file name (defaults to 'render.ppm').\n\n"
+        "  --pre-split <exponent>\n\n"
+        "    Sets the Edge Volume Heuristic triangle pre-splitting exponent value.\n"
+        "    The higher the exponent, the more aggressive splitting is. An exponent\n"
+        "    of zero deactivates splitting altogether.\n\n"
+        "  --rotate <axis> <degrees>\n\n"
+        "    Rotates the scene by the given amount of degrees on the\n"
+        "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
+        "    intended to test the impact of pre-splitting.\n\n"
         "  --collect-statistics <t> <i> <c>\n\n"
         "    Collects traversal statistics per pixel.\n"
         "    The arguments represent the weight of traversal steps (t),\n"
         "    primitive intersections (i), and the sum of the two (s).\n"
         "    These statistics are then converted to bytes and stored in\n"
         "    the red, green, and blue channels of the image, respectively.\n\n"
-        "  --eye <x> <y> <z>    Sets the position of the camera.\n"
-        "  --dir <x> <y> <z>    Sets the direction of the camera.\n"
-        "  --up  <x> <y> <z>    Sets the up vector of the camera.\n"
-        "  --fov <degrees>      Sets the field of view.\n"
-        "  --width <pixels>     Sets the image width.\n"
-        "  --height <pixels>    Sets the image height.\n"
-        "  -o <file.ppm>        Sets the output file name (defaults to 'render.ppm').\n"
         "\nBuilders:\n"
         "  binned_sah,\n"
         "  sweep_sah,\n"
@@ -142,6 +151,28 @@ void render(
     }
 }
 
+template <size_t Axis>
+static void rotate_triangles(Scalar degrees, Triangle* triangles, size_t triangle_count) {
+    static constexpr Scalar pi = Scalar(3.14159265359);
+    auto cos = std::cos(degrees * pi / Scalar(180));
+    auto sin = std::sin(degrees * pi / Scalar(180));
+    auto rotate = [&] (const Vector3& p) {
+        if (Axis == 0)
+            return Vector3(p[0], p[1] * cos - p[2] * sin, p[1] * sin + p[2] * cos);
+        else if (Axis == 1)
+            return Vector3(p[0] * cos + p[2] * sin, p[1], -p[0] * sin + p[2] * cos);
+        else
+            return Vector3(p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos, p[2]);
+    };
+    #pragma omp parallel for
+    for (size_t i = 0; i < triangle_count; ++i) {
+        auto p0 = rotate(triangles[i].p0);
+        auto p1 = rotate(triangles[i].p1());
+        auto p2 = rotate(triangles[i].p2());
+        triangles[i] = Triangle(p0, p1, p2);
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         usage();
@@ -159,7 +190,10 @@ int main(int argc, char** argv) {
         60
     };
     bool pre_shuffle = false;
+    size_t pre_split_exponent = 0;
     bool collect_statistics = false;
+    size_t rotation_axis = 3;
+    Scalar rotation_degrees = 0;
     Scalar statistics_weights[3];
     size_t width  = 1080;
     size_t height = 720;
@@ -200,6 +234,19 @@ int main(int argc, char** argv) {
                 *name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
+            } else if (!strcmp(argv[i], "--pre-split")) {
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                pre_split_exponent = strtoull(argv[++i], NULL, 10);
+            } else if (!strcmp(argv[i], "--rotate")) {
+                if (i + 2 >= argc)
+                    return not_enough_arguments(argv[i]);
+                rotation_axis = argv[++i][0] - 'x';
+                rotation_degrees = strtof(argv[++i], NULL);
+                if (rotation_axis > 2) {
+                    std::cerr << "Invalid rotation axis" << std::endl;
+                    return 1;
+                }
             } else if (!strcmp(argv[i], "--collect-statistics")) {
                 if (i + 2 >= argc)
                     return not_enough_arguments(argv[i]);
@@ -229,32 +276,33 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::function<void(Bvh&, const BoundingBox*, const Vector3*, size_t)> builder;
+    std::function<void(Bvh&, const BoundingBox&, const BoundingBox*, const Vector3*, size_t)> builder;
     if (!strcmp(builder_name, "binned_sah")) {
-        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             static constexpr size_t bin_count = 16;
             bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
-            builder.build(bboxes, centers, primitive_count);
+            builder.build(global_bbox, bboxes, centers, primitive_count);
         };
     } else if (!strcmp(builder_name, "sweep_sah")) {
-        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             bvh::SweepSahBuilder<Bvh> builder(bvh);
-            builder.build(bboxes, centers, primitive_count);
+            builder.build(global_bbox, bboxes, centers, primitive_count);
         };
     } else if (!strcmp(builder_name, "locally_ordered_clustering")) {
-        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             using Morton = uint32_t;
             bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
-            builder.build(bboxes, centers, primitive_count);
+            builder.build(global_bbox, bboxes, centers, primitive_count);
         };
     } else if (!strcmp(builder_name, "linear")) {
-        builder = [] (Bvh& bvh, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             using Morton = uint32_t;
             bvh::LinearBvhBuilder<Bvh, Morton> builder(bvh);
-            builder.build(bboxes, centers, primitive_count);
+            builder.build(global_bbox, bboxes, centers, primitive_count);
         };
     } else {
-        std::cerr << "Unknow BVH builder name" << std::endl;
+        std::cerr << "Unknown BVH builder name" << std::endl;
+        return 1;
     }
 
     std::function<void(Bvh&)> optimizer;
@@ -266,7 +314,8 @@ int main(int argc, char** argv) {
             optimization.optimize();
         };
     } else {
-        std::cerr << "Unknow BVH optimizer name" << std::endl;
+        std::cerr << "Unknown BVH optimizer name" << std::endl;
+        return 1;
     }
 
     // Load mesh from file
@@ -276,19 +325,51 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Rotate triangles if requested
+    if (rotation_axis == 0)
+        rotate_triangles<0>(rotation_degrees, triangles.data(), triangles.size());
+    else if (rotation_axis == 1)
+        rotate_triangles<1>(rotation_degrees, triangles.data(), triangles.size());
+    else if (rotation_axis == 2)
+        rotate_triangles<2>(rotation_degrees, triangles.data(), triangles.size());
+
     Bvh bvh;
+
+    size_t reference_count = triangles.size();
+    std::unique_ptr<Triangle[]> shuffled_triangles;
 
     // Build an acceleration data structure for this object set
     std::cout << "Building BVH (" << builder_name << ")..." << std::endl;
     profile("BVH construction", [&] {
-        auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
-        builder(bvh, bboxes.get(), centers.get(), triangles.size());
+        size_t max_reference_count = pre_split_exponent > 0 ? triangles.size() * 3 / 2 : triangles.size();
+        auto [bboxes, centers] =
+            bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size(), max_reference_count);
+        auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), triangles.size());
+
+        std::unique_ptr<size_t[]> triangle_indices;
+        if (pre_split_exponent > 0) {
+            triangle_indices = std::make_unique<size_t[]>(max_reference_count);
+            auto threshold = bvh::EdgeVolumeHeuristic<Triangle>::threshold(global_bbox, pre_split_exponent);
+            reference_count = bvh::EdgeVolumeHeuristic<Triangle>::pre_split(
+                triangles.data(),
+                bboxes.get(),
+                centers.get(),
+                triangle_indices.get(),
+                triangles.size(),
+                max_reference_count,
+                threshold); 
+        }
+
+        builder(bvh, global_bbox, bboxes.get(), centers.get(), reference_count);
+        if (pre_split_exponent > 0)
+            bvh::EdgeVolumeHeuristic<Triangle>::repair_bvh_leaves(bvh, triangle_indices.get());
+
         optimizer(bvh);
         if (pre_shuffle)
-            bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), triangles.size());
+            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
 
-    std::cout << bvh.node_count << " node(s)" << std::endl;
+    std::cout << bvh.node_count << " node(s), " << reference_count << " reference(s)" << std::endl;
 
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);
 
@@ -296,9 +377,9 @@ int main(int argc, char** argv) {
     profile("Rendering", [&] {
         if (pre_shuffle) {
             if (collect_statistics)
-                render<true, true>(camera, bvh, triangles.data(), pixels.get(), width, height, statistics_weights);
+                render<true, true>(camera, bvh, shuffled_triangles.get(), pixels.get(), width, height, statistics_weights);
             else
-                render<true, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
+                render<true, false>(camera, bvh, shuffled_triangles.get(), pixels.get(), width, height);
         } else {
             if (collect_statistics)
                 render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, statistics_weights);
