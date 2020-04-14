@@ -4,6 +4,7 @@
 #include <numeric>
 
 #include "bvh/morton_code_based_builder.hpp"
+#include "bvh/prefix_sum.hpp"
 #include "bvh/utilities.hpp"
 
 namespace bvh {
@@ -18,6 +19,8 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
 
     Bvh& bvh;
 
+    PrefixSum<size_t> prefix_sum;
+
     std::pair<size_t, size_t> cluster(
         const Node* bvh__restrict__ input,
         Node* bvh__restrict__ output,
@@ -26,8 +29,8 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
         size_t begin, size_t end,
         size_t previous_end)
     {
-        size_t children_begin = 0;
-        size_t unmerged_begin = 0;
+        size_t next_begin = 0;
+        size_t next_end   = 0;
 
         #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
@@ -64,13 +67,17 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
             }
 
             // Perform a prefix sum to compute the insertion indices
-            #pragma omp single
+            prefix_sum.sum(merged_index + begin, merged_index + begin, end - begin);
+            size_t merged_count   = merged_index[end - 1];
+            size_t unmerged_count = end - begin - merged_count;
+            size_t children_count = merged_count * 2;
+            size_t children_begin = end - children_count;
+            size_t unmerged_begin = end - (children_count + unmerged_count);
+
+            #pragma omp single nowait
             {
-                size_t merged_count = *std::prev(std::partial_sum(merged_index + begin, merged_index + end, merged_index + begin));
-                size_t unmerged_count = end - begin - merged_count;
-                size_t children_count = merged_count * 2;
-                children_begin = end - children_count;
-                unmerged_begin = end - (children_count + unmerged_count);
+                next_begin = unmerged_begin;
+                next_end   = children_begin;
             }
 
             // Finally, merge nodes that are marked for merging and create
@@ -102,12 +109,11 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                 output[i] = input[i];
         }
 
-        return std::make_pair(unmerged_begin, children_begin);
+        return std::make_pair(next_begin, next_end);
     }
 
 public:
     using ParentBuilder::loop_parallel_threshold;
-    using ParentBuilder::radix_sort_parallel_threshold;
 
     /// Parameter of the algorithm. The larger the search radius,
     /// the longer the search for neighboring nodes lasts.
