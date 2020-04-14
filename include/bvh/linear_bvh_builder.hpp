@@ -6,6 +6,7 @@
 #include <numeric>
 
 #include "bvh/morton_code_based_builder.hpp"
+#include "bvh/prefix_sum.hpp"
 #include "bvh/utilities.hpp"
 
 namespace bvh {
@@ -22,6 +23,8 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
 
     Bvh& bvh;
 
+    PrefixSum<size_t> prefix_sum;
+
     std::pair<size_t, size_t> merge(
         const Node* bvh__restrict__ input_nodes,
         Node* bvh__restrict__ output_nodes,
@@ -32,8 +35,8 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
         size_t begin, size_t end,
         size_t previous_end)
     {
-        size_t children_begin = 0;
-        size_t unmerged_begin = 0;
+        size_t next_begin = 0;
+        size_t next_end   = 0;
 
         merged_index[end - 1] = 0;
         needs_merge [end - 1] = 0;
@@ -58,14 +61,17 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
             }
 
             // Perform a prefix sum to compute the insertion indices
-            #pragma omp single
+            prefix_sum.sum(needs_merge + begin, merged_index + begin, end - begin);
+            size_t merged_count   = merged_index[end - 1];
+            size_t unmerged_count = end - begin - merged_count;
+            size_t children_count = merged_count * 2;
+            size_t children_begin = end - children_count;
+            size_t unmerged_begin = end - (children_count + unmerged_count);
+
+            #pragma omp single nowait
             {
-                size_t merged_count = *std::prev(std::partial_sum(needs_merge + begin, needs_merge + end, merged_index + begin));
-                size_t unmerged_count = end - begin - merged_count;
-                size_t children_count = merged_count * 2;
-                children_begin = end - children_count;
-                unmerged_begin = end - (children_count + unmerged_count);
-                assert(merged_count > 0);
+                next_begin = unmerged_begin;
+                next_end   = children_begin;
             }
 
             // Perform one step of node merging
@@ -97,12 +103,11 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
                 output_nodes[i] = input_nodes[i];
         }
 
-        return std::make_pair(unmerged_begin, children_begin);
+        return std::make_pair(next_begin, next_end);
     }
 
 public:
     using ParentBuilder::loop_parallel_threshold;
-    using ParentBuilder::radix_sort_parallel_threshold;
 
     LinearBvhBuilder(Bvh& bvh)
         : bvh(bvh)

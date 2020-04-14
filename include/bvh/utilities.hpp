@@ -11,6 +11,20 @@
 
 #include "bvh/bounding_box.hpp"
 
+#ifdef _OPENMP
+#include <omp.h>
+#include <cassert>
+#define bvh__get_num_threads()        omp_get_num_threads()
+#define bvh__get_thread_num()         omp_get_thread_num()
+#define bvh__assert_not_in_parallel() assert(omp_get_level() == 0);
+#define bvh__assert_in_parallel()     assert(omp_get_level() > 0);
+#else
+#define bvh__get_num_threads()        1
+#define bvh__get_thread_num()         0
+#define bvh__assert_not_in_parallel() (void)0
+#define bvh__assert_in_parallel()     (void)0
+#endif
+
 namespace bvh {
 
 /// Safe function to reinterpret the bits of the given value as another type.
