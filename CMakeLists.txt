@@ -9,7 +9,7 @@ target_include_directories(bvh INTERFACE include/)
 
 find_package(OpenMP QUIET)
 if (OpenMP_CXX_FOUND)
-    #target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
+    target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
 endif ()
 
 include(cmake/FindRestrictKeyword.cmake)
