@@ -13,6 +13,7 @@ template <typename T>
 class PrefixSum {
 public:
     PrefixSum() { bvh__assert_not_in_parallel(); }
+
     template <typename F = std::plus<T>>
     void sum(const T* input, T* output, size_t count, F f = F()) {
         bvh__assert_in_parallel();
@@ -40,7 +41,7 @@ public:
         T sum = T(0);
 
         // Compute partial sums
-        #pragma omp for nowait
+        #pragma omp for nowait schedule(static)
         for (size_t i = 0; i < count; ++i) {
             sum = f(sum, input[i]);
             output[i] = sum;
@@ -52,7 +53,7 @@ public:
         // Fix the sums
         auto offset = std::accumulate(per_thread_sums.get(), per_thread_sums.get() + thread_id + 1, 0, f);
 
-        #pragma omp for
+        #pragma omp for schedule(static)
         for (size_t i = 0; i < count; ++i)
             output[i] = f(output[i], offset);
     }
