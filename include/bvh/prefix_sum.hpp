@@ -20,7 +20,8 @@ public:
         size_t thread_count = bvh__get_num_threads();
         size_t thread_id    = bvh__get_thread_num();
 
-        if (thread_count < 2) {
+        // This algorithm is not effective when there are fewer than 2 threads.
+        if (thread_count <= 2) {
             #pragma omp single
             { std::partial_sum(input, input + count, output, f); }
             return;
