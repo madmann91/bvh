@@ -173,17 +173,32 @@ public:
             best_axis = 2;
 
         auto traversal_cost = static_cast<BinnedSahBuilder<Bvh, BinCount>&>(builder).traversal_cost;
+        auto max_leaf_size  = static_cast<BinnedSahBuilder<Bvh, BinCount>&>(builder).max_leaf_size;
+        auto split_index = best_splits[best_axis].second;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
         if (best_splits[best_axis].second == bin_count ||
             best_splits[best_axis].first >= node.bounding_box_proxy().half_area() * (item.work_size() - traversal_cost)) {
-            make_leaf(node, item.begin, item.end);
-            return std::nullopt;
+            if (item.work_size() > max_leaf_size) {
+                // Fallback strategy: approximate median split on largest axis
+                best_axis = node.bounding_box_proxy().to_bounding_box().largest_axis();
+                for (size_t i = 0, count = 0; i < bin_count - 1; ++i) {
+                    count += bins_per_axis[best_axis][i].primitive_count;
+                    // Split when we reach 0.4 times the number of primitives in the node
+                    if (count >= (item.work_size() * 2 / 5 + 1)) {
+                        split_index = i + 1;
+                        break;
+                    }
+                }
+            } else {
+                make_leaf(node, item.begin, item.end);
+                return std::nullopt;
+            }
         }
 
         // Split primitives according to split position
         size_t begin_right = std::partition(primitive_indices + item.begin, primitive_indices + item.end, [&] (size_t i) {
-            return bin_index(centers[i], best_axis) < best_splits[best_axis].second;
+            return bin_index(centers[i], best_axis) < split_index;
         }) - primitive_indices;
 
         // Check that the split does not leave one side empty
@@ -204,7 +219,7 @@ public:
             auto right_bbox = BoundingBox<Scalar>::empty();
             for (size_t i = 0; i < best_splits[best_axis].second; ++i)
                 left_bbox.extend(bins[i].bbox);
-            for (size_t i = best_splits[best_axis].second; i < bin_count; ++i)
+            for (size_t i = split_index; i < bin_count; ++i)
                 right_bbox.extend(bins[i].bbox);
             left.bounding_box_proxy()  = left_bbox;
             right.bounding_box_proxy() = right_bbox;

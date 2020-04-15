@@ -34,6 +34,11 @@ public:
     /// sure the required traversal stack size is under a given constant.
     size_t max_depth = 64;
 
+    /// Largest permissible leaf size. The builder will attempt to split
+    /// using a median split on the largest axis as a default strategy
+    /// to avoid creating leaves that are larger than this threshold.
+    size_t max_leaf_size = 16;
+
 protected:
     Bvh& bvh;
 
