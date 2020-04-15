@@ -22,6 +22,7 @@ class SweepSahBuilder :
     public SahBasedAlgorithm<Bvh>
 {
     using Scalar = typename Bvh::ScalarType;
+    using Mark   = typename SweepSahBuildTask<Bvh>::MarkType;
 
     using ParentBuilder = TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>>;
     using ParentBuilder::bvh;
@@ -49,6 +50,7 @@ public:
 
         auto reference_data = std::make_unique<size_t[]>(primitive_count * 2);
         auto cost_data      = std::make_unique<Scalar[]>(primitive_count * 3);
+        auto mark_data      = std::make_unique<Mark[]>(primitive_count);
 
         std::array<Scalar*, 3> costs = {
             cost_data.get(),
@@ -66,20 +68,18 @@ public:
 
         #pragma omp parallel
         {
-            #pragma omp for nowait
+            #pragma omp for
             for (int axis = 0; axis < 3; ++axis) {
                 std::iota(references[axis], references[axis] + primitive_count, 0);
-                std::sort(references[axis], references[axis] + primitive_count, [&] (size_t reference1, size_t reference2) {
-                    auto center1 = centers[reference1][axis];
-                    auto center2 = centers[reference2][axis];
-                    return center1 < center2 || (center1 == center2 && reference1 < reference2);
+                std::sort(references[axis], references[axis] + primitive_count, [&] (size_t i, size_t j) {
+                    return centers[i][axis] < centers[j][axis];
                 });
             }
 
             #pragma omp single
             {
                 bvh.nodes[0].bounding_box_proxy() = global_bbox;
-                SweepSahBuildTask<Bvh> first_task(*this, bboxes, centers, references, costs);
+                SweepSahBuildTask<Bvh> first_task(*this, bboxes, centers, references, costs, mark_data.get());
                 run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
@@ -87,10 +87,11 @@ public:
 };
 
 template <typename Bvh>
-struct SweepSahBuildTask {
+class SweepSahBuildTask {
     using Scalar   = typename Bvh::ScalarType;
     using Builder  = TopDownBuilder<Bvh, SweepSahBuildTask>;
     using WorkItem = typename Builder::WorkItem;
+    using Mark     = uint_fast8_t;
 
     Builder& builder;
     const BoundingBox<Scalar>* bboxes;
@@ -98,6 +99,7 @@ struct SweepSahBuildTask {
 
     std::array<size_t*, 3> references;
     std::array<Scalar*, 3> costs;
+    Mark* marks;
 
     std::pair<Scalar, size_t> find_split(int axis, size_t begin, size_t end) {
         auto bbox = BoundingBox<Scalar>::empty();
@@ -117,13 +119,16 @@ struct SweepSahBuildTask {
     }
 
 public:
+    using MarkType = Mark;
+
     SweepSahBuildTask(
         Builder& builder,
         const BoundingBox<Scalar>* bboxes,
         const Vector3<Scalar>* centers,
         const std::array<size_t*, 3>& references,
-        const std::array<Scalar*, 3>& costs)
-        : builder(builder), bboxes(bboxes), centers(centers), references(references), costs(costs)
+        const std::array<Scalar*, 3>& costs,
+        Mark* marks)
+        : builder(builder), bboxes(bboxes), centers(centers), references(references), costs(costs), marks(marks)
     {}
 
     std::optional<std::pair<WorkItem, WorkItem>> build(const WorkItem& item) {
@@ -164,13 +169,11 @@ public:
         }
 
         int other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
-        auto best_split = best_splits[best_axis];
-        auto best_reference = references[best_axis][best_split.second];
-        auto split_position = centers[best_reference][best_axis];
-        auto partition_predicate = [&] (size_t reference) {
-            auto position = centers[reference][best_axis];
-            return position < split_position || (position == split_position && reference < best_reference);
-        };
+        auto split_index = best_splits[best_axis].second;
+
+        for (size_t i = item.begin;  i < split_index; ++i) marks[references[best_axis][i]] = 1;
+        for (size_t i = split_index; i < item.end;    ++i) marks[references[best_axis][i]] = 0;
+        auto partition_predicate = [&] (size_t i) { return marks[i] != 0; };
 
         auto left_bbox  = BoundingBox<Scalar>::empty();
         auto right_bbox = BoundingBox<Scalar>::empty();
@@ -184,12 +187,12 @@ public:
             { std::stable_partition(references[other_axis[1]] + item.begin, references[other_axis[1]] + item.end, partition_predicate); }
             #pragma omp task if (should_spawn_tasks) default(shared)
             {
-                for (size_t i = item.begin; i < best_split.second; ++i)
+                for (size_t i = item.begin; i < split_index; ++i)
                     left_bbox.extend(bboxes[references[best_axis][i]]);
             }
             #pragma omp task if (should_spawn_tasks) default(shared)
             {
-                for (size_t i = item.end - 1; i >= best_split.second; --i)
+                for (size_t i = split_index; i < item.end; ++i)
                     right_bbox.extend(bboxes[references[best_axis][i]]);
             }
         }
@@ -207,8 +210,8 @@ public:
                 
         left.bounding_box_proxy()  = left_bbox;
         right.bounding_box_proxy() = right_bbox;
-        WorkItem first_item (left_index + 0, item.begin, best_split.second, item.depth + 1);
-        WorkItem second_item(left_index + 1, best_split.second, item.end,   item.depth + 1);
+        WorkItem first_item (left_index + 0, item.begin, split_index, item.depth + 1);
+        WorkItem second_item(left_index + 1, split_index, item.end,   item.depth + 1);
         return std::make_optional(std::make_pair(first_item, second_item));
     }
 };
