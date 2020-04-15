@@ -162,7 +162,9 @@ public:
             return std::min(size_t(multiply_add(center[axis], inverse[axis], base[axis])), size_t(bin_count - 1));
         };
 
+#ifndef BVH_DISABLE_OPENMP_TASKS
         #pragma omp taskloop if (item.work_size() > builder.task_spawn_threshold) grainsize(1) default(shared)
+#endif
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis, item.begin, item.end, bin_index);
 
@@ -205,7 +207,9 @@ public:
         if (begin_right > item.begin && begin_right < item.end) {
             // Allocate two nodes
             size_t left_index;
+#ifndef BVH_DISABLE_OPENMP_TASKS
             #pragma omp atomic capture
+#endif
             { left_index = bvh.node_count; bvh.node_count += 2; }
             auto& left  = bvh.nodes[left_index + 0];
             auto& right = bvh.nodes[left_index + 1];

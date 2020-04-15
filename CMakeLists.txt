@@ -7,11 +7,14 @@ set(CMAKE_CXX_STANDARD 17)
 add_library(bvh INTERFACE)
 target_include_directories(bvh INTERFACE include/)
 
-if (NOT MSVC)
-    find_package(OpenMP QUIET)
-    if (OpenMP_CXX_FOUND)
-        target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
-    endif ()
+find_package(OpenMP QUIET)
+if (OpenMP_CXX_FOUND)
+    target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
+endif ()
+
+# MSVC does not support OpenMP tasks
+if (MSVC)
+    target_compile_definitions(bvh INTERFACE -DBVH_DISABLE_OPENMP_TASKS)
 endif ()
 
 include(cmake/FindRestrictKeyword.cmake)
