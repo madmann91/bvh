@@ -48,11 +48,11 @@ struct Vector {
     }
 
     Vector operator - () const {
-        return Vector([&] (size_t i) { return -values[i]; });
+        return Vector([=] (size_t i) { return -values[i]; });
     }
 
     Vector inverse() const {
-        return Vector([&] (size_t i) { return Scalar(1) / values[i]; });
+        return Vector([=] (size_t i) { return Scalar(1) / values[i]; });
     }
 
     Scalar& operator [] (size_t i) { return values[i]; }

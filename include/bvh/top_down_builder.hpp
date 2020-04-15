@@ -47,7 +47,7 @@ protected:
         stack.emplace(std::forward<Args&&>(args)...);
         while (!stack.empty()) {
             auto work_item = stack.top();
-            assert(work_item.depth < max_depth);
+            assert(work_item.depth <= max_depth);
             stack.pop();
 
             auto more_work = task.build(work_item);
