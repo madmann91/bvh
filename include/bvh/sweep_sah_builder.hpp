@@ -32,6 +32,7 @@ class SweepSahBuilder :
 
 public:
     using ParentBuilder::max_depth;
+    using ParentBuilder::max_leaf_size;
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     SweepSahBuilder(Bvh& bvh)
@@ -161,15 +162,22 @@ public:
             best_axis = 2;
 
         auto traversal_cost = static_cast<SweepSahBuilder<Bvh>&>(builder).traversal_cost;
+        auto max_leaf_size  = static_cast<SweepSahBuilder<Bvh>&>(builder).max_leaf_size;
+        auto split_index = best_splits[best_axis].second;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
         if (best_splits[best_axis].first >= node.bounding_box_proxy().half_area() * (item.work_size() - traversal_cost)) {
-            make_leaf(node, item.begin, item.end);
-            return std::nullopt;
+            if (item.work_size() > max_leaf_size) {
+                // Fallback strategy: median split on largest axis
+                best_axis = node.bounding_box_proxy().to_bounding_box().largest_axis();
+                split_index = (item.begin + item.end) / 2;
+            } else {
+                make_leaf(node, item.begin, item.end);
+                return std::nullopt;
+            }
         }
 
         int other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
-        auto split_index = best_splits[best_axis].second;
 
         for (size_t i = item.begin;  i < split_index; ++i) marks[references[best_axis][i]] = 1;
         for (size_t i = split_index; i < item.end;    ++i) marks[references[best_axis][i]] = 0;
