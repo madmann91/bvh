@@ -13,7 +13,6 @@
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
-#include <bvh/edge_volume_heuristic.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
@@ -56,10 +55,6 @@ static void usage() {
         "  --width <pixels>    Sets the image width.\n"
         "  --height <pixels>   Sets the image height.\n"
         "  -o <file.ppm>       Sets the output file name (defaults to 'render.ppm').\n\n"
-        "  --pre-split <exponent>\n\n"
-        "    Sets the Edge Volume Heuristic triangle pre-splitting exponent value.\n"
-        "    The higher the exponent, the more aggressive splitting is. An exponent\n"
-        "    of zero deactivates splitting altogether.\n\n"
         "  --rotate <axis> <degrees>\n\n"
         "    Rotates the scene by the given amount of degrees on the\n"
         "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
@@ -190,7 +185,6 @@ int main(int argc, char** argv) {
         60
     };
     bool pre_shuffle = false;
-    size_t pre_split_exponent = 0;
     bool collect_statistics = false;
     size_t rotation_axis = 3;
     Scalar rotation_degrees = 0;
@@ -234,10 +228,6 @@ int main(int argc, char** argv) {
                 *name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
-            } else if (!strcmp(argv[i], "--pre-split")) {
-                if (i + 1 >= argc)
-                    return not_enough_arguments(argv[i]);
-                pre_split_exponent = strtoull(argv[++i], NULL, 10);
             } else if (!strcmp(argv[i], "--rotate")) {
                 if (i + 2 >= argc)
                     return not_enough_arguments(argv[i]);
@@ -342,38 +332,17 @@ int main(int argc, char** argv) {
     std::cout << "Building BVH (" << builder_name;
     if (optimizer_name)
         std::cout << " + " << optimizer_name;
-    if (pre_split_exponent > 0)
-        std::cout << " + pre-split";
     if (pre_shuffle)
         std::cout << " + pre-shuffle";
     std::cout << ")..." << std::endl;
     profile("BVH construction", [&] {
-        size_t max_reference_count = pre_split_exponent > 0 ? triangles.size() * 3 / 2 : triangles.size();
         auto [bboxes, centers] =
-            bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size(), max_reference_count);
+            bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
         auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), triangles.size());
-
-        std::unique_ptr<size_t[]> triangle_indices;
-        if (pre_split_exponent > 0) {
-            triangle_indices = std::make_unique<size_t[]>(max_reference_count);
-            auto threshold = bvh::EdgeVolumeHeuristic<Triangle>::threshold(global_bbox, pre_split_exponent);
-            reference_count = bvh::EdgeVolumeHeuristic<Triangle>::pre_split(
-                triangles.data(),
-                bboxes.get(),
-                centers.get(),
-                triangle_indices.get(),
-                triangles.size(),
-                max_reference_count,
-                threshold); 
-        }
-
-        builder(bvh, global_bbox, bboxes.get(), centers.get(), reference_count);
-        if (pre_split_exponent > 0)
-            bvh::EdgeVolumeHeuristic<Triangle>::repair_bvh_leaves(bvh, triangle_indices.get());
-
+        builder(bvh, global_bbox, bboxes.get(), centers.get(), triangles.size());
         optimizer(bvh);
         if (pre_shuffle)
-            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
+            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), triangles.size());
     });
 
     std::cout << bvh.node_count << " node(s), " << reference_count << " reference(s)" << std::endl;
