@@ -64,9 +64,7 @@ protected:
                 stack.push(second_item);
                 if (first_item.work_size() > task_spawn_threshold) {
                     BuildTask new_task(task);
-#ifndef BVH_DISABLE_OPENMP_TASKS
                     #pragma omp task firstprivate(new_task, first_item)
-#endif
                     { run_task(new_task, first_item); }
                 } else {
                     stack.push(first_item);
