@@ -79,10 +79,9 @@ std::unique_ptr<Primitive[]> shuffle_primitives(const Primitive* primitives, con
 /// Computes the bounding box and the center of each primitive in given array.
 template <typename Primitive, typename Scalar = typename Primitive::ScalarType>
 std::pair<std::unique_ptr<BoundingBox<Scalar>[]>, std::unique_ptr<Vector3<Scalar>[]>>
-compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive_count, size_t reference_count = 0) {
-    auto allocation_size = std::max(primitive_count, reference_count);
-    auto bounding_boxes  = std::make_unique<BoundingBox<Scalar>[]>(allocation_size);
-    auto centers         = std::make_unique<Vector3<Scalar>[]>(allocation_size);
+compute_bounding_boxes_and_centers(const Primitive* primitives, size_t primitive_count) {
+    auto bounding_boxes  = std::make_unique<BoundingBox<Scalar>[]>(primitive_count);
+    auto centers         = std::make_unique<Vector3<Scalar>[]>(primitive_count);
 
     #pragma omp parallel for
     for (size_t i = 0; i < primitive_count; ++i) {
