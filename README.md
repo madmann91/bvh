@@ -97,7 +97,7 @@ or pre-build triangle splitting.
  - `bvh::HeuristicPrimitiveSplitting`: A pre-splitting algorithm that splits primitives at regular
    positions, inspired by _Fast Parallel Construction of High-Quality Bounding Volume Hierarchies_,
    by T. Karras and T. Aila. Works well in combination with `bvh::LinearBvhBuilder`, but may
-   decrease performance of other builders on some scenes. Takes a budget of primitives to split,
+   decrease performance for other builders on some scenes. Takes a budget of primitives to split,
    and distributes it to each primitive based on a priority heuristic.
 
 ### Traversal Algorithms
