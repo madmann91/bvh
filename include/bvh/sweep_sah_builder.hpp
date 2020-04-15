@@ -148,10 +148,12 @@ public:
         }
 
         std::pair<Scalar, size_t> best_splits[3];
-        bool should_spawn_tasks = item.work_size() > builder.task_spawn_threshold;
 
         // Sweep primitives to find the best cost
+#ifndef BVH_DISABLE_OPENMP_TASKS
+        bool should_spawn_tasks = item.work_size() > builder.task_spawn_threshold;
         #pragma omp taskloop if (should_spawn_tasks) grainsize(1) default(shared)
+#endif
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis, item.begin, item.end);
 
@@ -187,18 +189,28 @@ public:
         auto right_bbox = BoundingBox<Scalar>::empty();
 
         // Partition reference arrays and compute bounding boxes
+#ifndef BVH_DISABLE_OPENMP_TASKS
         #pragma omp taskgroup
+#endif
         {
+#ifndef BVH_DISABLE_OPENMP_TASKS
             #pragma omp task if (should_spawn_tasks) default(shared)
+#endif
             { std::stable_partition(references[other_axis[0]] + item.begin, references[other_axis[0]] + item.end, partition_predicate); }
+#ifndef BVH_DISABLE_OPENMP_TASKS
             #pragma omp task if (should_spawn_tasks) default(shared)
+#endif
             { std::stable_partition(references[other_axis[1]] + item.begin, references[other_axis[1]] + item.end, partition_predicate); }
+#ifndef BVH_DISABLE_OPENMP_TASKS
             #pragma omp task if (should_spawn_tasks) default(shared)
+#endif
             {
                 for (size_t i = item.begin; i < split_index; ++i)
                     left_bbox.extend(bboxes[references[best_axis][i]]);
             }
+#ifndef BVH_DISABLE_OPENMP_TASKS
             #pragma omp task if (should_spawn_tasks) default(shared)
+#endif
             {
                 for (size_t i = split_index; i < item.end; ++i)
                     right_bbox.extend(bboxes[references[best_axis][i]]);
@@ -207,7 +219,9 @@ public:
 
         // Allocate space for children
         size_t left_index;
+#ifndef BVH_DISABLE_OPENMP_TASKS
         #pragma omp atomic capture
+#endif
         { left_index = bvh.node_count; bvh.node_count += 2; }
 
         auto& left  = bvh.nodes[left_index + 0];
