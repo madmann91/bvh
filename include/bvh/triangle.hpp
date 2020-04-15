@@ -46,8 +46,47 @@ struct Triangle {
 
     std::pair<Vector3<Scalar>, Vector3<Scalar>> edge(size_t i) const {
         assert(i < 3);
-        Vector3<Scalar> p[] { p0, p1(), p2() };
+        Vector3<Scalar> p[] = { p0, p1(), p2() };
         return std::make_pair(p[i], p[(i + 1) % 3]);
+    }
+
+    Scalar area() const {
+        return length(n) * Scalar(0.5);
+    }
+
+    std::pair<BoundingBox<Scalar>, BoundingBox<Scalar>> split(size_t axis, Scalar pos) const {
+        Vector3<Scalar> p[] = { p0, p1(), p2() };
+        auto left  = BoundingBox<Scalar>::empty();
+        auto right = BoundingBox<Scalar>::empty();
+        auto split_edge = [=] (const Vector3<Scalar>& a, const Vector3<Scalar>& b) {
+            auto t = (pos - a[axis]) / (b[axis] - a[axis]);
+            return a + t * (b - a);
+        };
+        auto q0 = p[0][axis] < pos;
+        auto q1 = p[1][axis] < pos;
+        auto q2 = p[2][axis] < pos;
+        if (q0) left.extend(p[0]);
+        else    right.extend(p[0]);
+        if (q1) left.extend(p[1]);
+        else    right.extend(p[1]);
+        if (q2) left.extend(p[2]);
+        else    right.extend(p[2]);
+        if (q0 ^ q1) {
+            auto m = split_edge(p[0], p[1]);
+            left.extend(m);
+            right.extend(m);
+        }
+        if (q1 ^ q2) {
+            auto m = split_edge(p[1], p[2]);
+            left.extend(m);
+            right.extend(m);
+        }
+        if (q2 ^ q0) {
+            auto m = split_edge(p[2], p[0]);
+            left.extend(m);
+            right.extend(m);
+        }
+        return std::make_pair(left, right);
     }
 
     std::optional<Intersection> intersect(const Ray<Scalar>& ray) const {

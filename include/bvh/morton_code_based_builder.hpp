@@ -52,20 +52,13 @@ protected:
         Morton* unsorted_morton_codes      = morton_codes_copy.get();
         size_t* unsorted_primitive_indices = primitive_indices_copy.get();
 
-        auto dim = Morton(1) << bit_count;
+        MortonEncoder<Morton, Scalar> encoder(global_bbox, size_t(1) << bit_count);
 
         #pragma omp parallel if (primitive_count > loop_parallel_threshold)
         {
-            auto world_to_grid = Scalar(dim) * global_bbox.diagonal().inverse();
-            auto grid_offset = -global_bbox.min * world_to_grid;
-
             #pragma omp for
             for (size_t i = 0; i < primitive_count; ++i) {
-                auto grid_position = centers[i] * world_to_grid + grid_offset;
-                Morton x = std::min(dim - 1, Morton(std::max(grid_position[0], Scalar(0))));
-                Morton y = std::min(dim - 1, Morton(std::max(grid_position[1], Scalar(0))));
-                Morton z = std::min(dim - 1, Morton(std::max(grid_position[2], Scalar(0))));
-                morton_codes[i] = morton_encode(x, y, z);
+                morton_codes[i] = encoder.encode(centers[i]);
                 primitive_indices[i] = i;
             }
 

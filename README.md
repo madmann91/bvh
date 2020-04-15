@@ -94,6 +94,11 @@ or pre-build triangle splitting.
    in a way that minimizes the SAH (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
    by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
    at the cost of longer build times.
+ - `bvh::HeuristicPrimitiveSplitting`: A pre-splitting algorithm that splits primitives at regular
+   positions, inspired by _Fast Parallel Construction of High-Quality Bounding Volume Hierarchies_,
+   by T. Karras and T. Aila. Works well in combination with builders that rely on Morton codes,
+   and can bring modest performance improvements to other builders as well. Takes a budget
+   of primitives to split, and distributes it to each primitive based on a priority heuristic.
 
 ### Traversal Algorithms
 

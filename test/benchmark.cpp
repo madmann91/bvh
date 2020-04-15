@@ -13,6 +13,7 @@
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
+#include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
@@ -44,17 +45,18 @@ static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
         "\nOptions:\n"
-        "  --help              Shows this message.\n"
-        "  --builder <name>    Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --optimizer <name>  Sets the BVH optimizer to use (none by default).\n"
-        "  --pre-shuffle       Activates the pre-shuffling optimization.\n"
-        "  --eye <x> <y> <z>   Sets the position of the camera.\n"
-        "  --dir <x> <y> <z>   Sets the direction of the camera.\n"
-        "  --up  <x> <y> <z>   Sets the up vector of the camera.\n"
-        "  --fov <degrees>     Sets the field of view.\n"
-        "  --width <pixels>    Sets the image width.\n"
-        "  --height <pixels>   Sets the image height.\n"
-        "  -o <file.ppm>       Sets the output file name (defaults to 'render.ppm').\n\n"
+        "  --help                Shows this message.\n"
+        "  --builder <name>      Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "  --optimizer <name>    Sets the BVH optimizer to use (none by default).\n"
+        "  --pre-shuffle         Activates the pre-shuffling optimization (disabled by default).\n"
+        "  --pre-split <percent> Activates pre-splitting and sets the percentage of references (disabled by default).\n"
+        "  --eye <x> <y> <z>     Sets the position of the camera.\n"
+        "  --dir <x> <y> <z>     Sets the direction of the camera.\n"
+        "  --up  <x> <y> <z>     Sets the up vector of the camera.\n"
+        "  --fov <degrees>       Sets the field of view.\n"
+        "  --width <pixels>      Sets the image width.\n"
+        "  --height <pixels>     Sets the image height.\n"
+        "  -o <file.ppm>         Sets the output file name (defaults to 'render.ppm').\n\n"
         "  --rotate <axis> <degrees>\n\n"
         "    Rotates the scene by the given amount of degrees on the\n"
         "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
@@ -185,6 +187,7 @@ int main(int argc, char** argv) {
         60
     };
     bool pre_shuffle = false;
+    Scalar pre_split_factor = 0;
     bool collect_statistics = false;
     size_t rotation_axis = 3;
     Scalar rotation_degrees = 0;
@@ -228,6 +231,14 @@ int main(int argc, char** argv) {
                 *name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
+            } else if (!strcmp(argv[i], "--pre-split")) {
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                pre_split_factor = strtof(argv[++i], NULL) / Scalar(100.0);
+                if (pre_split_factor < 0) {
+                    std::cerr << "Invalid pre-split factor." << std::endl;
+                    return 1;
+                }
             } else if (!strcmp(argv[i], "--rotate")) {
                 if (i + 2 >= argc)
                     return not_enough_arguments(argv[i]);
@@ -330,6 +341,8 @@ int main(int argc, char** argv) {
 
     // Build an acceleration data structure for this object set
     std::cout << "Building BVH (" << builder_name;
+    if (pre_split_factor)
+        std::cout << " + pre-split";
     if (optimizer_name)
         std::cout << " + " << optimizer_name;
     if (pre_shuffle)
@@ -339,10 +352,15 @@ int main(int argc, char** argv) {
         auto [bboxes, centers] =
             bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
         auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), triangles.size());
-        builder(bvh, global_bbox, bboxes.get(), centers.get(), triangles.size());
+        bvh::HeuristicPrimitiveSplitter<Triangle> splitter;
+        if (pre_split_factor > 0)
+            std::tie(reference_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
+        builder(bvh, global_bbox, bboxes.get(), centers.get(), reference_count);
+        if (pre_split_factor > 0)
+            splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
         if (pre_shuffle)
-            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), triangles.size());
+            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
 
     std::cout << bvh.node_count << " node(s), " << reference_count << " reference(s)" << std::endl;

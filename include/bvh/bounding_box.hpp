@@ -14,6 +14,12 @@ struct BoundingBox {
     BoundingBox(const Vector3<Scalar>& v) : min(v), max(v) {}
     BoundingBox(const Vector3<Scalar>& min, const Vector3<Scalar>& max) : min(min), max(max) {}
 
+    BoundingBox& shrink(const BoundingBox& bbox) {
+        min = bvh::max(min, bbox.min);
+        max = bvh::min(max, bbox.max);
+        return *this;
+    }
+
     BoundingBox& extend(const BoundingBox& bbox) {
         min = bvh::min(min, bbox.min);
         max = bvh::max(max, bbox.max);
@@ -28,6 +34,10 @@ struct BoundingBox {
 
     Vector3<Scalar> diagonal() const {
         return max - min;
+    }
+
+    Vector3<Scalar> center() const {
+        return (max + min) * Scalar(0.5);
     }
 
     Scalar half_area() const {
@@ -46,6 +56,10 @@ struct BoundingBox {
         if (d[0] < d[1]) axis = 1;
         if (d[axis] < d[2]) axis = 2;
         return axis;
+    }
+
+    Scalar largest_extent() const {
+        return diagonal()[largest_axis()];
     }
 
     static BoundingBox full() {
