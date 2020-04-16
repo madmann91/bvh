@@ -1,0 +1,12 @@
+language: cpp
+os: linux
+compiler:
+  - clang
+  - gcc
+before_script:
+  - mkdir build
+  - cd build
+  - cmake ..
+script:
+  - cmake --build .
+  - ctest
