@@ -71,6 +71,7 @@ void atomic_max(std::atomic<Scalar>& x, Scalar y) {
 template <typename Primitive>
 std::unique_ptr<Primitive[]> shuffle_primitives(const Primitive* primitives, const size_t* indices, size_t primitive_count) {
     auto primitives_copy = std::make_unique<Primitive[]>(primitive_count);
+    #pragma omp parallel for
     for (size_t i = 0; i < primitive_count; ++i)
         primitives_copy[i] = primitives[indices[i]];
     return primitives_copy;
