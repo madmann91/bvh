@@ -124,7 +124,10 @@ public:
     {
         assert(primitive_count > 0);
 
-        auto [primitive_indices, morton_codes] =
+        std::unique_ptr<size_t[]> primitive_indices;
+        std::unique_ptr<Morton[]> morton_codes;
+
+        std::tie(primitive_indices, morton_codes) =
             sort_primitives_by_morton_code(global_bbox, centers, primitive_count);
 
         auto node_count = 2 * primitive_count - 1;

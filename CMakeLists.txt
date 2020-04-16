@@ -12,6 +12,8 @@ if (NOT MSVC)
     if (OpenMP_CXX_FOUND)
         target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
     endif ()
+else ()
+    message(STATUS "OpenMP is disabled because MSVC only supports OpenMP 2.0.")
 endif ()
 
 include(cmake/FindRestrictKeyword.cmake)

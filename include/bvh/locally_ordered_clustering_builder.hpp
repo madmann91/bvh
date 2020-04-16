@@ -137,8 +137,8 @@ public:
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
-        auto [primitive_indices, _] =
-            sort_primitives_by_morton_code(global_bbox, centers, primitive_count);
+        auto primitive_indices =
+            sort_primitives_by_morton_code(global_bbox, centers, primitive_count).first;
 
         auto node_count     = 2 * primitive_count - 1;
         auto nodes          = std::make_unique<Node[]>(node_count);
