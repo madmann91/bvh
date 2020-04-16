@@ -57,11 +57,11 @@ protected:
 
             auto more_work = task.build(work_item);
             if (more_work) {
-                auto [first_item, second_item] = *more_work;
-                if (first_item.work_size() > second_item.work_size())
-                    std::swap(first_item, second_item);
+                if (more_work->first.work_size() > more_work->second.work_size())
+                    std::swap(more_work->first, more_work->second);
 
-                stack.push(second_item);
+                stack.push(more_work->second);
+                auto first_item = more_work->first;
                 if (first_item.work_size() > task_spawn_threshold) {
                     BuildTask new_task(task);
                     #pragma omp task firstprivate(new_task, first_item)
