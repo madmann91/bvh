@@ -23,4 +23,4 @@ before_script:
 
 script:
     - cmake --build .
-    - ctest
+    - ctest --verbose
