@@ -1,8 +1,26 @@
 language: cpp
 os: linux
 dist: bionic
+
 compiler:
-  - clang
-  - gcc
-before_script: travis/download-and-run-cmake.sh
-script: travis/build-and-test.sh
+    - clang
+    - gcc
+
+install:
+    # Install libomp, necessary for OpenMP with clang
+    - sudo apt-get -y install libomp-dev
+    # Download CMake
+    - CMAKE_INSTALL_DIR="${TRAVIS_BUILD_DIR}/cmake-install"
+    - wget https://github.com/Kitware/CMake/releases/download/v3.17.1/cmake-3.17.1-Linux-x86_64.tar.gz
+    - tar -xvf cmake-3.17.1-Linux-x86_64.tar.gz > /dev/null
+    - mv cmake-3.17.1-Linux-x86_64 cmake-install
+    - PATH=${CMAKE_INSTALL_DIR}:${CMAKE_INSTALL_DIR}/bin:$PATH
+
+before_script:
+    - mkdir -p build
+    - cd build
+    - cmake ..
+
+script:
+    - cmake --build .
+    - ctest
