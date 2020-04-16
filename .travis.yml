@@ -4,10 +4,5 @@ dist: bionic
 compiler:
   - clang
   - gcc
-before_script:
-  - mkdir build
-  - cd build
-  - cmake ..
-script:
-  - cmake --build .
-  - ctest
+before_script: travis/download-and-run-cmake.sh
+script: travis/build-and-test.sh
