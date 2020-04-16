@@ -76,6 +76,15 @@ public:
                 size_t split_begin = i > 0 ? split_indices[i - 1] : 0;
                 size_t split_count = split_indices[i] - split_begin;
 
+                // Use the primitive's center instead of the bounding box
+                // center if the primitive is not split.
+                if (split_count == 1) {
+                    bboxes[split_begin]  = primitives[i].bounding_box();
+                    centers[split_begin] = primitives[i].center();
+                    original_indices[split_begin] = i;
+                    continue;
+                }
+
                 // Split this primitive
                 size_t j = split_begin;
                 stack.emplace(primitives[i].bounding_box(), split_count);
