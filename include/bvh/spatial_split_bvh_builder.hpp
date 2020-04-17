@@ -420,7 +420,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         } 
 
         assert(left_end == right_begin);
-        assert(right_end < item.split_end);
+        assert(right_end <= item.split_end);
         return allocate_children(bvh, item, parent, right_begin, right_end, left_bbox, right_bbox);
     }
 
