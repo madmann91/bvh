@@ -47,14 +47,13 @@ high-quality BVHs also built by Embree, this library is around 50% slower (20-30
 optimization enabled), but the actual number can vary depending on the type of ray (e.g. coherent/incoherent)
 and the scene. To match that level of performance, this library would have to implement:
 
-  - Spatial splits (see _Spatial Splits in Bounding Volume Hierarchies_, by Stich et al.),
   - Higher-arity BVHs (BVH4 or BVH8, with more than just two children per node),
   - Vectorization of the traversal and intersection routines.
 
-While spatial splits may be added in the future, wider BVHs and vectorization go against the principles of
-simplicity and portability followed by this library and will most likely never be implemented. Instead, algorithmic
-improvements such as post-build optimizations will be investigated, as long as they offer a good compromise
-between implementation complexity and performance improvements.
+Wider BVHs and vectorization go against the principles of simplicity and portability followed by this library
+and will most likely never be implemented. Instead, algorithmic improvements such as post-build optimizations
+will be investigated, as long as they offer a good compromise between implementation complexity and performance
+improvements.
 
 ## Detailed Description
 
@@ -69,7 +68,7 @@ This library contains several construction algorithms, all parallelized using Op
    _On fast Construction of SAH-based Bounding Volume Hierarchies_, by I. Wald). Relatively fast
    and produces medium- to high-quality trees. Can be configured by setting the number of bins.
  - `bvh::SweepSahBuilder`: Top-down builder that sorts primitives on all axes and sweeps them
-   to find the split with the lowest SAH. Relatively slow but produces high-quality trees.
+   to find the split with the lowest SAH cost. Relatively slow but produces high-quality trees.
  - `bvh::LocallyOrderedClusteringBuilder`: Bottom-up builder that produces trees by sorting
    primitives on a Morton curve and performing a local search to merge them into nodes (see
    _Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction_,
@@ -82,6 +81,12 @@ This library contains several construction algorithms, all parallelized using Op
    search radius of that algorithm is small. Since the BVHs built by this algorithm are significantly
    worse than those produced by other algorithms, do not use this builder unless you absolutely
    need the fastest construction algorithm.
+ - `bvh::SpatialSplitBvhBuilder`: Top-down SBVH builder that splits primitives to minimize overlap
+   between nodes. Based on the article _Spatial Splits in Bounding Volume Hierarchies_, by M. Stich et al.
+   Produces very high-quality trees, at the cost of very slow BVH builds. Use for offline rendering.
+   Although it is possible to disable spatial splits and only perform object splits with this builder,
+   prefer `bvh::SweepSahBuilder` for this as, unlike this builder, it does not need to sort references
+   at every step.
 
 Those algorithms only require a bounding box and center for each primitive.
 

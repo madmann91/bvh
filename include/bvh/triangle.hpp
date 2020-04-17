@@ -54,17 +54,17 @@ struct Triangle {
         return length(n) * Scalar(0.5);
     }
 
-    std::pair<BoundingBox<Scalar>, BoundingBox<Scalar>> split(size_t axis, Scalar pos) const {
+    std::pair<BoundingBox<Scalar>, BoundingBox<Scalar>> split(size_t axis, Scalar position) const {
         Vector3<Scalar> p[] = { p0, p1(), p2() };
         auto left  = BoundingBox<Scalar>::empty();
         auto right = BoundingBox<Scalar>::empty();
         auto split_edge = [=] (const Vector3<Scalar>& a, const Vector3<Scalar>& b) {
-            auto t = (pos - a[axis]) / (b[axis] - a[axis]);
+            auto t = (position - a[axis]) / (b[axis] - a[axis]);
             return a + t * (b - a);
         };
-        auto q0 = p[0][axis] < pos;
-        auto q1 = p[1][axis] < pos;
-        auto q2 = p[2][axis] < pos;
+        auto q0 = p[0][axis] <= position;
+        auto q1 = p[1][axis] <= position;
+        auto q2 = p[2][axis] <= position;
         if (q0) left.extend(p[0]);
         else    right.extend(p[0]);
         if (q1) left.extend(p[1]);

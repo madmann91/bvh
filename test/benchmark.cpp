@@ -10,6 +10,7 @@
 #include <bvh/bvh.hpp>
 #include <bvh/binned_sah_builder.hpp>
 #include <bvh/sweep_sah_builder.hpp>
+#include <bvh/spatial_split_bvh_builder.hpp>
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
@@ -70,6 +71,7 @@ static void usage() {
         "\nBuilders:\n"
         "  binned_sah,\n"
         "  sweep_sah,\n"
+        "  spatial_split,\n"
         "  locally_ordered_clustering,\n"
         "  linear\n"
         "\nOptimizers:\n"
@@ -277,29 +279,39 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::function<void(Bvh&, const BoundingBox&, const BoundingBox*, const Vector3*, size_t)> builder;
+    std::function<size_t(Bvh&, const Triangle*, const BoundingBox&, const BoundingBox*, const Vector3*, size_t)> builder;
     if (!strcmp(builder_name, "binned_sah")) {
-        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const Triangle*, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             static constexpr size_t bin_count = 16;
             bvh::BinnedSahBuilder<Bvh, bin_count> builder(bvh);
             builder.build(global_bbox, bboxes, centers, primitive_count);
+            return primitive_count;
         };
     } else if (!strcmp(builder_name, "sweep_sah")) {
-        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const Triangle*, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             bvh::SweepSahBuilder<Bvh> builder(bvh);
             builder.build(global_bbox, bboxes, centers, primitive_count);
+            return primitive_count;
+        };
+    } else if (!strcmp(builder_name, "spatial_split")) {
+        builder = [] (Bvh& bvh, const Triangle* triangles, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+            static constexpr size_t bin_count = 64;
+            bvh::SpatialSplitBvhBuilder<Bvh, Triangle, bin_count> builder(bvh);
+            return builder.build(global_bbox, triangles, bboxes, centers, primitive_count);
         };
     } else if (!strcmp(builder_name, "locally_ordered_clustering")) {
-        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const Triangle*, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             using Morton = uint32_t;
             bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
             builder.build(global_bbox, bboxes, centers, primitive_count);
+            return primitive_count;
         };
     } else if (!strcmp(builder_name, "linear")) {
-        builder = [] (Bvh& bvh, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
+        builder = [] (Bvh& bvh, const Triangle*, const BoundingBox& global_bbox, const BoundingBox* bboxes, const Vector3* centers, size_t primitive_count) {
             using Morton = uint32_t;
             bvh::LinearBvhBuilder<Bvh, Morton> builder(bvh);
             builder.build(global_bbox, bboxes, centers, primitive_count);
+            return primitive_count;
         };
     } else {
         std::cerr << "Unknown BVH builder name" << std::endl;
@@ -355,7 +367,7 @@ int main(int argc, char** argv) {
         bvh::HeuristicPrimitiveSplitter<Triangle> splitter;
         if (pre_split_factor > 0)
             std::tie(reference_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
-        builder(bvh, global_bbox, bboxes.get(), centers.get(), reference_count);
+        reference_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), reference_count);
         if (pre_split_factor > 0)
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
