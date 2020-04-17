@@ -50,7 +50,7 @@ struct Sphere  {
             auto t1 = -(b - std::sqrt(delta)) * inv;
             auto t = std::fmin(t0 > ray.tmin ? t0 : t1, t1 > ray.tmin ? t1 : t0);
             if (t > ray.tmin && t < ray.tmax)
-                return std::make_optional(Intersection(t));
+                return std::make_optional(Intersection { t });
         }
 
         return std::nullopt;
