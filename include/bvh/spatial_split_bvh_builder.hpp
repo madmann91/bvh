@@ -242,7 +242,6 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         // - [item.begin...right_begin[ is the range of references on the left,
         // - [right_begin...right_end[ is the range of references on the right,
         // - [right_end...item.split_end[ is the free split space
-
         size_t remaining_split_count = item.split_end - right_end;
         auto left_cost  = left_bbox.half_area() * (right_begin - item.begin);
         auto right_cost = right_bbox.half_area() * (right_end - right_begin);
@@ -335,9 +334,8 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
                 found = true;
             }
         }
-        if (found)
-            return std::make_optional(std::make_pair(split.position - bin_size, split.position + bin_size));
-        return std::nullopt;
+
+        return found ? std::make_optional(std::make_pair(split.position - bin_size, split.position + bin_size)) : std::nullopt;
     }
 
     SpatialSplit find_spatial_split(const BoundingBox<Scalar>& node_bbox, size_t begin, size_t end, size_t binning_pass_count) {
@@ -500,11 +498,9 @@ public:
         }
 
         // Apply the (object/spatial) split
-        if (use_spatial_split) {
-            return std::make_optional(apply_spatial_split(bvh, node, best_spatial_split, item));
-        } else {
-            return std::make_optional(apply_object_split(bvh, node, best_object_split, item));
-        }
+        return use_spatial_split
+            ? std::make_optional(apply_spatial_split(bvh, node, best_spatial_split, item))
+            : std::make_optional(apply_object_split(bvh, node, best_object_split, item));
     }
 };
 
