@@ -21,9 +21,10 @@ class BinnedSahBuilder :
     public TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinCount>>,
     public SahBasedAlgorithm<Bvh>
 {
-    using Scalar = typename Bvh::ScalarType;
+    using Scalar    = typename Bvh::ScalarType;
+    using BuildTask = BinnedSahBuildTask<Bvh, BinCount>;
 
-    using ParentBuilder = TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinCount>>;
+    using ParentBuilder = TopDownBuilder<Bvh, BuildTask>;
     using ParentBuilder::bvh;
     using ParentBuilder::run_task;
 
@@ -48,6 +49,7 @@ public:
         bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);
 
         bvh.node_count = 1;
+        bvh.nodes[0].bounding_box_proxy() = global_bbox;
 
         #pragma omp parallel
         {
@@ -57,8 +59,7 @@ public:
 
             #pragma omp single
             {
-                bvh.nodes[0].bounding_box_proxy() = global_bbox;
-                BinnedSahBuildTask first_task(*this, bboxes, centers);
+                BuildTask first_task(*this, bboxes, centers);
                 run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
@@ -66,10 +67,11 @@ public:
 };
 
 template <typename Bvh, size_t BinCount>
-class BinnedSahBuildTask {
+class BinnedSahBuildTask : public TopDownBuildTask {
     using Scalar  = typename Bvh::ScalarType;
     using Builder = TopDownBuilder<Bvh, BinnedSahBuildTask>;
-    using WorkItem = typename Builder::WorkItem;
+
+    using TopDownBuildTask::WorkItem;
 
     struct Bin {
         BoundingBox<Scalar> bbox;
@@ -128,6 +130,8 @@ class BinnedSahBuildTask {
     }
 
 public:
+    using WorkItemType = WorkItem;
+
     BinnedSahBuildTask(Builder& builder, const BoundingBox<Scalar>* bboxes, const Vector3<Scalar>* centers)
         : builder(builder), bboxes(bboxes), centers(centers)
     {}
@@ -204,12 +208,13 @@ public:
         // Check that the split does not leave one side empty
         if (begin_right > item.begin && begin_right < item.end) {
             // Allocate two nodes
-            size_t left_index;
+            size_t first_child;
             #pragma omp atomic capture
-            { left_index = bvh.node_count; bvh.node_count += 2; }
-            auto& left  = bvh.nodes[left_index + 0];
-            auto& right = bvh.nodes[left_index + 1];
-            node.first_child_or_primitive = left_index;
+            { first_child = bvh.node_count; bvh.node_count += 2; }
+
+            auto& left  = bvh.nodes[first_child + 0];
+            auto& right = bvh.nodes[first_child + 1];
+            node.first_child_or_primitive = first_child;
             node.primitive_count          = 0;
             node.is_leaf                  = false;
 
@@ -225,8 +230,8 @@ public:
             right.bounding_box_proxy() = right_bbox;
 
             // Return new work items
-            WorkItem first_item (left_index + 0, item.begin, begin_right, item.depth + 1);
-            WorkItem second_item(left_index + 1, begin_right, item.end,   item.depth + 1);
+            WorkItem first_item (first_child + 0, item.begin, begin_right, item.depth + 1);
+            WorkItem second_item(first_child + 1, begin_right, item.end,   item.depth + 1);
             return std::make_optional(std::make_pair(first_item, second_item));
         }
 

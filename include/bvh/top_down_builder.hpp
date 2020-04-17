@@ -6,12 +6,9 @@
 
 namespace bvh {
 
-/// Base class for top-down BVH builders.
-template <typename Bvh, typename BuildTask>
-class TopDownBuilder {
-    friend BuildTask;
-
-public:
+/// Base class for build tasks
+class TopDownBuildTask {
+protected:
     struct WorkItem {
         size_t node_index;
         size_t begin;
@@ -25,7 +22,16 @@ public:
 
         size_t work_size() const { return end - begin; }
     };
+};
 
+/// Base class for top-down BVH builders.
+template <typename Bvh, typename BuildTask>
+class TopDownBuilder {
+    friend BuildTask;
+
+    using WorkItem = typename BuildTask::WorkItemType;
+
+public:
     /// Threshold (number of primitives) under which the builder
     /// doesn't spawn any more OpenMP tasks.
     size_t task_spawn_threshold = 1024;

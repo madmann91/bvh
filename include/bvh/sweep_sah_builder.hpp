@@ -21,14 +21,13 @@ class SweepSahBuilder :
     public TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>>,
     public SahBasedAlgorithm<Bvh>
 {
-    using Scalar = typename Bvh::ScalarType;
-    using Mark   = typename SweepSahBuildTask<Bvh>::MarkType;
+    using Scalar    = typename Bvh::ScalarType;
+    using BuildTask = SweepSahBuildTask<Bvh>;
+    using Mark      = typename BuildTask::MarkType;
 
-    using ParentBuilder = TopDownBuilder<Bvh, SweepSahBuildTask<Bvh>>;
+    using ParentBuilder = TopDownBuilder<Bvh, BuildTask>;
     using ParentBuilder::bvh;
     using ParentBuilder::run_task;
-
-    using SahBasedAlgorithm<Bvh>::cost;
 
 public:
     using ParentBuilder::max_depth;
@@ -46,8 +45,8 @@ public:
         size_t primitive_count)
     {
         // Allocate buffers
-        bvh.nodes.reset(new typename Bvh::Node[2 * primitive_count + 1]);
-        bvh.primitive_indices.reset(new size_t[primitive_count]);
+        bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * primitive_count + 1);
+        bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);
 
         auto reference_data = std::make_unique<size_t[]>(primitive_count * 2);
         auto cost_data      = std::make_unique<Scalar[]>(primitive_count * 3);
@@ -66,6 +65,7 @@ public:
         };
 
         bvh.node_count = 1;
+        bvh.nodes[0].bounding_box_proxy() = global_bbox;
 
         #pragma omp parallel
         {
@@ -79,8 +79,7 @@ public:
 
             #pragma omp single
             {
-                bvh.nodes[0].bounding_box_proxy() = global_bbox;
-                SweepSahBuildTask<Bvh> first_task(*this, bboxes, centers, references, costs, mark_data.get());
+                BuildTask first_task(*this, bboxes, centers, references, costs, mark_data.get());
                 run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
@@ -88,11 +87,12 @@ public:
 };
 
 template <typename Bvh>
-class SweepSahBuildTask {
-    using Scalar   = typename Bvh::ScalarType;
-    using Builder  = TopDownBuilder<Bvh, SweepSahBuildTask>;
-    using WorkItem = typename Builder::WorkItem;
-    using Mark     = uint_fast8_t;
+class SweepSahBuildTask : public TopDownBuildTask {
+    using Scalar  = typename Bvh::ScalarType;
+    using Builder = TopDownBuilder<Bvh, SweepSahBuildTask>;
+    using Mark    = uint_fast8_t;
+
+    using TopDownBuildTask::WorkItem;
 
     Builder& builder;
     const BoundingBox<Scalar>* bboxes;
@@ -120,7 +120,8 @@ class SweepSahBuildTask {
     }
 
 public:
-    using MarkType = Mark;
+    using MarkType     = Mark;
+    using WorkItemType = WorkItem;
 
     SweepSahBuildTask(
         Builder& builder,
@@ -206,20 +207,20 @@ public:
         }
 
         // Allocate space for children
-        size_t left_index;
+        size_t first_child;
         #pragma omp atomic capture
-        { left_index = bvh.node_count; bvh.node_count += 2; }
+        { first_child = bvh.node_count; bvh.node_count += 2; }
 
-        auto& left  = bvh.nodes[left_index + 0];
-        auto& right = bvh.nodes[left_index + 1];
-        node.first_child_or_primitive = left_index;
+        auto& left  = bvh.nodes[first_child + 0];
+        auto& right = bvh.nodes[first_child + 1];
+        node.first_child_or_primitive = first_child;
         node.primitive_count          = 0;
         node.is_leaf                  = false;
                 
         left.bounding_box_proxy()  = left_bbox;
         right.bounding_box_proxy() = right_bbox;
-        WorkItem first_item (left_index + 0, item.begin, split_index, item.depth + 1);
-        WorkItem second_item(left_index + 1, split_index, item.end,   item.depth + 1);
+        WorkItem first_item (first_child + 0, item.begin, split_index, item.depth + 1);
+        WorkItem second_item(first_child + 1, split_index, item.end,   item.depth + 1);
         return std::make_optional(std::make_pair(first_item, second_item));
     }
 };
