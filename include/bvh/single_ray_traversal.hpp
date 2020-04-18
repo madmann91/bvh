@@ -99,7 +99,7 @@ private:
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
-        if (bvh.nodes[0].is_leaf)
+        if (bvh__unlikely(bvh.nodes[0].is_leaf))
             return intersect_leaf(bvh.nodes[0], ray, best_hit, intersector, statistics);
 
         // Precompute the inverse direction to avoid divisions and refactor
