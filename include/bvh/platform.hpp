@@ -18,12 +18,18 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define bvh__restrict__      __restrict
 #define bvh__always_inline__ __attribute__((always_inline))
+#define bvh__likely(x)       __builtin_expect(x, true)
+#define bvh__unlikely(x)     __builtin_expect(x, false)
 #elif defined(_MSC_VER)
 #define bvh__restrict__      __restrict
 #define bvh__always_inline__ __forceinline
+#define bvh__likely(x)       x
+#define bvh__unlikely(x)     x
 #else
 #define bvh__restrict__
 #define bvh__always_inline__
+#define bvh__likely(x)       x
+#define bvh__unlikely(x)     x
 #endif
 
 #endif
