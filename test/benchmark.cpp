@@ -50,6 +50,7 @@ static void usage() {
         "  --builder <name>      Sets the BVH builder to use (defaults to 'binned_sah').\n"
         "  --optimizer <name>    Sets the BVH optimizer to use (none by default).\n"
         "  --pre-shuffle         Activates the pre-shuffling optimization (disabled by default).\n"
+        "  --optimize-layout     Activates the node layout optimization (disabled by default).\n"
         "  --pre-split <percent> Activates pre-splitting and sets the percentage of references (disabled by default).\n"
         "  --eye <x> <y> <z>     Sets the position of the camera.\n"
         "  --dir <x> <y> <z>     Sets the direction of the camera.\n"
@@ -189,6 +190,7 @@ int main(int argc, char** argv) {
         60
     };
     bool pre_shuffle = false;
+    bool optimize_layout = false;
     Scalar pre_split_factor = 0;
     bool collect_statistics = false;
     size_t rotation_axis = 3;
@@ -233,6 +235,8 @@ int main(int argc, char** argv) {
                 *name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
+            } else if (!strcmp(argv[i], "--optimize-layout")) {
+                optimize_layout = true;
             } else if (!strcmp(argv[i], "--pre-split")) {
                 if (i + 1 >= argc)
                     return not_enough_arguments(argv[i]);
@@ -371,6 +375,8 @@ int main(int argc, char** argv) {
         if (pre_split_factor > 0)
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
+        if (optimize_layout)
+            bvh::optimize_node_layout(bvh);
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });

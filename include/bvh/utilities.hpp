@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <atomic>
 #include <memory>
+#include <queue>
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -93,6 +94,37 @@ BoundingBox<Scalar> compute_bounding_boxes_union(const BoundingBox<Scalar>* bbox
         bbox.extend(bboxes[i]);
 
     return bbox;
+}
+
+/// Optimizes the layout of BVH nodes so that the nodes
+/// with the highest area are closer to the beginning of
+/// the array of nodes.
+template <typename Bvh>
+void optimize_node_layout(Bvh& bvh) {
+    using Scalar = typename Bvh::ScalarType;
+    auto new_nodes = std::make_unique<typename Bvh::Node[]>(bvh.node_count);
+    std::priority_queue<std::tuple<Scalar, size_t, size_t>> queue;
+
+    size_t current_index = 0;
+    new_nodes[0] = bvh.nodes[0];
+    queue.emplace(0, 0, 0);
+    while (!queue.empty()) {
+        auto [_, old_index, new_index] = queue.top();
+        queue.pop();
+        auto& old_node = bvh.nodes[old_index];
+        if (!old_node.is_leaf) {
+            auto first_child = old_node.first_child_or_primitive;
+            auto& left_child  = bvh.nodes[first_child + 0];
+            auto& right_child = bvh.nodes[first_child + 1];
+            new_nodes[new_index].first_child_or_primitive = current_index;
+            new_nodes[current_index + 0] = left_child;
+            new_nodes[current_index + 1] = right_child;
+            queue.emplace(left_child.bounding_box_proxy().half_area(),  first_child + 0, current_index + 0);
+            queue.emplace(right_child.bounding_box_proxy().half_area(), first_child + 1, current_index + 1);
+            current_index += 2;
+        }
+    }
+    std::swap(bvh.nodes, new_nodes);
 }
 
 /// Templates that contains signed and unsigned integer types of the given number of bits.
