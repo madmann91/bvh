@@ -144,7 +144,7 @@ private:
 
             if (bvh__likely((left_child != NULL) ^ (right_child != NULL))) {
                 node = left_child != NULL ? left_child : right_child;
-            } else if (bvh__unlikely((left_child != NULL) ^ (right_child != NULL))) {
+            } else if (bvh__unlikely((left_child != NULL) & (right_child != NULL))) {
                 if (distance_left.first > distance_right.first)
                     std::swap(left_child, right_child);
                 stack.push(right_child);
