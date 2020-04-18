@@ -8,9 +8,9 @@ compiler:
 
 install:
     # Install libomp, necessary for OpenMP with clang
-    - sudo apt install -y libomp-dev
+    - sudo apt-get -y install libomp-dev
     # Install ImageMagick (optional) for the tests
-    - sudo apt install -y imagemagick
+    - sudo apt-get -y install imagemagick
     # Download CMake
     - CMAKE_INSTALL_DIR="${TRAVIS_BUILD_DIR}/cmake-install"
     - wget https://github.com/Kitware/CMake/releases/download/v3.17.1/cmake-3.17.1-Linux-x86_64.tar.gz
