@@ -7,7 +7,6 @@
 
 #include "bvh/morton_code_based_builder.hpp"
 #include "bvh/prefix_sum.hpp"
-#include "bvh/utilities.hpp"
 
 namespace bvh {
 
@@ -29,12 +28,12 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     PrefixSum<size_t> prefix_sum;
 
     std::pair<size_t, size_t> merge(
-        const Node* input_nodes,
-        Node* output_nodes,
-        const Level* input_levels,
-        Level* output_levels,
-        size_t* merged_index,
-        size_t* needs_merge,
+        const Node* bvh__restrict__ input_nodes,
+        Node* bvh__restrict__ output_nodes,
+        const Level* bvh__restrict__ input_levels,
+        Level* bvh__restrict__ output_levels,
+        size_t* bvh__restrict__ merged_index,
+        size_t* bvh__restrict__ needs_merge,
         size_t begin, size_t end,
         size_t previous_end)
     {

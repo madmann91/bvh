@@ -194,10 +194,11 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
 
     Builder& builder;
 
-    const Primitive*          primitives;
-    BoundingBox<Scalar>*      accumulated_bboxes;
-    std::array<Reference*, 3> references;
-    std::vector<bool>         reference_marks;
+    const Primitive*     primitives;
+    BoundingBox<Scalar>* accumulated_bboxes;
+    std::vector<bool>    reference_marks;
+
+    std::array<Reference* bvh__restrict__, 3> references;
 
     size_t& reference_count;
     size_t  primitive_count;
@@ -496,7 +497,7 @@ public:
         : builder(builder)
         , primitives(primitives)
         , accumulated_bboxes(accumulated_bboxes)
-        , references(references) 
+        , references { references[0], references[1], references[2] }
         , reference_count(reference_count)
         , primitive_count(primitive_count)
         , spatial_threshold(spatial_threshold)
