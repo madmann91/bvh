@@ -384,59 +384,97 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         auto left_bbox  = BoundingBox<Scalar>::empty();
         auto right_bbox = BoundingBox<Scalar>::empty();
 
+        // Choosing the references that are sorted on the split axis
+        // is more efficient than the others, since fewers swaps are
+        // necessary for primitives that are completely contained on
+        // one side of the partition.
+        auto references_to_split = references[split.axis];
+
         // Partition references such that:
         // - [item.begin...left_end[ is on the left,
         // - [left_end...right_begin[ is in between,
         // - [right_begin...item.end[ is on the right
         for (size_t i = item.begin; i < right_begin;) {
-            auto& bbox = references[0][i].bbox;
+            auto& bbox = references_to_split[i].bbox;
             if (bbox.max[split.axis] <= split.position) {
                 left_bbox.extend(bbox);
-                std::swap(references[0][i++], references[0][left_end++]);
+                std::swap(references_to_split[i++], references_to_split[left_end++]);
             } else if (bbox.min[split.axis] >= split.position) {
                 right_bbox.extend(bbox);
-                std::swap(references[0][i], references[0][--right_begin]);
+                std::swap(references_to_split[i], references_to_split[--right_begin]);
             } else {
                 i++;
             }
         }
 
+        size_t left_count  = left_end  - item.begin;
+        size_t right_count = right_end - right_begin;
+        if ((left_count == 0 || right_count == 0) && left_end == right_begin) {
+            // Sometimes, because of numerical imprecision,
+            // the algorithm will report that a spatial split is
+            // possible, but all references end up on the same side
+            // when applying it. To counteract this, we simply put
+            // half of the primitives of the left side in the right side
+            // and continue as usual.
+            if (left_count > 0) {
+                left_end -= left_count / 2;
+                right_begin = left_end;
+            } else {
+                left_end += right_count / 2;
+                right_begin = left_end;
+            }
+            // Recompute the left and right bounding boxes
+            left_bbox  = BoundingBox<Scalar>::empty();
+            right_bbox = BoundingBox<Scalar>::empty();
+            for (size_t i = item.begin; i < left_end; ++i)
+                left_bbox.extend(references_to_split[i].bbox);
+            for (size_t i = left_end; i < item.end; ++i)
+                right_bbox.extend(references_to_split[i].bbox);
+        }
+
         // Handle straddling references
         while (left_end < right_begin) {
-            auto reference = references[0][left_end];
+            auto reference = references_to_split[left_end];
             auto [left_primitive_bbox, right_primitive_bbox] =
                 primitives[reference.primitive_index].split(split.axis, split.position);
             left_primitive_bbox .shrink(reference.bbox);
             right_primitive_bbox.shrink(reference.bbox);
 
-            size_t left_count  = left_end  - item.begin;
-            size_t right_count = right_end - right_begin;
-
             // Make sure there is enough space to split that reference
             if (item.split_end - right_end > 0) {
                 left_bbox .extend(left_primitive_bbox);
                 right_bbox.extend(right_primitive_bbox);
-                references[0][right_end++] = Reference {
+                references_to_split[right_end++] = Reference {
                     right_primitive_bbox,
                     right_primitive_bbox.center(),
                     reference.primitive_index
                 };
-                references[0][left_end++] = Reference {
+                references_to_split[left_end++] = Reference {
                     left_primitive_bbox,
                     left_primitive_bbox.center(),
                     reference.primitive_index
                 };
+                left_count++;
+                right_count++;
             } else if (left_count < right_count) {
                 left_bbox.extend(reference.bbox);
                 left_end++;
+                left_count++;
             } else {
                 right_bbox.extend(reference.bbox);
-                std::swap(references[0][--right_begin], references[0][left_end]);
+                std::swap(references_to_split[--right_begin], references_to_split[left_end]);
+                right_count++;
             }
         } 
 
-        std::copy(references[0] + item.begin, references[0] + right_end, references[1] + item.begin);
-        std::copy(references[0] + item.begin, references[0] + right_end, references[2] + item.begin);
+        std::copy(
+            references_to_split + item.begin,
+            references_to_split + right_end,
+            references[(split.axis + 1) % 3] + item.begin);
+        std::copy(
+            references_to_split + item.begin,
+            references_to_split + right_end,
+            references[(split.axis + 2) % 3] + item.begin);
 
         assert(left_end == right_begin);
         assert(right_end <= item.split_end);
