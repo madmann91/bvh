@@ -305,7 +305,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
             { std::stable_partition(references[other_axis[1]] + item.begin, references[other_axis[1]] + item.end, partition_predicate); }
         }
 
-        return allocate_children(bvh, item, split.index, item.end, split.left_bbox, split.right_bbox, false);
+        return allocate_children(bvh, item, split.index, item.end, split.left_bbox, split.right_bbox, true);
     }
 
     std::optional<std::pair<Scalar, Scalar>>
