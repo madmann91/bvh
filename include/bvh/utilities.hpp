@@ -131,7 +131,7 @@ void optimize_bvh_layout(Bvh& bvh, size_t primitive_count) {
                 bvh.primitive_indices.get() + old_node.first_child_or_primitive + old_node.primitive_count,
                 new_primitive_indices.get() + current_primitive_index);
             current_primitive_index += old_node.primitive_count;
-        }          
+        }
     }
     std::swap(bvh.nodes, new_nodes);
     std::swap(bvh.primitive_indices, new_primitive_indices);
