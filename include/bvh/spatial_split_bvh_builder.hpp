@@ -298,9 +298,9 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
 
         #pragma omp taskgroup
         {
-            #pragma omp task if (item.work_size() < builder.task_spawn_threshold) default(shared)
+            #pragma omp task if (item.work_size() > builder.task_spawn_threshold) default(shared)
             { std::stable_partition(references[other_axis[0]] + item.begin, references[other_axis[0]] + item.end, partition_predicate); }
-            #pragma omp task if (item.work_size() < builder.task_spawn_threshold) default(shared)
+            #pragma omp task if (item.work_size() > builder.task_spawn_threshold) default(shared)
             { std::stable_partition(references[other_axis[1]] + item.begin, references[other_axis[1]] + item.end, partition_predicate); }
         }
 
