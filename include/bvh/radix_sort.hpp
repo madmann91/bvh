@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 
-#include "bvh/utilities.hpp"
+#include "bvh/platform.hpp"
 
 namespace bvh {
 
@@ -18,10 +18,10 @@ public:
 
     template <typename Key, typename Value>
     void sort(
-        Key*& keys,
-        Key*& keys_copy,
-        Value*& values,
-        Value*& values_copy,
+        Key* bvh__restrict__& keys,
+        Key* bvh__restrict__& keys_copy,
+        Value* bvh__restrict__& values,
+        Value* bvh__restrict__& values_copy,
         size_t count, size_t bit_count)
     {
         bvh__assert_in_parallel();
