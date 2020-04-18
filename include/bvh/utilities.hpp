@@ -100,12 +100,14 @@ BoundingBox<Scalar> compute_bounding_boxes_union(const BoundingBox<Scalar>* bbox
 /// with the highest area are closer to the beginning of
 /// the array of nodes.
 template <typename Bvh>
-void optimize_node_layout(Bvh& bvh) {
+void optimize_bvh_layout(Bvh& bvh, size_t primitive_count) {
     using Scalar = typename Bvh::ScalarType;
     auto new_nodes = std::make_unique<typename Bvh::Node[]>(bvh.node_count);
+    auto new_primitive_indices = std::make_unique<size_t[]>(primitive_count);
     std::priority_queue<std::tuple<Scalar, size_t, size_t>> queue;
 
-    size_t current_index = 0;
+    size_t current_node_index = 1;
+    size_t current_primitive_index = 0;
     new_nodes[0] = bvh.nodes[0];
     queue.emplace(0, 0, 0);
     while (!queue.empty()) {
@@ -116,15 +118,23 @@ void optimize_node_layout(Bvh& bvh) {
             auto first_child = old_node.first_child_or_primitive;
             auto& left_child  = bvh.nodes[first_child + 0];
             auto& right_child = bvh.nodes[first_child + 1];
-            new_nodes[new_index].first_child_or_primitive = current_index;
-            new_nodes[current_index + 0] = left_child;
-            new_nodes[current_index + 1] = right_child;
-            queue.emplace(left_child.bounding_box_proxy().half_area(),  first_child + 0, current_index + 0);
-            queue.emplace(right_child.bounding_box_proxy().half_area(), first_child + 1, current_index + 1);
-            current_index += 2;
-        }
+            new_nodes[new_index].first_child_or_primitive = current_node_index;
+            new_nodes[current_node_index + 0] = left_child;
+            new_nodes[current_node_index + 1] = right_child;
+            queue.emplace(left_child.bounding_box_proxy().half_area(),  first_child + 0, current_node_index + 0);
+            queue.emplace(right_child.bounding_box_proxy().half_area(), first_child + 1, current_node_index + 1);
+            current_node_index += 2;
+        } else {
+            new_nodes[new_index].first_child_or_primitive = current_primitive_index;
+            std::copy(
+                bvh.primitive_indices.get() + old_node.first_child_or_primitive,
+                bvh.primitive_indices.get() + old_node.first_child_or_primitive + old_node.primitive_count,
+                new_primitive_indices.get() + current_primitive_index);
+            current_primitive_index += old_node.primitive_count;
+        }          
     }
     std::swap(bvh.nodes, new_nodes);
+    std::swap(bvh.primitive_indices, new_primitive_indices);
 }
 
 /// Templates that contains signed and unsigned integer types of the given number of bits.
