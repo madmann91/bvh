@@ -19,10 +19,6 @@ else ()
     message(STATUS "OpenMP is disabled because MSVC only supports OpenMP 2.0.")
 endif ()
 
-include(cmake/FindRestrictKeyword.cmake)
-find_restrict_keyword(restrict_keyword)
-target_compile_definitions(bvh INTERFACE -Dbvh__restrict__=${restrict_keyword})
-
 # Make sure to only build tests when building this project,
 # and not when importing it into another one.
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
