@@ -30,10 +30,10 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
     PrefixSum<size_t> prefix_sum;
 
     std::pair<size_t, size_t> cluster(
-        const Node* bvh__restrict__ input,
-        Node* bvh__restrict__ output,
-        size_t* bvh__restrict__ neighbors,
-        size_t* bvh__restrict__ merged_index,
+        const Node* input,
+        Node* output,
+        size_t* neighbors,
+        size_t* merged_index,
         size_t begin, size_t end,
         size_t previous_end)
     {
