@@ -361,6 +361,8 @@ int main(int argc, char** argv) {
         std::cout << " + pre-split";
     if (optimizer_name)
         std::cout << " + " << optimizer_name;
+    if (optimize_layout)
+        std::cout << " + optimize-layout";
     if (pre_shuffle)
         std::cout << " + pre-shuffle";
     std::cout << ")..." << std::endl;
@@ -376,7 +378,7 @@ int main(int argc, char** argv) {
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
         if (optimize_layout)
-            bvh::optimize_node_layout(bvh);
+            bvh::optimize_bvh_layout(bvh, reference_count);
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
