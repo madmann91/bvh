@@ -52,11 +52,11 @@ struct Vector {
     }
 
     bvh__always_inline__ Vector operator - () const {
-        return Vector([=] (size_t i) { return -values[i]; });
+        return Vector([this] (size_t i) { return -values[i]; });
     }
 
     bvh__always_inline__ Vector inverse() const {
-        return Vector([=] (size_t i) { return Scalar(1) / values[i]; });
+        return Vector([this] (size_t i) { return Scalar(1) / values[i]; });
     }
 
     bvh__always_inline__ Scalar& operator [] (size_t i) { return values[i]; }
