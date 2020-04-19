@@ -88,7 +88,8 @@ This library contains several construction algorithms, all parallelized using Op
    prefer `bvh::SweepSahBuilder` for this as, unlike this builder, it does not need to sort references
    at every step.
 
-Those algorithms only require a bounding box and center for each primitive.
+Those algorithms only require a bounding box and center for each primitive, except for
+`bvh::SpatialSplitBvhBuilder`, which needs a way to split individual primitives.
 
 ### Optimization/Splitting Algorithms
 
