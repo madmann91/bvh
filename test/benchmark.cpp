@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
         if (optimize_layout)
-            bvh::optimize_bvh_layout(bvh, reference_count);
+            bvh::optimize_bvh_layout(bvh);
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
