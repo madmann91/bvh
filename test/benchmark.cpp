@@ -14,6 +14,7 @@
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
+#include <bvh/layout_optimization.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
@@ -377,8 +378,10 @@ int main(int argc, char** argv) {
         if (pre_split_factor > 0)
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
-        if (optimize_layout)
-            bvh::optimize_bvh_layout(bvh);
+        if (optimize_layout) {
+            bvh::LayoutOptimization layout_optimizer(bvh);
+            layout_optimizer.optimize();
+        }
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
