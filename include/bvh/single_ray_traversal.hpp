@@ -124,8 +124,8 @@ private:
             auto distance_left  = intersect_node(*left_child,  inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
             auto distance_right = intersect_node(*right_child, inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
 
-            if (distance_left.first <= distance_left.second) {
-                if (bvh__unlikely(left_child->is_leaf)) {
+            if (bvh__unlikely(distance_left.first <= distance_left.second)) {
+                if (left_child->is_leaf) {
                     if (intersect_leaf(*left_child, ray, best_hit, intersector, statistics) && intersector.any_hit)
                         break;
                     left_child = nullptr;
@@ -133,8 +133,8 @@ private:
             } else
                 left_child = nullptr;
 
-            if (distance_right.first <= distance_right.second) {
-                if (bvh__unlikely(right_child->is_leaf)) {
+            if (bvh__unlikely(distance_right.first <= distance_right.second)) {
+                if (right_child->is_leaf) {
                     if (intersect_leaf(*right_child, ray, best_hit, intersector, statistics) && intersector.any_hit)
                         break;
                     right_child = nullptr;
@@ -174,6 +174,7 @@ public:
 
     /// Intersects the BVH with the given ray and intersector.
     template <typename Intersector>
+    bvh__always_inline__
     std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector) const {
         struct {
             struct Empty {
@@ -188,6 +189,7 @@ public:
     /// Intersects the BVH with the given ray and intersector.
     /// Record statistics on the number of traversal and intersection steps.
     template <typename Intersector>
+    bvh__always_inline__
     std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
         return intersect_bvh(ray, intersector, statistics);
     }
