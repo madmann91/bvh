@@ -42,12 +42,10 @@ private:
         {}
 
         Octant(const Ray<Scalar>& ray)
-            : x(ray.direction[0] >= Scalar(0) ? 0 : 3)
-            , y(ray.direction[1] >= Scalar(0) ? 1 : 4)
-            , z(ray.direction[2] >= Scalar(0) ? 2 : 5)
+            : x(ray.direction[0] < Scalar(0))
+            , y(ray.direction[1] < Scalar(0))
+            , z(ray.direction[2] < Scalar(0))
         {}
-
-        Octant inverse() const { return Octant(3 - x, 5 - y, 7 - z); }
 
         int x, y, z;
     };
@@ -60,24 +58,23 @@ private:
         const Vector3<Scalar>& padded_inverse_direction,
         const Octant& octant) const
     {
-        auto inverse_octant = octant.inverse();
         Vector3<Scalar> entry, exit;
         if (Robust) {
-            entry[0] = (node.bounds[        octant.x] - ray.origin[0]) * inverse_direction[0];
-            entry[1] = (node.bounds[        octant.y] - ray.origin[1]) * inverse_direction[1];
-            entry[2] = (node.bounds[        octant.z] - ray.origin[2]) * inverse_direction[2];
-            exit[0]  = (node.bounds[inverse_octant.x] - ray.origin[0]) * padded_inverse_direction[0];
-            exit[1]  = (node.bounds[inverse_octant.y] - ray.origin[1]) * padded_inverse_direction[1];
-            exit[2]  = (node.bounds[inverse_octant.z] - ray.origin[2]) * padded_inverse_direction[2];
+            entry[0] = (node.bounds[0 +     octant.x] - ray.origin[0]) * inverse_direction[0];
+            entry[1] = (node.bounds[2 +     octant.y] - ray.origin[1]) * inverse_direction[1];
+            entry[2] = (node.bounds[4 +     octant.z] - ray.origin[2]) * inverse_direction[2];
+            exit[0]  = (node.bounds[0 + 1 - octant.x] - ray.origin[0]) * padded_inverse_direction[0];
+            exit[1]  = (node.bounds[2 + 1 - octant.y] - ray.origin[1]) * padded_inverse_direction[1];
+            exit[2]  = (node.bounds[4 + 1 - octant.z] - ray.origin[2]) * padded_inverse_direction[2];
         } else {
-            entry[0] = multiply_add(node.bounds[        octant.x], inverse_direction[0], inverse_origin[0]);
-            entry[1] = multiply_add(node.bounds[        octant.y], inverse_direction[1], inverse_origin[1]);
-            entry[2] = multiply_add(node.bounds[        octant.z], inverse_direction[2], inverse_origin[2]);
-            exit[0]  = multiply_add(node.bounds[inverse_octant.x], inverse_direction[0], inverse_origin[0]);
-            exit[1]  = multiply_add(node.bounds[inverse_octant.y], inverse_direction[1], inverse_origin[1]);
-            exit[2]  = multiply_add(node.bounds[inverse_octant.z], inverse_direction[2], inverse_origin[2]);
+            entry[0] = multiply_add(node.bounds[0 +     octant.x], inverse_direction[0], inverse_origin[0]);
+            entry[1] = multiply_add(node.bounds[2 +     octant.y], inverse_direction[1], inverse_origin[1]);
+            entry[2] = multiply_add(node.bounds[4 +     octant.z], inverse_direction[2], inverse_origin[2]);
+            exit[0]  = multiply_add(node.bounds[0 + 1 - octant.x], inverse_direction[0], inverse_origin[0]);
+            exit[1]  = multiply_add(node.bounds[2 + 1 - octant.y], inverse_direction[1], inverse_origin[1]);
+            exit[2]  = multiply_add(node.bounds[4 + 1 - octant.z], inverse_direction[2], inverse_origin[2]);
         }
-        // Note: the order of the min/max operations is guaranteed not to produce NaNs
+        // Note: This order for the min/max operations is guaranteed not to produce NaNs
         return std::make_pair(
             robust_max(entry[0], robust_max(entry[1], robust_max(entry[2], ray.tmin))),
             robust_min(exit [0], robust_min(exit [1], robust_min(exit [2], ray.tmax)))

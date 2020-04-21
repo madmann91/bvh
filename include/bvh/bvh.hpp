@@ -34,18 +34,18 @@ struct Bvh {
 
             BoundingBoxProxy& operator = (const BoundingBox<Scalar>& bbox) {
                 node.bounds[0] = bbox.min[0];
-                node.bounds[1] = bbox.min[1];
-                node.bounds[2] = bbox.min[2];
-                node.bounds[3] = bbox.max[0];
-                node.bounds[4] = bbox.max[1];
+                node.bounds[1] = bbox.max[0];
+                node.bounds[2] = bbox.min[1];
+                node.bounds[3] = bbox.max[1];
+                node.bounds[4] = bbox.min[2];
                 node.bounds[5] = bbox.max[2];
                 return *this;
             }
 
             operator BoundingBox<Scalar> () const {
                 return BoundingBox<Scalar>(
-                    Vector3<Scalar>(node.bounds[0], node.bounds[1], node.bounds[2]),
-                    Vector3<Scalar>(node.bounds[3], node.bounds[4], node.bounds[5]));
+                    Vector3<Scalar>(node.bounds[0], node.bounds[2], node.bounds[4]),
+                    Vector3<Scalar>(node.bounds[1], node.bounds[3], node.bounds[5]));
             }
 
             BoundingBox<Scalar> to_bounding_box() const {
