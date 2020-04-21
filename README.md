@@ -117,7 +117,10 @@ This library provides the following traversal algorithms:
  - `bvh::SingleRayTraversal`: A traversal algorithm optimized for single rays.
     Rays are classified by octant, to make the ray-box test more efficient. The
     traversal order is such that the closest node is taken first. The ray-box
-    test does not use divisions, and uses FMA instructions when possible.
+    test does not use divisions, and uses FMA instructions when possible. The
+    traversal can also be configured to operate in "robust" mode, in which the
+    ray-node intersection does not use FMA instructions, and makes the necessary
+    corrections to avoid false-misses (see _Robust BVH Ray Traversal_, by T. Ize).
     
 Traversal algorithms can work in two modes: closest intersection,
 or any intersection (for shadow rays, usually around 20% faster).
