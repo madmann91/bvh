@@ -3,12 +3,13 @@
 
 #include <cassert>
 
-#include "bvh.hpp"
-#include "ray.hpp"
+#include "bvh/bvh.hpp"
+#include "bvh/ray.hpp"
+#include "bvh/utilities.hpp"
 
 namespace bvh {
 
-template <typename Bvh, size_t StackSize = 64>
+template <typename Bvh, size_t StackSize = 64, bool Robust = false>
 class SingleRayTraversal {
 public:
     static constexpr size_t stack_size = StackSize;
@@ -41,9 +42,9 @@ private:
         {}
 
         Octant(const Ray<Scalar>& ray)
-            : x(ray.direction[0] > Scalar(0) ? 0 : 3)
-            , y(ray.direction[1] > Scalar(0) ? 1 : 4)
-            , z(ray.direction[2] > Scalar(0) ? 2 : 5)
+            : x(ray.direction[0] >= Scalar(0) ? 0 : 3)
+            , y(ray.direction[1] >= Scalar(0) ? 1 : 4)
+            , z(ray.direction[2] >= Scalar(0) ? 2 : 5)
         {}
 
         Octant inverse() const { return Octant(3 - x, 5 - y, 7 - z); }
@@ -53,21 +54,33 @@ private:
 
     std::pair<Scalar, Scalar> intersect_node(
         const typename Bvh::Node& node,
+        const Ray<Scalar>& ray,
         const Vector3<Scalar>& inverse_origin,
         const Vector3<Scalar>& inverse_direction,
-        Scalar tmin, Scalar tmax,
+        const Vector3<Scalar>& padded_inverse_direction,
         const Octant& octant) const
     {
         auto inverse_octant = octant.inverse();
-        Scalar entry_x = multiply_add(node.bounds[        octant.x], inverse_direction[0], inverse_origin[0]);
-        Scalar entry_y = multiply_add(node.bounds[        octant.y], inverse_direction[1], inverse_origin[1]);
-        Scalar entry_z = multiply_add(node.bounds[        octant.z], inverse_direction[2], inverse_origin[2]);
-        Scalar exit_x  = multiply_add(node.bounds[inverse_octant.x], inverse_direction[0], inverse_origin[0]);
-        Scalar exit_y  = multiply_add(node.bounds[inverse_octant.y], inverse_direction[1], inverse_origin[1]);
-        Scalar exit_z  = multiply_add(node.bounds[inverse_octant.z], inverse_direction[2], inverse_origin[2]);
+        Vector3<Scalar> entry, exit;
+        if (Robust) {
+            entry[0] = (node.bounds[        octant.x] - ray.origin[0]) * inverse_direction[0];
+            entry[1] = (node.bounds[        octant.y] - ray.origin[1]) * inverse_direction[1];
+            entry[2] = (node.bounds[        octant.z] - ray.origin[2]) * inverse_direction[2];
+            exit[0]  = (node.bounds[inverse_octant.x] - ray.origin[0]) * padded_inverse_direction[0];
+            exit[1]  = (node.bounds[inverse_octant.y] - ray.origin[1]) * padded_inverse_direction[1];
+            exit[2]  = (node.bounds[inverse_octant.z] - ray.origin[2]) * padded_inverse_direction[2];
+        } else {
+            entry[0] = multiply_add(node.bounds[        octant.x], inverse_direction[0], inverse_origin[0]);
+            entry[1] = multiply_add(node.bounds[        octant.y], inverse_direction[1], inverse_origin[1]);
+            entry[2] = multiply_add(node.bounds[        octant.z], inverse_direction[2], inverse_origin[2]);
+            exit[0]  = multiply_add(node.bounds[inverse_octant.x], inverse_direction[0], inverse_origin[0]);
+            exit[1]  = multiply_add(node.bounds[inverse_octant.y], inverse_direction[1], inverse_origin[1]);
+            exit[2]  = multiply_add(node.bounds[inverse_octant.z], inverse_direction[2], inverse_origin[2]);
+        }
+        // Note: the order of the min/max operations is guaranteed not to produce NaNs
         return std::make_pair(
-            std::max(std::max(entry_x, entry_y), std::max(entry_z, tmin)),
-            std::min(std::min(exit_x,  exit_y),  std::min(exit_z,  tmax))
+            robust_max(entry[0], robust_max(entry[1], robust_max(entry[2], ray.tmin))),
+            robust_min(exit [0], robust_min(exit [1], robust_min(exit [2], ray.tmax)))
         );
     }
 
@@ -95,7 +108,7 @@ private:
     }
 
     template <typename Intersector, typename Statistics>
-    std::optional<typename Intersector::Result> intersect_bvh(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
+    std::optional<typename Intersector::Result> traverse(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
@@ -106,6 +119,13 @@ private:
         // the computation to allow the use of FMA instructions (when available).
         auto inverse_direction = ray.direction.inverse();
         auto inverse_origin    = -ray.origin * inverse_direction;
+
+        // Padded inverse direction to avoid false-negatives in the ray-node test.
+        // Only used when the robust ray-node intersection code is enabled.
+        auto padded_inverse_direction = Vector3<Scalar>(
+            add_ulp_magnitude(inverse_direction[0], 2),
+            add_ulp_magnitude(inverse_direction[1], 2),
+            add_ulp_magnitude(inverse_direction[2], 2));
 
         // Precompute the octant of the ray to speed up the ray-node test
         Octant octant(ray);
@@ -121,8 +141,8 @@ private:
             auto first_child = node->first_child_or_primitive;
             const auto* left_child  = &bvh.nodes[first_child + 0];
             const auto* right_child = &bvh.nodes[first_child + 1];
-            auto distance_left  = intersect_node(*left_child,  inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
-            auto distance_right = intersect_node(*right_child, inverse_origin, inverse_direction, ray.tmin, ray.tmax, octant);
+            auto distance_left  = intersect_node(*left_child,  ray, inverse_origin, inverse_direction, padded_inverse_direction, octant);
+            auto distance_right = intersect_node(*right_child, ray, inverse_origin, inverse_direction, padded_inverse_direction, octant);
 
             if (bvh__unlikely(distance_left.first <= distance_left.second)) {
                 if (left_child->is_leaf) {
@@ -183,7 +203,7 @@ public:
                 Empty& operator += (size_t) { return *this; }
             } traversal_steps, intersections;
         } statistics;
-        return intersect_bvh(ray, intersector, statistics);
+        return traverse(ray, intersector, statistics);
     }
 
     /// Intersects the BVH with the given ray and intersector.
@@ -191,7 +211,7 @@ public:
     template <typename Intersector>
     bvh__always_inline__
     std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
-        return intersect_bvh(ray, intersector, statistics);
+        return traverse(ray, intersector, statistics);
     }
 };
 

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <climits>
+#include <type_traits>
 
 #include "bvh/bounding_box.hpp"
 
@@ -48,6 +49,20 @@ inline double multiply_add(double x, double y, double z) {
 #endif
 }
 
+/// Returns the mininum of two values.
+/// Guaranteed to return a non-NaN value if the right hand side is not a Nan.
+template <typename T>
+const T& robust_min(const T& x, const T& y) {
+    return x < y ? x : y;
+}
+
+/// Returns the maximum of two values.
+/// Guaranteed to return a non-NaN value if the right hand side is not a Nan.
+template <typename T>
+const T& robust_max(const T& x, const T& y) {
+    return x < y ? x : y;
+}
+
 template <typename Scalar>
 void atomic_max(std::atomic<Scalar>& x, Scalar y) {
     auto z = x.load();
@@ -79,6 +94,13 @@ struct SizedIntegerType<16> {
     using Signed   = int16_t;
     using Unsigned = uint16_t;
 };
+
+/// Adds the given number of ULPs (Unit in the Last Place) to the floating-point argument.
+template <typename T, std::enable_if_t<std::is_floating_point<T>::value, int> = 0>
+T add_ulp_magnitude(T x, unsigned ulps) {
+    using U = typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Unsigned;
+    return std::isfinite(x) ? as<T>(as<U>(x) + ulps) : x;
+}
 
 /// Computes the (rounded-up) compile-time log in base-2 of an unsigned integer.
 template <size_t P, size_t I = 0, bool Found = P == 0>
