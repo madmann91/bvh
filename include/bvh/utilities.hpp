@@ -60,7 +60,7 @@ const T& robust_min(const T& x, const T& y) {
 /// Guaranteed to return a non-NaN value if the right hand side is not a Nan.
 template <typename T>
 const T& robust_max(const T& x, const T& y) {
-    return x < y ? x : y;
+    return x > y ? x : y;
 }
 
 template <typename Scalar>
