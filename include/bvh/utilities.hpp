@@ -50,14 +50,14 @@ inline double multiply_add(double x, double y, double z) {
 }
 
 /// Returns the mininum of two values.
-/// Guaranteed to return a non-NaN value if the right hand side is not a Nan.
+/// Guaranteed to return a non-NaN value if the right hand side is not a NaN.
 template <typename T>
 const T& robust_min(const T& x, const T& y) {
     return x < y ? x : y;
 }
 
 /// Returns the maximum of two values.
-/// Guaranteed to return a non-NaN value if the right hand side is not a Nan.
+/// Guaranteed to return a non-NaN value if the right hand side is not a NaN.
 template <typename T>
 const T& robust_max(const T& x, const T& y) {
     return x > y ? x : y;
