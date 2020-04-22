@@ -15,6 +15,7 @@
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
 #include <bvh/node_layout_optimization.hpp>
+#include <bvh/leaf_collapser.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
@@ -52,6 +53,7 @@ static void usage() {
         "  --optimizer <name>    Sets the BVH optimizer to use (none by default).\n"
         "  --pre-shuffle         Activates the pre-shuffling optimization (disabled by default).\n"
         "  --optimize-layout     Activates the node layout optimization (disabled by default).\n"
+        "  --collapse-leaves     Activates the leaf collapse optimization (disabled by default).\n"
         "  --pre-split <percent> Activates pre-splitting and sets the percentage of references (disabled by default).\n"
         "  --eye <x> <y> <z>     Sets the position of the camera.\n"
         "  --dir <x> <y> <z>     Sets the direction of the camera.\n"
@@ -192,6 +194,7 @@ int main(int argc, char** argv) {
     };
     bool pre_shuffle = false;
     bool optimize_layout = false;
+    bool collapse_leaves = false;
     Scalar pre_split_factor = 0;
     bool collect_statistics = false;
     size_t rotation_axis = 3;
@@ -238,6 +241,8 @@ int main(int argc, char** argv) {
                 pre_shuffle = true;
             } else if (!strcmp(argv[i], "--optimize-layout")) {
                 optimize_layout = true;
+            } else if (!strcmp(argv[i], "--collapse-leaves")) {
+                collapse_leaves = true;
             } else if (!strcmp(argv[i], "--pre-split")) {
                 if (i + 1 >= argc)
                     return not_enough_arguments(argv[i]);
@@ -364,6 +369,8 @@ int main(int argc, char** argv) {
         std::cout << " + " << optimizer_name;
     if (optimize_layout)
         std::cout << " + optimize-layout";
+    if (collapse_leaves)
+        std::cout << " + collapse-leaves";
     if (pre_shuffle)
         std::cout << " + pre-shuffle";
     std::cout << ")..." << std::endl;
@@ -381,6 +388,10 @@ int main(int argc, char** argv) {
         if (optimize_layout) {
             bvh::NodeLayoutOptimization layout_optimizer(bvh);
             layout_optimizer.optimize();
+        }
+        if (collapse_leaves) {
+            bvh::LeafCollapser leaf_collapser(bvh);
+            leaf_collapser.collapse(reference_count);
         }
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);

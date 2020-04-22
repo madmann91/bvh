@@ -39,8 +39,9 @@ private:
         // Refit all nodes that are on the path between the given node and the root
         auto bbox = bvh.nodes[child].bounding_box_proxy().to_bounding_box();
         while (child != 0) {
-            auto parent = parents[child];
-            bvh.nodes[parent].bounding_box_proxy() = bbox.extend(bvh.nodes[sibling(child)].bounding_box_proxy());
+            auto parent  = parents[child];
+            auto sibling = bvh.sibling(child);
+            bvh.nodes[parent].bounding_box_proxy() = bbox.extend(bvh.nodes[sibling].bounding_box_proxy());
             child = parent;
         }
     }
@@ -50,7 +51,7 @@ private:
         auto parent_in = parents[in];
         return std::array<size_t, 6> {
             in,
-            sibling(in),
+            bvh.sibling(in),
             parent_in,
             parent_in == 0 ? in : parents[parent_in],
             out,
@@ -59,7 +60,7 @@ private:
     }
 
     void reinsert(size_t in, size_t out) {
-        auto sibling_in   = sibling(in);
+        auto sibling_in   = bvh.sibling(in);
         auto parent_in    = parents[in];
         auto sibling_node = bvh.nodes[sibling_in];
         auto out_node     = bvh.nodes[out];
@@ -84,15 +85,10 @@ private:
         parents[in] = out;
     }
 
-    size_t sibling(size_t index) const {
-        assert(index != 0);
-        return index % 2 == 1 ? index + 1 : index - 1;
-    }
-
     Insertion search(size_t in) {
         bool   down  = true;
         size_t pivot = parents[in];
-        size_t out   = sibling(in);
+        size_t out   = bvh.sibling(in);
         size_t out_best = out;
 
         auto bbox_in = bvh.nodes[in].bounding_box_proxy();
@@ -135,14 +131,13 @@ private:
                     }
                     if (out == 0)
                         break;
-                    out = sibling(pivot);
+                    out = bvh.sibling(pivot);
                     pivot = parents[out];
                     down = true;
                 } else {
-                    // If the node is the left sibling, go down
-                    if (out % 2 == 1) {
+                    if (bvh.is_left_sibling(out)) {
                         down = true;
-                        out = sibling(out);
+                        out = bvh.sibling(out);
                     } else {
                         out = parents[out];
                     }
@@ -150,7 +145,7 @@ private:
             }
         }
 
-        if (in == out_best || sibling(in) == out_best || parents[in] == out_best)
+        if (in == out_best || bvh.sibling(in) == out_best || parents[in] == out_best)
             return Insertion { 0, 0 };
         return Insertion { out_best, d_best };
     }

@@ -3,6 +3,7 @@
 
 #include <climits>
 #include <memory>
+#include <cassert>
 
 #include "bvh/bounding_box.hpp"
 #include "bvh/utilities.hpp"
@@ -71,6 +72,18 @@ struct Bvh {
             return BoundingBoxProxy(*const_cast<Node*>(this));
         }
     };
+
+    /// Given a node index, returns the index of its sibling.
+    static size_t sibling(size_t index) {
+        assert(index != 0);
+        return index % 2 == 1 ? index + 1 : index - 1;
+    }
+
+    /// Returns true if the given node is the left sibling of another.
+    static bool is_left_sibling(size_t index) {
+        assert(index != 0);
+        return index % 2 == 1;
+    }
 
     std::unique_ptr<Node[]>   nodes;
     std::unique_ptr<size_t[]> primitive_indices;
