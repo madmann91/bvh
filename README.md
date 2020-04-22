@@ -96,19 +96,24 @@ Those algorithms only require a bounding box and center for each primitive, exce
 Additionally, the BVH structure can be further improved by running post-build optimizations,
 or pre-build triangle splitting.
 
- - `bvh::ParallelReinsertionOptimization`: An optimization that tries to re-insert BVH nodes
+ - `bvh::ParallelReinsertionOptimizer`: An optimization that tries to re-insert BVH nodes
    in a way that minimizes the SAH (see _Parallel Reinsertion for Bounding Volume Hierarchy Optimization_,
    by D. Meister and J. Bittner). This can lead up to a 20% improvement in trace performance,
    at the cost of longer build times.
- - `bvh::HeuristicPrimitiveSplitting`: A pre-splitting algorithm that splits primitives at regular
+ - `bvh::HeuristicPrimitiveSplitter`: A pre-splitting algorithm that splits primitives at regular
    positions, inspired by _Fast Parallel Construction of High-Quality Bounding Volume Hierarchies_,
    by T. Karras and T. Aila. Works well in combination with `bvh::LinearBvhBuilder`, but may
    decrease performance for other builders on some scenes. Takes a budget of primitives to split,
    and distributes it to each primitive based on a priority heuristic.
- - `bvh::NodeLayoutOptimization`: A cheap post-build optimization that reorders the nodes of the BVH in
+ - `bvh::NodeLayoutOptimizer`: A cheap post-build optimization that reorders the nodes of the BVH in
    memory in such a way that nodes that have a high probability of being hit are likely to already be
    in the cache. This optimization is only really helpful when traversing incoherent rays, but can in
    that case increase performance by up to 10%.
+ - `bvh::LeafCollapser`: A post-build optimization that collapses the leaves of the BVH when this is
+   beneficial to the SAH cost of the tree. This optimization is only relevant for bottom-up builders
+   like `bvh::LinearBvhBuilder` or `bvh::LocallyOrderedClusteringBuilder`, because top-down builders
+   already have a stopping criterion that prevents creating leaves that would be detrimental to the
+   SAH cost of the tree.
 
 ### Traversal Algorithms
 
