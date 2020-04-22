@@ -8,6 +8,10 @@
 
 namespace bvh {
 
+/// Optimization that tries to re-insert BVH nodes in such a way that the
+/// SAH cost of the tree decreases after the re-insertion. Inspired from the
+/// article "Parallel Reinsertion for Bounding Volume Hierarchy Optimization",
+/// by D. Meister and J. Bittner.
 template <typename Bvh>
 class ParallelReinsertionOptimizer : public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
