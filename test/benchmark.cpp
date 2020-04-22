@@ -13,8 +13,8 @@
 #include <bvh/spatial_split_bvh_builder.hpp>
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
-#include <bvh/parallel_reinsertion_optimization.hpp>
-#include <bvh/node_layout_optimization.hpp>
+#include <bvh/parallel_reinsertion_optimizer.hpp>
+#include <bvh/node_layout_optimizer.hpp>
 #include <bvh/leaf_collapser.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/single_ray_traversal.hpp>
@@ -48,20 +48,21 @@ static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
         "\nOptions:\n"
-        "  --help                Shows this message.\n"
-        "  --builder <name>      Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --optimizer <name>    Sets the BVH optimizer to use (none by default).\n"
-        "  --pre-shuffle         Activates the pre-shuffling optimization (disabled by default).\n"
-        "  --optimize-layout     Activates the node layout optimization (disabled by default).\n"
-        "  --collapse-leaves     Activates the leaf collapse optimization (disabled by default).\n"
-        "  --pre-split <percent> Activates pre-splitting and sets the percentage of references (disabled by default).\n"
-        "  --eye <x> <y> <z>     Sets the position of the camera.\n"
-        "  --dir <x> <y> <z>     Sets the direction of the camera.\n"
-        "  --up  <x> <y> <z>     Sets the up vector of the camera.\n"
-        "  --fov <degrees>       Sets the field of view.\n"
-        "  --width <pixels>      Sets the image width.\n"
-        "  --height <pixels>     Sets the image height.\n"
-        "  -o <file.ppm>         Sets the output file name (defaults to 'render.ppm').\n\n"
+        "  --help                  Shows this message.\n"
+        "  --builder <name>        Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "  --optimizer <name>      Sets the BVH optimizer to use (none by default).\n"
+        "  --pre-shuffle           Activates the pre-shuffling optimization (disabled by default).\n"
+        "  --optimize-layout       Activates the node layout optimization (disabled by default).\n"
+        "  --collapse-leaves       Activates the leaf collapse optimization (disabled by default).\n"
+        "  --parallel-reinsertion  Activates the parallel reinsertion optimization (disabled by default).\n"
+        "  --pre-split <percent>   Activates pre-splitting and sets the percentage of references (disabled by default).\n"
+        "  --eye <x> <y> <z>       Sets the position of the camera.\n"
+        "  --dir <x> <y> <z>       Sets the direction of the camera.\n"
+        "  --up  <x> <y> <z>       Sets the up vector of the camera.\n"
+        "  --fov <degrees>         Sets the field of view.\n"
+        "  --width <pixels>        Sets the image width.\n"
+        "  --height <pixels>       Sets the image height.\n"
+        "  -o <file.ppm>           Sets the output file name (defaults to 'render.ppm').\n\n"
         "  --rotate <axis> <degrees>\n\n"
         "    Rotates the scene by the given amount of degrees on the\n"
         "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
@@ -182,10 +183,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const char* output_file    = "render.ppm";
-    const char* input_file     = NULL;
-    const char* builder_name   = "binned_sah";
-    const char* optimizer_name = NULL;
+    const char* output_file  = "render.ppm";
+    const char* input_file   = NULL;
+    const char* builder_name = "binned_sah";
     Camera camera = {
         Vector3(0, 0, -10),
         Vector3(0, 0, 1),
@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
     };
     bool pre_shuffle = false;
     bool optimize_layout = false;
+    bool parallel_reinsertion = false;
     bool collapse_leaves = false;
     Scalar pre_split_factor = 0;
     bool collect_statistics = false;
@@ -231,16 +232,16 @@ int main(int argc, char** argv) {
                     return not_enough_arguments(argv[i]);
                 size_t* destination = argv[i][2] == 'w' ? &width : &height;
                 *destination = strtoull(argv[++i], NULL, 10);
-            } else if (!strcmp(argv[i], "--builder") ||
-                       !strcmp(argv[i], "--optimizer")) {
+            } else if (!strcmp(argv[i], "--builder")) {
                 if (i + 1 >= argc)
                     return not_enough_arguments(argv[i]);
-                const char** name = argv[i][2] == 'b' ? &builder_name : &optimizer_name;
-                *name = argv[++i];
+                builder_name = argv[++i];
             } else if (!strcmp(argv[i], "--pre-shuffle")) {
                 pre_shuffle = true;
             } else if (!strcmp(argv[i], "--optimize-layout")) {
                 optimize_layout = true;
+            } else if (!strcmp(argv[i], "--parallel-reinsertion")) {
+                parallel_reinsertion = true;
             } else if (!strcmp(argv[i], "--collapse-leaves")) {
                 collapse_leaves = true;
             } else if (!strcmp(argv[i], "--pre-split")) {
@@ -328,19 +329,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::function<void(Bvh&)> optimizer;
-    if (!optimizer_name) {
-        optimizer = [] (Bvh&) {};
-    } else if (!strcmp(optimizer_name, "parallel_reinsertion")) {
-        optimizer = [] (Bvh& bvh) {
-            bvh::ParallelReinsertionOptimization<Bvh> optimization(bvh);
-            optimization.optimize();
-        };
-    } else {
-        std::cerr << "Unknown BVH optimizer name" << std::endl;
-        return 1;
-    }
-
     // Load mesh from file
     auto triangles = obj::load_from_file(input_file);
     if (triangles.size() == 0) {
@@ -365,8 +353,8 @@ int main(int argc, char** argv) {
     std::cout << "Building BVH (" << builder_name;
     if (pre_split_factor)
         std::cout << " + pre-split";
-    if (optimizer_name)
-        std::cout << " + " << optimizer_name;
+    if (parallel_reinsertion)
+        std::cout << " + parallel-reinsertion";
     if (optimize_layout)
         std::cout << " + optimize-layout";
     if (collapse_leaves)
@@ -384,9 +372,12 @@ int main(int argc, char** argv) {
         reference_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), reference_count);
         if (pre_split_factor > 0)
             splitter.repair_bvh_leaves(bvh);
-        optimizer(bvh);
+        if (parallel_reinsertion) {
+            bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh);
+            reinsertion_optimizer.optimize();
+        }
         if (optimize_layout) {
-            bvh::NodeLayoutOptimization layout_optimizer(bvh);
+            bvh::NodeLayoutOptimizer layout_optimizer(bvh);
             layout_optimizer.optimize();
         }
         if (collapse_leaves) {

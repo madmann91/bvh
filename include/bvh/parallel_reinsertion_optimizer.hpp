@@ -1,5 +1,5 @@
-#ifndef BVH_PARALLEL_REINSERTION_OPTIMIZATION_HPP
-#define BVH_PARALLEL_REINSERTION_OPTIMIZATION_HPP
+#ifndef BVH_PARALLEL_REINSERTION_OPTIMIZER_HPP
+#define BVH_PARALLEL_REINSERTION_OPTIMIZER_HPP
 
 #include <cassert>
 
@@ -9,7 +9,7 @@
 namespace bvh {
 
 template <typename Bvh>
-class ParallelReinsertionOptimization : public SahBasedAlgorithm<Bvh> {
+class ParallelReinsertionOptimizer : public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using Insertion = std::pair<size_t, Scalar>;
 
@@ -19,7 +19,7 @@ class ParallelReinsertionOptimization : public SahBasedAlgorithm<Bvh> {
     std::unique_ptr<size_t[]> parents;
 
 public:
-    ParallelReinsertionOptimization(Bvh& bvh)
+    ParallelReinsertionOptimizer(Bvh& bvh)
         : bvh(bvh), parents(new size_t[bvh.node_count])
     {
         // Compute the index of the parent of each node

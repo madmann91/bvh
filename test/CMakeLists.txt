@@ -66,7 +66,7 @@ foreach (build_options_as_string
     "--builder locally_ordered_clustering"
     "--builder linear"
     "--builder linear --pre-split 30"
-    "--builder sweep_sah --optimizer parallel_reinsertion"
+    "--builder sweep_sah --parallel-reinsertion"
     "--builder sweep_sah --optimize-layout")
     string(MAKE_C_IDENTIFIER ${build_options_as_string} benchmark_test_name)
     string(REPLACE " " ";" build_options ${build_options_as_string})
