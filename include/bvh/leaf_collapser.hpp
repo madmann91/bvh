@@ -35,7 +35,6 @@ public:
 
         auto node_index       = std::make_unique<size_t[]>(bvh.node_count / 2 + 1);
         auto primitive_counts = std::make_unique<size_t[]>(bvh.node_count);
-        auto first_primitives = std::make_unique<size_t[]>(bvh.node_count);
 
         std::unique_ptr<size_t[]> primitive_indices_copy;
         std::unique_ptr<typename Bvh::Node[]> nodes_copy;
