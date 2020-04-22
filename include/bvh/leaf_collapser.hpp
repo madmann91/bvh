@@ -2,7 +2,6 @@
 #define BVH_LEAF_COLLAPSER_HPP
 
 #include <memory>
-#include <stack>
 
 #include "bvh/bvh.hpp"
 #include "bvh/sah_based_algorithm.hpp"
@@ -21,37 +20,6 @@ class LeafCollapser : public SahBasedAlgorithm<Bvh> {
     PrefixSum<size_t> prefix_sum;
 
     Bvh& bvh;
-
-    void compute_first_primitives(
-        size_t node_index,
-        const size_t* bvh__restrict__ children,
-        const size_t* bvh__restrict__ primitive_counts,
-        size_t* bvh__restrict__ first_primitives)
-    {
-        static constexpr size_t task_spawn_threshold = 256;
-        std::stack<size_t> stack;
-        stack.push(node_index); 
-        while (!stack.empty()) {
-            auto i = stack.top();
-            stack.pop();
-            auto first_child = children[i];
-            if (first_child != 0) {
-                auto first_primitive = first_primitives[i];
-                auto primitive_count = primitive_counts[i];
-                first_primitives[first_child + 0] = first_primitive;
-                first_primitives[first_child + 1] = first_primitive + primitive_counts[first_child + 0];
-                if (primitive_count > task_spawn_threshold) {
-                    #pragma omp task
-                    { compute_first_primitives(first_child + 0, children, primitive_counts, first_primitives); }
-                    #pragma omp task
-                    { compute_first_primitives(first_child + 1, children, primitive_counts, first_primitives); }
-                } else {
-                    stack.push(first_child + 0);
-                    stack.push(first_child + 1);
-                }
-            }
-        }
-    }
 
 public:
     using SahBasedAlgorithm<Bvh>::traversal_cost;
@@ -147,8 +115,6 @@ public:
                 nodes_copy = std::make_unique<typename Bvh::Node[]>(node_index[bvh.node_count / 2]);
                 primitive_indices_copy = std::make_unique<size_t[]>(primitive_counts[0]);
                 nodes_copy[0] = bvh.nodes[0];
-
-                compute_first_primitives(0, children.get(), primitive_counts.get(), first_primitives.get());
             }
 
             #pragma omp for
@@ -157,13 +123,13 @@ public:
                     continue;
 
                 // Find the index of the first primitive in this subtree
-                size_t first_primitive = first_primitives[i];//0;
+                size_t first_primitive = 0;
                 size_t j = i;
-                /*while (j != 0) {
+                while (j != 0) {
                     if (!bvh.is_left_sibling(j))
                         first_primitive += primitive_counts[bvh.sibling(j)];
                     j = parents[j];
-                }*/
+                }
 
                 // Top-down traversal to store the primitives contained in this subtree.
                 j = i;
