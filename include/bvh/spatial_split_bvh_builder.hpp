@@ -58,9 +58,6 @@ public:
         size_t max_reference_count = primitive_count + primitive_count * split_factor;
         size_t reference_count = 0;
 
-        std::unique_ptr<size_t[]> primitive_indices_copy;
-        std::unique_ptr<typename Bvh::Node[]> nodes_copy;
-
         bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * max_reference_count + 1);
         bvh.primitive_indices = std::make_unique<size_t[]>(max_reference_count); 
 
@@ -102,25 +99,8 @@ public:
                     spatial_threshold);
                 run_task(first_task, 0, 0, primitive_count, max_reference_count, 0, false);
             }
-
-            // Allocate the right amount of new nodes and primitive indices
-            #pragma omp single
-            {
-                primitive_indices_copy = std::make_unique<size_t[]>(reference_count);
-                nodes_copy = std::make_unique<typename Bvh::Node[]>(bvh.node_count);
-            }
-
-            #pragma omp for nowait
-            for (size_t i = 0; i < reference_count; ++i)
-                primitive_indices_copy[i] = bvh.primitive_indices[i];
-
-            #pragma omp for nowait
-            for (size_t i = 0; i < bvh.node_count; ++i)
-                nodes_copy[i] = bvh.nodes[i];
         }
 
-        std::swap(bvh.nodes, nodes_copy);
-        std::swap(bvh.primitive_indices, primitive_indices_copy);
         return reference_count;
     }
 };
