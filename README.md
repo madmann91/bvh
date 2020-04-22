@@ -105,7 +105,7 @@ or pre-build triangle splitting.
    by T. Karras and T. Aila. Works well in combination with `bvh::LinearBvhBuilder`, but may
    decrease performance for other builders on some scenes. Takes a budget of primitives to split,
    and distributes it to each primitive based on a priority heuristic.
- - `bvh::LayoutOptimization`: A cheap post-build optimization that reorders the nodes of the BVH in
+ - `bvh::NodeLayoutOptimization`: A cheap post-build optimization that reorders the nodes of the BVH in
    memory in such a way that nodes that have a high probability of being hit are likely to already be
    in the cache. This optimization is only really helpful when traversing incoherent rays, but can in
    that case increase performance by up to 10%.

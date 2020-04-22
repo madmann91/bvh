@@ -14,7 +14,7 @@
 #include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/linear_bvh_builder.hpp>
 #include <bvh/parallel_reinsertion_optimization.hpp>
-#include <bvh/layout_optimization.hpp>
+#include <bvh/node_layout_optimization.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/single_ray_traversal.hpp>
 #include <bvh/intersectors.hpp>
@@ -379,7 +379,7 @@ int main(int argc, char** argv) {
             splitter.repair_bvh_leaves(bvh);
         optimizer(bvh);
         if (optimize_layout) {
-            bvh::LayoutOptimization layout_optimizer(bvh);
+            bvh::NodeLayoutOptimization layout_optimizer(bvh);
             layout_optimizer.optimize();
         }
         if (pre_shuffle)

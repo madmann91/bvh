@@ -14,7 +14,7 @@ namespace bvh {
 /// of nodes. This does not change the topology of the BVH;
 /// only the memory layout of the nodes is affected.
 template <typename Bvh>
-class LayoutOptimization {
+class NodeLayoutOptimization {
     using Scalar = typename Bvh::ScalarType;
     using Key    = typename SizedIntegerType<sizeof(Scalar) * CHAR_BIT>::Unsigned;
 
@@ -23,7 +23,7 @@ class LayoutOptimization {
     Bvh& bvh;
 
 public:
-    LayoutOptimization(Bvh& bvh)
+    NodeLayoutOptimization(Bvh& bvh)
         : bvh(bvh)
     {}
 
