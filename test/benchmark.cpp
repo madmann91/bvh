@@ -382,7 +382,7 @@ int main(int argc, char** argv) {
         }
         if (collapse_leaves) {
             bvh::LeafCollapser leaf_collapser(bvh);
-            leaf_collapser.collapse(reference_count);
+            leaf_collapser.collapse();
         }
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);

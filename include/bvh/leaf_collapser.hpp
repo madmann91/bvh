@@ -28,7 +28,7 @@ public:
         : bvh(bvh)
     {}
 
-    void collapse(size_t) {
+    void collapse() {
         auto parents  = std::make_unique<size_t[]>(bvh.node_count);
         auto children = std::make_unique<size_t[]>(bvh.node_count);
         auto flags    = std::make_unique<int[]>(bvh.node_count);
