@@ -11,6 +11,10 @@
 namespace bvh {
 
 /// This structure represents a BVH with a list of nodes and primitives indices.
+/// The memory layout is such that the children of a node are always grouped together.
+/// This means that each node only needs one index to point to its children, as the other
+/// child can be obtained by adding one to the index of the first child. The root of the
+/// hierarchy is located at index 0 in the array of nodes.
 template <typename Scalar>
 struct Bvh {
     using IndexType  = typename SizedIntegerType<sizeof(Scalar) * CHAR_BIT>::Unsigned;

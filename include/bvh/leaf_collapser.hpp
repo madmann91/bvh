@@ -154,6 +154,7 @@ public:
                 bvh.nodes[i].primitive_count = primitive_counts[i];
             }
 
+            // Create the new nodes
             #pragma omp for
             for (size_t i = 1; i < bvh.node_count; i += 2) {
                 auto j = node_index[(i - 1) / 2];
