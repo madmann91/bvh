@@ -28,8 +28,6 @@ public:
     {}
 
     void optimize() {
-        using Scalar = typename Bvh::ScalarType;
-
         size_t pair_count = (bvh.node_count - 1) / 2;
         auto keys         = std::make_unique<Scalar[]>(pair_count * 2);
         auto indices      = std::make_unique<size_t[]>(pair_count * 2);
