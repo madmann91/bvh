@@ -9,8 +9,11 @@
 
 namespace bvh {
 
+/// Single ray traversal algorithm that can either uses a fast semi-robust algorithm
+/// (that uses FMA when available), or uses a slightly slower, fully robust algorithm
+/// (see "Robust BVH Ray Traversal", by T. Ize).
 template <typename Bvh, size_t StackSize = 64, bool Robust = false>
-class SingleRayTraversal {
+class SingleRayTraverser {
 public:
     static constexpr size_t stack_size = StackSize;
 
@@ -105,7 +108,7 @@ private:
     }
 
     template <typename Intersector, typename Statistics>
-    std::optional<typename Intersector::Result> traverse(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
+    std::optional<typename Intersector::Result> intersect(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
@@ -185,14 +188,14 @@ public:
         size_t intersections   = 0;
     };
 
-    SingleRayTraversal(const Bvh& bvh)
+    SingleRayTraverser(const Bvh& bvh)
         : bvh(bvh)
     {}
 
     /// Intersects the BVH with the given ray and intersector.
     template <typename Intersector>
     bvh__always_inline__
-    std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector) const {
+    std::optional<typename Intersector::Result> traverse(const Ray<Scalar>& ray, Intersector& intersector) const {
         struct {
             struct Empty {
                 Empty& operator ++ (int)    { return *this; }
@@ -200,15 +203,15 @@ public:
                 Empty& operator += (size_t) { return *this; }
             } traversal_steps, intersections;
         } statistics;
-        return traverse(ray, intersector, statistics);
+        return intersect(ray, intersector, statistics);
     }
 
     /// Intersects the BVH with the given ray and intersector.
     /// Record statistics on the number of traversal and intersection steps.
     template <typename Intersector>
     bvh__always_inline__
-    std::optional<typename Intersector::Result> intersect(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
-        return traverse(ray, intersector, statistics);
+    std::optional<typename Intersector::Result> traverse(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
+        return intersect(ray, intersector, statistics);
     }
 };
 

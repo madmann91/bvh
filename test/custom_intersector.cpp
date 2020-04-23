@@ -5,7 +5,7 @@
 #include <bvh/vector.hpp>
 #include <bvh/ray.hpp>
 #include <bvh/sweep_sah_builder.hpp>
-#include <bvh/single_ray_traversal.hpp>
+#include <bvh/single_ray_traverser.hpp>
 #include <bvh/intersectors.hpp>
 
 using Scalar      = float;
@@ -61,11 +61,11 @@ int main() {
     builder.build(global_bbox, bboxes.data(), centers.data(), bboxes.size());
 
     Intersector intersector;
-    bvh::SingleRayTraversal<Bvh> traversal(bvh);
+    bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
     // Setup the ray (see above for an example)
     Ray ray(Vector3(0.0), Vector3(1.0), 0, 1);
-    auto hit = traversal.intersect(ray, intersector);
+    auto hit = traverser.traverse(ray, intersector);
     if (hit) {
         auto dummy_value = hit->dummy;
 

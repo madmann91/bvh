@@ -17,7 +17,7 @@
 #include <bvh/node_layout_optimizer.hpp>
 #include <bvh/leaf_collapser.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
-#include <bvh/single_ray_traversal.hpp>
+#include <bvh/single_ray_traverser.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
 
@@ -109,7 +109,7 @@ void render(
     image_v = image_v * image_w * ratio;
 
     bvh::ClosestIntersector<PreShuffle, Bvh, Triangle> intersector(bvh, triangles);
-    bvh::SingleRayTraversal<Bvh> traversal(bvh);
+    bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
     size_t traversal_steps = 0, intersections = 0;
 
@@ -123,10 +123,10 @@ void render(
 
             Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
 
-            bvh::SingleRayTraversal<Bvh>::Statistics statistics;
+            bvh::SingleRayTraverser<Bvh>::Statistics statistics;
             auto hit = CollectStatistics
-                ? traversal.intersect(ray, intersector, statistics)
-                : traversal.intersect(ray, intersector);
+                ? traverser.traverse(ray, intersector, statistics)
+                : traverser.traverse(ray, intersector);
             if (CollectStatistics) {
                 traversal_steps += statistics.traversal_steps;
                 intersections   += statistics.intersections;
