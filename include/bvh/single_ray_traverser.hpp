@@ -9,9 +9,9 @@
 
 namespace bvh {
 
-/// Single ray traversal algorithm that can either uses a fast semi-robust algorithm
-/// (that uses FMA when available), or uses a slightly slower, fully robust algorithm
-/// (see "Robust BVH Ray Traversal", by T. Ize).
+/// Single ray traversal algorithm that can either use a fast semi-robust algorithm
+/// (taking advantage of FMA instructions when available), or a slightly slower,
+/// but fully robust algorithm (see "Robust BVH Ray Traversal", by T. Ize).
 template <typename Bvh, size_t StackSize = 64, bool Robust = false>
 class SingleRayTraverser {
 public:
