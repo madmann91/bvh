@@ -84,7 +84,7 @@ or pre-build triangle splitting.
 
 This library provides the following traversal algorithms:
 
- - `bvh::SingleRayTraversal`: A traversal algorithm optimized for single rays.
+ - `bvh::SingleRayTraverser`: A traversal algorithm optimized for single rays.
     Rays are classified by octant, to make the ray-box test more efficient. The
     traversal order is such that the closest node is taken first. The ray-box
     test does not use divisions, and uses FMA instructions when possible. The
