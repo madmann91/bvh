@@ -98,8 +98,9 @@ They only require an intersector to compute primitive-ray intersections.
 
 ### Intersectors
 
-Intersectors contained in the libray support linear collections of primitives (i.e. arrays/vectors),
-and allow permuting the primitive data in such a way that no indirection is done during traversal.
+Intersectors contained in the libary support linear collections of primitives (i.e. arrays/vectors),
+and allow permuting the primitive data in such a way that no indirection is done during traversal
+(the helper function `bvh::shuffle_primitives` reorders primitives for this exact purpose).
 Custom intersectors can be introduced when the primitive data is in another form.
 
 ## Building
