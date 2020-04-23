@@ -11,7 +11,7 @@ except the C++ standard library.
 
 ## Performance
 
-Here is a comparison of this library with other alternatives:
+Here is a comparison of this library with other alternatives ([Embree](https://github.com/embree/embree), [Fast-BVH](https://github.com/brandonpelfrey/Fast-BVH), [nanort](https://github.com/lighttransport/nanort)):
 
 ![Comparison of this library vs. other alternatives](chart.png)
 
