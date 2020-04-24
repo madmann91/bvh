@@ -77,7 +77,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                 Scalar best_distance = std::numeric_limits<Scalar>::max();
                 size_t best_neighbor = -1;
 
-                // Backwards search
+                // Backward search
                 for (size_t j = search_begin; j < i; ++j) {
                     auto distance = distance_matrix[i - j][i - j - 1];
                     if (distance < best_distance) {
