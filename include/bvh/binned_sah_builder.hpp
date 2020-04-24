@@ -141,7 +141,7 @@ public:
         auto bin_offset    = -bbox.min * center_to_bin;
         auto compute_bin_index = [=] (const Vector3<Scalar>& center, int axis) {
             auto bin_index = multiply_add(center[axis], center_to_bin[axis], bin_offset[axis]);
-            return size_t(std::min(Scalar(bin_count - 1), std::max(Scalar(0), bin_index)));
+            return std::min(bin_count - 1, size_t(std::max(Scalar(0), bin_index)));
         };
 
         // Setup bins
