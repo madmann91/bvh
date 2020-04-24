@@ -31,8 +31,8 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
 
     std::pair<size_t, size_t> search_range(size_t i, size_t begin, size_t end) const {
         return std::make_pair(
-            i > begin + search_radius   ? i - search_radius : begin,
-            i + search_radius + 1 < end ? i + search_radius + 1 : end);
+            i > begin + search_radius ? i - search_radius : begin,
+            std::min(i + search_radius + 1, end));
     }
 
     std::pair<size_t, size_t> cluster(
@@ -52,7 +52,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
             auto thread_id    = bvh__get_thread_num();
             auto chunk_size   = (end - begin) / thread_count;
             auto chunk_begin  = begin + thread_id * chunk_size;
-            auto chunk_end    = thread_id != thread_count - 1 ? begin + (thread_id + 1) * chunk_size : end;
+            auto chunk_end    = thread_id != thread_count - 1 ? chunk_begin + chunk_size : end;
 
             auto distances = std::make_unique<Scalar[]>((search_radius + 1) * search_radius);
             auto distance_matrix = std::make_unique<Scalar*[]>(search_radius + 1);
@@ -100,6 +100,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                     }
                 }
 
+                assert(best_neighbor != size_t(-1));
                 neighbors[i] = best_neighbor;
 
                 // Rotate the distance matrix columns
@@ -110,6 +111,8 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                     distance_matrix.get() + search_radius + 1);
                 distance_matrix[0] = last;
             }
+
+            #pragma omp barrier
 
             // Mark nodes that are the closest as merged, but keep
             // the one with lowest index to act as the parent
