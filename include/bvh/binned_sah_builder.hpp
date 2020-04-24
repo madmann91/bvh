@@ -83,24 +83,8 @@ class BinnedSahBuildTask : public TopDownBuildTask {
     const BoundingBox<Scalar>* bboxes;
     const Vector3<Scalar>* centers;
 
-    template <typename BinIndex>
-    std::pair<Scalar, size_t> find_split(int axis, size_t begin, size_t end, BinIndex bin_index) {
+    std::pair<Scalar, size_t> find_split(int axis) {
         auto& bins = bins_per_axis[axis];
-        auto& primitive_indices = builder.bvh.primitive_indices;
-
-        // Setup bins
-        for (auto& bin : bins) {
-            bin.bbox = BoundingBox<Scalar>::empty();
-            bin.primitive_count = 0;
-        }
-
-        // Fill bins with primitives
-        for (size_t i = begin; i < end; ++i) {
-            auto primitive_index = primitive_indices[i];
-            Bin& bin = bins[bin_index(centers[primitive_index], axis)];
-            bin.primitive_count++;
-            bin.bbox.extend(bboxes[primitive_index]);
-        }
 
         // Right sweep to compute partial SAH
         auto   current_bbox  = BoundingBox<Scalar>::empty();
@@ -150,22 +134,36 @@ public:
 
         auto primitive_indices = bvh.primitive_indices.get();
 
-        // Compute the bounding box of the centers of the primitives in this node
-        auto center_bbox = BoundingBox<Scalar>::empty();
-        for (size_t i = item.begin; i < item.end; ++i)
-            center_bbox.extend(centers[primitive_indices[i]]);
-
         std::pair<Scalar, size_t> best_splits[3];
 
-        auto inverse = center_bbox.diagonal().inverse() * Scalar(bin_count);
-        auto base    = -center_bbox.min * inverse;
-        auto bin_index = [=] (const Vector3<Scalar>& center, int axis) {
-            return std::min(size_t(multiply_add(center[axis], inverse[axis], base[axis])), size_t(bin_count - 1));
+        auto bbox = node.bounding_box_proxy().to_bounding_box();
+        auto center_to_bin = bbox.diagonal().inverse() * Scalar(bin_count);
+        auto bin_offset    = -bbox.min * center_to_bin;
+        auto compute_bin_index = [=] (const Vector3<Scalar>& center, int axis) {
+            auto bin_index = multiply_add(center[axis], center_to_bin[axis], bin_offset[axis]);
+            return size_t(std::min(Scalar(bin_count - 1), std::max(Scalar(0), bin_index)));
         };
 
-        #pragma omp taskloop if (item.work_size() > builder.task_spawn_threshold) grainsize(1) default(shared)
+        // Setup bins
+        for (int axis = 0; axis < 3; ++axis) {
+            for (auto& bin : bins_per_axis[axis]) {
+                bin.bbox = BoundingBox<Scalar>::empty();
+                bin.primitive_count = 0;
+            }
+        }
+
+        // Fill bins with primitives
+        for (size_t i = item.begin; i < item.end; ++i) {
+            auto primitive_index = bvh.primitive_indices[i];
+            for (int axis = 0; axis < 3; ++axis) {
+                Bin& bin = bins_per_axis[axis][compute_bin_index(centers[primitive_index], axis)];
+                bin.primitive_count++;
+                bin.bbox.extend(bboxes[primitive_index]);
+            }
+        }
+
         for (int axis = 0; axis < 3; ++axis)
-            best_splits[axis] = find_split(axis, item.begin, item.end, bin_index);
+            best_splits[axis] = find_split(axis);
 
         int best_axis = 0;
         if (best_splits[0].first > best_splits[1].first)
@@ -197,7 +195,7 @@ public:
 
         // Split primitives according to split position
         size_t begin_right = std::partition(primitive_indices + item.begin, primitive_indices + item.end, [&] (size_t i) {
-            return bin_index(centers[i], best_axis) < split_index;
+            return compute_bin_index(centers[i], best_axis) < split_index;
         }) - primitive_indices;
 
         // Check that the split does not leave one side empty
