@@ -8,6 +8,7 @@
 #include "bvh/bounding_box.hpp"
 #include "bvh/top_down_builder.hpp"
 #include "bvh/sah_based_algorithm.hpp"
+#include "bvh/radix_sort.hpp"
 
 namespace bvh {
 
@@ -23,11 +24,14 @@ class SweepSahBuilder :
 {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = SweepSahBuildTask<Bvh>;
+    using Key       = typename SizedIntegerType<sizeof(Scalar) * CHAR_BIT>::Unsigned;
     using Mark      = typename BuildTask::MarkType;
 
     using ParentBuilder = TopDownBuilder<Bvh, BuildTask>;
     using ParentBuilder::bvh;
     using ParentBuilder::run_task;
+
+    RadixSort<10> radix_sort;
 
 public:
     using ParentBuilder::max_depth;
@@ -48,8 +52,9 @@ public:
         bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * primitive_count + 1);
         bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);
 
-        auto reference_data = std::make_unique<size_t[]>(primitive_count * 2);
+        auto reference_data = std::make_unique<size_t[]>(primitive_count * 3);
         auto cost_data      = std::make_unique<Scalar[]>(primitive_count * 3);
+        auto key_data       = std::make_unique<Key[]>(primitive_count * 2);
         auto mark_data      = std::make_unique<Mark[]>(primitive_count);
 
         std::array<Scalar*, 3> costs = {
@@ -58,28 +63,48 @@ public:
             cost_data.get() + 2 * primitive_count
         };
 
-        std::array<size_t*, 3> references = {
-            reference_data.get(),
-            reference_data.get() + primitive_count,
-            bvh.primitive_indices.get()
-        };
+        std::array<size_t*, 3> sorted_references;
+        size_t* unsorted_references = bvh.primitive_indices.get();
+        Key* sorted_keys = key_data.get();
+        Key* unsorted_keys = key_data.get() + primitive_count;
 
         bvh.node_count = 1;
         bvh.nodes[0].bounding_box_proxy() = global_bbox;
 
         #pragma omp parallel
         {
-            #pragma omp for
+            // Sort the primitives on each axis once
             for (int axis = 0; axis < 3; ++axis) {
-                std::iota(references[axis], references[axis] + primitive_count, 0);
-                std::sort(references[axis], references[axis] + primitive_count, [&] (size_t i, size_t j) {
-                    return centers[i][axis] < centers[j][axis];
-                });
+                #pragma omp single
+                {
+                    sorted_references[axis] = unsorted_references;
+                    unsorted_references = reference_data.get() + axis * primitive_count;
+                    // Make sure that one array is the final array of references used by the BVH
+                    if (axis != 0 && sorted_references[axis] == bvh.primitive_indices.get())
+                        std::swap(sorted_references[axis], unsorted_references);
+                    assert(axis < 2 ||
+                           sorted_references[0] == bvh.primitive_indices.get() ||
+                           sorted_references[1] == bvh.primitive_indices.get());
+                }
+
+                #pragma omp for
+                for (size_t i = 0; i < primitive_count; ++i) {
+                    sorted_keys[i] = radix_sort.make_key(centers[i][axis]);
+                    sorted_references[axis][i] = i;
+                }
+
+                radix_sort.sort(
+                    sorted_keys,
+                    unsorted_keys,
+                    sorted_references[axis],
+                    unsorted_references,
+                    primitive_count,
+                    sizeof(Scalar) * CHAR_BIT);
             }
 
             #pragma omp single
             {
-                BuildTask first_task(*this, bboxes, centers, references, costs, mark_data.get());
+                BuildTask first_task(*this, bboxes, centers, sorted_references, costs, mark_data.get());
                 run_task(first_task, 0, 0, primitive_count, 0);
             }
         }
