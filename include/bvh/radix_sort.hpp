@@ -6,9 +6,11 @@
 #include <cstddef>
 
 #include "bvh/platform.hpp"
+#include "bvh/utilities.hpp"
 
 namespace bvh {
 
+/// Parallel implementation of the radix sort algorithm.
 template <size_t BitsPerIteration>
 class RadixSort {
 public:
@@ -16,6 +18,7 @@ public:
 
     RadixSort() { bvh__assert_not_in_parallel(); }
 
+    /// Performs the sort. Must be called from a parallel region.
     template <typename Key, typename Value>
     void sort(
         Key* bvh__restrict__& keys,
@@ -81,6 +84,15 @@ public:
                 std::swap(values_copy, values);
             }
         }
+    }
+
+    /// Creates a radix sort key from a floating point value.
+    template <typename T, std::enable_if_t<std::is_floating_point<T>::value, int> = 0>
+    static typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Unsigned make_key(T x) {
+        using U = typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Unsigned;
+        auto mask = U(1) << (sizeof(T) * CHAR_BIT - 1);
+        auto y = as<U>(x);
+        return (y & mask ? (-y) ^ mask : y) ^ mask;
     }
 
 private:

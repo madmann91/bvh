@@ -9,11 +9,15 @@
 
 namespace bvh {
 
+/// Parallel prefix sum. The parallel algorithm used in this implementation
+/// needs twice the work as the naive serial version, and is thus enabled
+/// only if the number of cores if greater or equal than 3.
 template <typename T>
 class PrefixSum {
 public:
     PrefixSum() { bvh__assert_not_in_parallel(); }
 
+    /// Performs the prefix sum. Must be called from a parallel region.
     template <typename F = std::plus<T>>
     void sum(const T* input, T* output, size_t count, F f = F()) {
         bvh__assert_in_parallel();
