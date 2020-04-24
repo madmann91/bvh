@@ -5,6 +5,7 @@
 
 #include "bvh/morton_code_based_builder.hpp"
 #include "bvh/prefix_sum.hpp"
+#include "bvh/platform.hpp"
 
 namespace bvh {
 
@@ -28,6 +29,12 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
 
     PrefixSum<size_t> prefix_sum;
 
+    std::pair<size_t, size_t> search_range(size_t i, size_t begin, size_t end) const {
+        return std::make_pair(
+            i > begin + search_radius   ? i - search_radius : begin,
+            i + search_radius + 1 < end ? i + search_radius + 1 : end);
+    }
+
     std::pair<size_t, size_t> cluster(
         const Node* bvh__restrict__ input,
         Node* bvh__restrict__ output,
@@ -41,27 +48,67 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
 
         #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
-            // Nearest neighbor search
-            #pragma omp for
-            for (size_t i = begin; i < end; ++i) {
-                size_t search_begin = i > begin + search_radius   ? i - search_radius     : begin;
-                size_t search_end   = i + search_radius + 1 < end ? i + search_radius + 1 : end;
-                Scalar best_distance = std::numeric_limits<Scalar>::max();
-                size_t best_neighbor = -1;
-                for (size_t j = search_begin; j < search_end; ++j) {
-                    if (j == i)
-                        continue;
-                    auto distance = input[i]
+            auto thread_count = bvh__get_num_threads();
+            auto thread_id    = bvh__get_thread_num();
+            auto chunk_size   = (end - begin) / thread_count;
+            auto chunk_begin  = begin + thread_id * chunk_size;
+            auto chunk_end    = thread_id != thread_count - 1 ? begin + (thread_id + 1) * chunk_size : end;
+
+            auto distances = std::make_unique<Scalar[]>((search_radius + 1) * search_radius);
+            auto distance_matrix = std::make_unique<Scalar*[]>(search_radius + 1);
+            for (size_t i = 0; i <= search_radius; ++i)
+                distance_matrix[i] = &distances[i * search_radius];
+
+            // Initialize distance matrix
+            for (size_t i = search_range(chunk_begin, begin, end).first; i < chunk_begin; ++i) {
+                auto search_end = search_range(i, begin, end).second;
+                for (size_t j = i + 1; j < search_end; ++j) {
+                    distance_matrix[chunk_begin - i][j - i - 1] = input[i]
                         .bounding_box_proxy()
                         .to_bounding_box()
                         .extend(input[j].bounding_box_proxy())
                         .half_area();
+                }
+            }
+
+            // Nearest neighbor search
+            for (size_t i = chunk_begin; i < chunk_end; i++) {
+                auto [search_begin, search_end] = search_range(i, begin, end);
+                Scalar best_distance = std::numeric_limits<Scalar>::max();
+                size_t best_neighbor = -1;
+
+                // Backwards search
+                for (size_t j = search_begin; j < i; ++j) {
+                    auto distance = distance_matrix[i - j][i - j - 1];
                     if (distance < best_distance) {
                         best_distance = distance;
                         best_neighbor = j;
                     }
                 }
+
+                // Forward search
+                for (size_t j = i + 1; j < search_end; ++j) {
+                    auto distance = input[i]
+                        .bounding_box_proxy()
+                        .to_bounding_box()
+                        .extend(input[j].bounding_box_proxy())
+                        .half_area();
+                    distance_matrix[0][j - i - 1] = distance;
+                    if (distance < best_distance) {
+                        best_distance = distance;
+                        best_neighbor = j;
+                    }
+                }
+
                 neighbors[i] = best_neighbor;
+
+                // Rotate the distance matrix columns
+                auto last = distance_matrix[search_radius];
+                std::move_backward(
+                    distance_matrix.get(),
+                    distance_matrix.get() + search_radius,
+                    distance_matrix.get() + search_radius + 1);
+                distance_matrix[0] = last;
             }
 
             // Mark nodes that are the closest as merged, but keep
