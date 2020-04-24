@@ -6,7 +6,7 @@
 
 namespace bvh {
 
-/// Base class for build tasks
+/// Base class for top-down build tasks.
 class TopDownBuildTask {
 protected:
     struct WorkItem {
@@ -25,12 +25,8 @@ protected:
 };
 
 /// Base class for top-down BVH builders.
-template <typename Bvh, typename BuildTask>
+template <typename Bvh>
 class TopDownBuilder {
-    friend BuildTask;
-
-    using WorkItem = typename BuildTask::WorkItemType;
-
 public:
     /// Threshold (number of primitives) under which the builder
     /// doesn't spawn any more OpenMP tasks.
@@ -52,8 +48,9 @@ protected:
         : bvh(bvh)
     {}
 
-    template <typename... Args>
+    template <typename BuildTask, typename... Args>
     void run_task(BuildTask& task, Args&&... args) {
+        using WorkItem = typename BuildTask::WorkItemType;
         std::stack<WorkItem> stack;
         stack.emplace(std::forward<Args&&>(args)...);
         while (!stack.empty()) {

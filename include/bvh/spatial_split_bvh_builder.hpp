@@ -20,17 +20,16 @@ template <typename, typename, size_t> class SpatialSplitBvhBuildTask;
 /// this builder is not as efficient as bvh::SweepSahBuilder when spatial splits
 /// are disabled, because it needs to sort primitive references at every step.
 template <typename Bvh, typename Primitive, size_t BinCount>
-class SpatialSplitBvhBuilder :
-    public TopDownBuilder<Bvh, SpatialSplitBvhBuildTask<Bvh, Primitive, BinCount>>,
-    public SahBasedAlgorithm<Bvh>
-{
+class SpatialSplitBvhBuilder : public TopDownBuilder<Bvh>, public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = SpatialSplitBvhBuildTask<Bvh, Primitive, BinCount>;
     using Reference = typename BuildTask::ReferenceType;
 
-    using ParentBuilder = TopDownBuilder<Bvh, BuildTask>;
+    using ParentBuilder = TopDownBuilder<Bvh>;
     using ParentBuilder::bvh;
     using ParentBuilder::run_task;
+
+    friend BuildTask;
 
 public:
     using ParentBuilder::max_depth;
@@ -108,7 +107,7 @@ public:
 template <typename Bvh, typename Primitive, size_t BinCount>
 class SpatialSplitBvhBuildTask : public TopDownBuildTask {
     using Scalar  = typename Bvh::ScalarType;
-    using Builder = TopDownBuilder<Bvh, SpatialSplitBvhBuildTask>;
+    using Builder = SpatialSplitBvhBuilder<Bvh, Primitive, BinCount>;
 
     struct WorkItem : public TopDownBuildTask::WorkItem {
         size_t split_end;
@@ -534,12 +533,10 @@ public:
         auto best_cost = std::min(best_spatial_split.cost, best_object_split.cost);
         bool use_spatial_split = best_cost < best_object_split.cost;
 
-        auto traversal_cost = static_cast<SpatialSplitBvhBuilder<Bvh, Primitive, BinCount>&>(builder).traversal_cost;
-        auto max_leaf_size  = static_cast<SpatialSplitBvhBuilder<Bvh, Primitive, BinCount>&>(builder).max_leaf_size;
-
         // Make sure the cost of splitting does not exceed the cost of not splitting
-        if (best_cost >= node.bounding_box_proxy().half_area() * (item.work_size() - traversal_cost)) {
-            if (item.work_size() > max_leaf_size) {
+        auto max_split_cost = node.bounding_box_proxy().half_area() * (item.work_size() - builder.traversal_cost);
+        if (best_cost >= max_split_cost) {
+            if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: median split on the largest axis
                 use_spatial_split = false;
                 best_object_split.index = (item.begin + item.end) / 2;

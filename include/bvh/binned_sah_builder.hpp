@@ -17,18 +17,15 @@ template <typename, size_t> class BinnedSahBuildTask;
 /// See "On fast Construction of SAH-based Bounding Volume Hierarchies",
 /// by I. Wald.
 template <typename Bvh, size_t BinCount>
-class BinnedSahBuilder :
-    public TopDownBuilder<Bvh, BinnedSahBuildTask<Bvh, BinCount>>,
-    public SahBasedAlgorithm<Bvh>
-{
+class BinnedSahBuilder : public TopDownBuilder<Bvh>, public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = BinnedSahBuildTask<Bvh, BinCount>;
 
-    using ParentBuilder = TopDownBuilder<Bvh, BuildTask>;
+    using ParentBuilder = TopDownBuilder<Bvh>;
     using ParentBuilder::bvh;
     using ParentBuilder::run_task;
 
-    using SahBasedAlgorithm<Bvh>::cost;
+    friend BuildTask;
 
 public:
     using ParentBuilder::max_depth;
@@ -69,7 +66,7 @@ public:
 template <typename Bvh, size_t BinCount>
 class BinnedSahBuildTask : public TopDownBuildTask {
     using Scalar  = typename Bvh::ScalarType;
-    using Builder = TopDownBuilder<Bvh, BinnedSahBuildTask>;
+    using Builder = BinnedSahBuilder<Bvh, BinCount>;
 
     using TopDownBuildTask::WorkItem;
 
@@ -176,14 +173,12 @@ public:
         if (best_splits[best_axis].first > best_splits[2].first)
             best_axis = 2;
 
-        auto traversal_cost = static_cast<BinnedSahBuilder<Bvh, BinCount>&>(builder).traversal_cost;
-        auto max_leaf_size  = static_cast<BinnedSahBuilder<Bvh, BinCount>&>(builder).max_leaf_size;
         auto split_index = best_splits[best_axis].second;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
-        if (best_splits[best_axis].second == bin_count ||
-            best_splits[best_axis].first >= node.bounding_box_proxy().half_area() * (item.work_size() - traversal_cost)) {
-            if (item.work_size() > max_leaf_size) {
+        auto max_split_cost = node.bounding_box_proxy().half_area() * (item.work_size() - builder.traversal_cost);
+        if (best_splits[best_axis].second == bin_count || best_splits[best_axis].first >= max_split_cost) {
+            if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: approximate median split on largest axis
                 best_axis = node.bounding_box_proxy().to_bounding_box().largest_axis();
                 for (size_t i = 0, count = 0; i < bin_count - 1; ++i) {
