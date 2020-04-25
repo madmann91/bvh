@@ -18,27 +18,26 @@ template <typename> class SweepSahBuildTask;
 /// sorted once, and a stable partitioning algorithm is used when splitting,
 /// so as to keep the relative order of primitives within each partition intact.
 template <typename Bvh>
-class SweepSahBuilder : public TopDownBuilder<Bvh>, public SahBasedAlgorithm<Bvh> {
+class SweepSahBuilder : public TopDownBuilder, public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = SweepSahBuildTask<Bvh>;
     using Key       = typename SizedIntegerType<sizeof(Scalar) * CHAR_BIT>::Unsigned;
     using Mark      = typename BuildTask::MarkType;
 
-    using ParentBuilder = TopDownBuilder<Bvh>;
-    using ParentBuilder::bvh;
-    using ParentBuilder::run_task;
+    using TopDownBuilder::run_task;
 
     friend BuildTask;
 
     RadixSort<10> radix_sort;
+    Bvh& bvh;
 
 public:
-    using ParentBuilder::max_depth;
-    using ParentBuilder::max_leaf_size;
+    using TopDownBuilder::max_depth;
+    using TopDownBuilder::max_leaf_size;
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     SweepSahBuilder(Bvh& bvh)
-        : ParentBuilder(bvh)
+        : bvh(bvh)
     {}
 
     void build(

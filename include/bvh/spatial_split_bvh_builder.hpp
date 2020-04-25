@@ -20,20 +20,20 @@ template <typename, typename, size_t> class SpatialSplitBvhBuildTask;
 /// this builder is not as efficient as bvh::SweepSahBuilder when spatial splits
 /// are disabled, because it needs to sort primitive references at every step.
 template <typename Bvh, typename Primitive, size_t BinCount>
-class SpatialSplitBvhBuilder : public TopDownBuilder<Bvh>, public SahBasedAlgorithm<Bvh> {
+class SpatialSplitBvhBuilder : public TopDownBuilder, public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = SpatialSplitBvhBuildTask<Bvh, Primitive, BinCount>;
     using Reference = typename BuildTask::ReferenceType;
 
-    using ParentBuilder = TopDownBuilder<Bvh>;
-    using ParentBuilder::bvh;
-    using ParentBuilder::run_task;
+    using TopDownBuilder::run_task;
 
     friend BuildTask;
 
+    Bvh& bvh;
+
 public:
-    using ParentBuilder::max_depth;
-    using ParentBuilder::max_leaf_size;
+    using TopDownBuilder::max_depth;
+    using TopDownBuilder::max_leaf_size;
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     /// Number of spatial binning passes that are run in order to
@@ -42,7 +42,7 @@ public:
     size_t binning_pass_count = 2;
 
     SpatialSplitBvhBuilder(Bvh& bvh)
-        : ParentBuilder(bvh)
+        : bvh(bvh)
     {}
 
     size_t build(

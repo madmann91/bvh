@@ -36,6 +36,8 @@ protected:
 
     RadixSort<bits_per_iteration> radix_sort;
 
+    ~MortonCodeBasedBuilder() {}
+
     SortedPairs sort_primitives_by_morton_code(
         const BoundingBox<Scalar>& global_bbox,
         const Vector3<Scalar>* centers,

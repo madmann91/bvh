@@ -25,7 +25,6 @@ protected:
 };
 
 /// Base class for top-down BVH builders.
-template <typename Bvh>
 class TopDownBuilder {
 public:
     /// Threshold (number of primitives) under which the builder
@@ -42,11 +41,7 @@ public:
     size_t max_leaf_size = 16;
 
 protected:
-    Bvh& bvh;
-
-    TopDownBuilder(Bvh& bvh)
-        : bvh(bvh)
-    {}
+    ~TopDownBuilder() {}
 
     template <typename BuildTask, typename... Args>
     void run_task(BuildTask& task, Args&&... args) {

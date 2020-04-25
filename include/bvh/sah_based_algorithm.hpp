@@ -16,6 +16,8 @@ public:
     Scalar traversal_cost = 1;
 
 protected:
+    ~SahBasedAlgorithm() {}
+
     Scalar cost(const Bvh& bvh) const {
         // Compute the SAH cost for the entire BVH
         Scalar cost(0);

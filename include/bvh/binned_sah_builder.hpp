@@ -17,22 +17,23 @@ template <typename, size_t> class BinnedSahBuildTask;
 /// See "On fast Construction of SAH-based Bounding Volume Hierarchies",
 /// by I. Wald.
 template <typename Bvh, size_t BinCount>
-class BinnedSahBuilder : public TopDownBuilder<Bvh>, public SahBasedAlgorithm<Bvh> {
+class BinnedSahBuilder : public TopDownBuilder, public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using BuildTask = BinnedSahBuildTask<Bvh, BinCount>;
 
-    using ParentBuilder = TopDownBuilder<Bvh>;
-    using ParentBuilder::bvh;
-    using ParentBuilder::run_task;
+    using TopDownBuilder::run_task;
 
     friend BuildTask;
 
+    Bvh& bvh;
+
 public:
-    using ParentBuilder::max_depth;
+    using TopDownBuilder::max_depth;
+    using TopDownBuilder::max_leaf_size;
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     BinnedSahBuilder(Bvh& bvh)
-        : ParentBuilder(bvh)
+        : bvh(bvh)
     {}
 
     void build(

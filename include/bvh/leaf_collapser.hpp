@@ -5,6 +5,7 @@
 
 #include "bvh/bvh.hpp"
 #include "bvh/sah_based_algorithm.hpp"
+#include "bvh/bottom_up_algorithm.hpp"
 #include "bvh/prefix_sum.hpp"
 
 namespace bvh {
@@ -14,71 +15,39 @@ namespace bvh {
 /// have a termination criterion that prevents leaf creation when the SAH
 /// cost does not improve.
 template <typename Bvh>
-class LeafCollapser : public SahBasedAlgorithm<Bvh> {
+class LeafCollapser : public SahBasedAlgorithm<Bvh>, public BottomUpAlgorithm<Bvh> {
     using Scalar = typename Bvh::ScalarType;
 
     PrefixSum<size_t> prefix_sum;
 
-    Bvh& bvh;
+    using BottomUpAlgorithm<Bvh>::traverse;
+    using BottomUpAlgorithm<Bvh>::children;
+    using BottomUpAlgorithm<Bvh>::parents;
+    using BottomUpAlgorithm<Bvh>::bvh;
 
 public:
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     LeafCollapser(Bvh& bvh)
-        : bvh(bvh)
+        : BottomUpAlgorithm<Bvh>(bvh)
     {}
 
     void collapse() {
-        auto parents  = std::make_unique<size_t[]>(bvh.node_count);
-        auto children = std::make_unique<size_t[]>(bvh.node_count);
-        auto flags    = std::make_unique<int[]>(bvh.node_count);
+        std::unique_ptr<size_t[]> primitive_indices_copy;
+        std::unique_ptr<typename Bvh::Node[]> nodes_copy;
 
         auto node_index       = std::make_unique<size_t[]>(bvh.node_count / 2 + 1);
         auto primitive_counts = std::make_unique<size_t[]>(bvh.node_count);
 
-        std::unique_ptr<size_t[]> primitive_indices_copy;
-        std::unique_ptr<typename Bvh::Node[]> nodes_copy;
-
-        parents[0] = 0;
         node_index[0] = 1;
 
         #pragma omp parallel
         {
-            // Compute parent indices
-            #pragma omp for
-            for (size_t i = 0; i < bvh.node_count; i++) {
-                auto& node = bvh.nodes[i];
-                if (node.is_leaf) {
-                    primitive_counts[i] = node.primitive_count;
-                    children[i] = 0;
-                    continue;
-                }
-                auto first_child = node.first_child_or_primitive;
-                parents[first_child + 0] = i;
-                parents[first_child + 1] = i;
-                primitive_counts[i] = 0;
-                children[i] = first_child;
-            }
-
-            // Bottom-up traversal that collapses leaves according to the SAH
-            #pragma omp for
-            for (size_t i = 1; i < bvh.node_count; ++i) {
-                // Only process leaves
-                if (children[i] != 0)
-                    continue;
-                // Merge up to the root
-                size_t j = i;
-                do {
-                    j = parents[j];
-
-                    // Make sure that the children of this node have been processed
-                    int previous_flag;
-                    #pragma omp atomic capture
-                    { previous_flag = flags[j]; flags[j]++; }
-                    if (previous_flag != 1)
-                        break;
-
-                    auto& node = bvh.nodes[j];
+            // Bottom-up traversal to collapse leaves
+            traverse(
+                [&] (size_t i) { primitive_counts[i] = bvh.nodes[i].primitive_count; },
+                [&] (size_t i) {
+                    auto& node = bvh.nodes[i];
                     assert(!node.is_leaf);
                     auto first_child  = node.first_child_or_primitive;
                     auto& left_child  = bvh.nodes[first_child + 0];
@@ -87,7 +56,7 @@ public:
                     auto left_primitive_count  = primitive_counts[first_child + 0];
                     auto right_primitive_count = primitive_counts[first_child + 1];
                     auto total_primitive_count = left_primitive_count + right_primitive_count;
-                    primitive_counts[j] = total_primitive_count;
+                    primitive_counts[i] = total_primitive_count;
 
                     // Compute the cost of collapsing this node when both children are leaves
                     if (left_child.is_leaf && right_child.is_leaf) {
@@ -99,13 +68,12 @@ public:
                         if (collapse_cost <= base_cost) {
                             node_index[(first_child + 1) / 2] = 0;
                             node.is_leaf = true;
-                            continue;
+                            return;
                         }
                     }
 
                     node_index[(first_child + 1) / 2] = 2;
-                } while (j != 0);
-            }
+                });
 
             prefix_sum.sum(node_index.get(), node_index.get(), bvh.node_count / 2 + 1);
 

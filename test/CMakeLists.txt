@@ -64,6 +64,7 @@ foreach (build_options_as_string
     "--builder binned_sah"
     "--builder spatial_split"
     "--builder locally_ordered_clustering"
+    "--builder locally_ordered_clustering --collapse-leaves"
     "--builder linear"
     "--builder linear --pre-split 30"
     "--builder sweep_sah --parallel-reinsertion"
