@@ -35,6 +35,6 @@ public:
     }
 };
 
-}
+} // namespace bvh
 
 #endif
