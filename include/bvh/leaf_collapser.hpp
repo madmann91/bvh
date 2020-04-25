@@ -15,21 +15,21 @@ namespace bvh {
 /// have a termination criterion that prevents leaf creation when the SAH
 /// cost does not improve.
 template <typename Bvh>
-class LeafCollapser : public SahBasedAlgorithm<Bvh>, public BottomUpAlgorithm<Bvh> {
+class LeafCollapser : public SahBasedAlgorithm<Bvh>, public BottomUpAlgorithm<Bvh, true> {
     using Scalar = typename Bvh::ScalarType;
 
     PrefixSum<size_t> prefix_sum;
 
-    using BottomUpAlgorithm<Bvh>::traverse;
-    using BottomUpAlgorithm<Bvh>::children;
-    using BottomUpAlgorithm<Bvh>::parents;
-    using BottomUpAlgorithm<Bvh>::bvh;
+    using BottomUpAlgorithm<Bvh, true>::traverse;
+    using BottomUpAlgorithm<Bvh, true>::children;
+    using BottomUpAlgorithm<Bvh, true>::parents;
+    using BottomUpAlgorithm<Bvh, true>::bvh;
 
 public:
     using SahBasedAlgorithm<Bvh>::traversal_cost;
 
     LeafCollapser(Bvh& bvh)
-        : BottomUpAlgorithm<Bvh>(bvh)
+        : BottomUpAlgorithm<Bvh, true>(bvh)
     {}
 
     void collapse() {

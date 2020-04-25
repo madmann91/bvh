@@ -17,6 +17,7 @@
 #include <bvh/node_layout_optimizer.hpp>
 #include <bvh/leaf_collapser.hpp>
 #include <bvh/heuristic_primitive_splitter.hpp>
+#include <bvh/hierarchy_refitter.hpp>
 #include <bvh/single_ray_traverser.hpp>
 #include <bvh/intersectors.hpp>
 #include <bvh/triangle.hpp>
@@ -387,6 +388,10 @@ int main(int argc, char** argv) {
         if (pre_shuffle)
             shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
+
+    // This is just to make sure that refitting works
+    bvh::HierarchyRefitter refitter(bvh);
+    refitter.refit([] (Bvh::Node&) {});
 
     std::cout << bvh.node_count << " node(s), " << reference_count << " reference(s)" << std::endl;
 

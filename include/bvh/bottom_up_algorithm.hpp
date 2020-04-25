@@ -12,7 +12,7 @@ namespace bvh {
 /// Base class for bottom-up BVH traversal algorithms. The implementation is inspired
 /// from T. Karras' bottom-up refitting algorithm, explained in the article
 /// "Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees".
-template <typename Bvh>
+template <typename Bvh, bool MaintainChildIndices = false>
 class BottomUpAlgorithm {
 protected:
     std::unique_ptr<size_t[]> parents, children;
@@ -24,9 +24,12 @@ protected:
         : bvh(bvh)
     {
         bvh__assert_not_in_parallel();
-        parents  = std::make_unique<size_t[]>(bvh.node_count);
-        children = std::make_unique<size_t[]>(bvh.node_count);
-        flags    = std::make_unique<int[]>(bvh.node_count);
+        parents = std::make_unique<size_t[]>(bvh.node_count);
+        flags   = std::make_unique<int[]>(bvh.node_count);
+
+        if (MaintainChildIndices)
+            children = std::make_unique<size_t[]>(bvh.node_count);
+
         parents[0] = 0;
 
         // Compute parent/children indices
@@ -38,7 +41,8 @@ protected:
             auto first_child = node.first_child_or_primitive;
             parents[first_child + 0] = i;
             parents[first_child + 1] = i;
-            children[i] = first_child;
+            if (MaintainChildIndices)
+                children[i] = first_child;
         }
     }
 
@@ -54,7 +58,7 @@ protected:
         #pragma omp for
         for (size_t i = 1; i < bvh.node_count; ++i) {
             // Only process leaves
-            if (children[i] != 0)
+            if (MaintainChildIndices ? children[i] != 0 : bvh.nodes[i].is_leaf)
                 continue;
 
             process_leaf(i);
