@@ -177,7 +177,7 @@ public:
         }
 
         std::pair<Scalar, size_t> best_splits[3];
-        bool should_spawn_tasks = item.work_size() > builder.task_spawn_threshold;
+        [[maybe_unused]] bool should_spawn_tasks = item.work_size() > builder.task_spawn_threshold;
 
         // Sweep primitives to find the best cost
         #pragma omp taskloop if (should_spawn_tasks) grainsize(1) default(shared)
