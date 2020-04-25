@@ -56,7 +56,7 @@ This library contains several construction algorithms, all parallelized using Op
 Those algorithms only require a bounding box and center for each primitive, except for
 `bvh::SpatialSplitBvhBuilder`, which needs a way to split individual primitives.
 
-### Optimization/Splitting Algorithms
+### Optimization/Splitting/Refitting Algorithms
 
 Additionally, the BVH structure can be further improved by running post-build optimizations,
 or pre-build triangle splitting.
@@ -79,6 +79,11 @@ or pre-build triangle splitting.
    like `bvh::LinearBvhBuilder` or `bvh::LocallyOrderedClusteringBuilder`, because top-down builders
    already have a stopping criterion that prevents creating leaves that would be detrimental to the
    SAH cost of the tree.
+ - `bvh::HierarchyRefitter`: A parallel bottom-up BVH refitting algorithm, to use after changing the
+   geometry inside the leaves of the BVH (for example, with animated models). This algorithm will
+   simply update the bounding boxes of each node, and propagate the result up to the root. The topology
+   of the BVH is left untouched during the operation. Useful when building another BVH is too expensive,
+   or when the changes are small enough. Note that BVH quality may decrease as a result.
 
 ### Traversal Algorithms
 
