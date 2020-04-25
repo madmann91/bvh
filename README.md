@@ -37,10 +37,10 @@ This library contains several construction algorithms, all parallelized using Op
  - `bvh::LocallyOrderedClusteringBuilder`: Bottom-up builder that produces trees by sorting
    primitives on a Morton curve and performing a local search to merge them into nodes (see
    _Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction_,
-   by D. Meister and J. Bittner). Very fast algorithm but produces medium-quality trees only.
-   The search radius can be configured to change the quality/speed ratio. Additionally,
-   the integer type used to compute Morton codes can also be changed when more precision
-   is required.
+   by D. Meister and J. Bittner). Very fast algorithm but produces medium- to high-quality
+   trees (if `bvh::LeafCollapser` is used). The search radius can be configured to change the
+   quality/speed ratio. Additionally, the integer type used to compute Morton codes can also be
+   changed when more precision is required.
  - `bvh::LinearBvhBuilder`: Bottom-up LBVH builder. Very fast and produces low-quality trees.
    Not substantially faster than `bvh::LocallyOrderedClusteringBuilder`, particularly when the
    search radius of that algorithm is small. Since the BVHs built by this algorithm are significantly
