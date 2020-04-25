@@ -29,15 +29,15 @@ public:
 
     void optimize() {
         size_t pair_count = (bvh.node_count - 1) / 2;
-        auto keys         = std::make_unique<Scalar[]>(pair_count * 2);
+        auto keys         = std::make_unique<Key[]>(pair_count * 2);
         auto indices      = std::make_unique<size_t[]>(pair_count * 2);
         auto nodes_copy   = std::make_unique<typename Bvh::Node[]>(bvh.node_count);
         nodes_copy[0] = bvh.nodes[0];
 
         auto sorted_indices   = indices.get();
         auto unsorted_indices = indices.get() + pair_count;
-        auto sorted_keys      = reinterpret_cast<Key*>(keys.get());
-        auto unsorted_keys    = reinterpret_cast<Key*>(keys.get() + pair_count);
+        auto sorted_keys      = keys.get();
+        auto unsorted_keys    = keys.get() + pair_count;
 
         #pragma omp parallel
         {
@@ -50,7 +50,7 @@ public:
                     .extend(bvh.nodes[i + 1].bounding_box_proxy())
                     .half_area();
                 size_t j = (i - 1) / 2;
-                keys[j]    = area;
+                keys[j]    = as<Key>(area);
                 indices[j] = j;
             }
 

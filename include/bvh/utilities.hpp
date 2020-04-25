@@ -18,6 +18,7 @@ namespace bvh {
 /// Safe function to reinterpret the bits of the given value as another type.
 template <typename To, typename From>
 To as(From from) {
+    static_assert(sizeof(To) == sizeof(From));
     To to;
     std::memcpy(&to, &from, sizeof(from));
     return to;

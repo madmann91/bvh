@@ -1,7 +1,7 @@
 #ifndef BVH_SWEEP_SAH_BUILDER_HPP
 #define BVH_SWEEP_SAH_BUILDER_HPP
 
-#include <numeric>
+#include <array>
 #include <optional>
 
 #include "bvh/bvh.hpp"
