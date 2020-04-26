@@ -7,6 +7,7 @@
 #include "bvh/sah_based_algorithm.hpp"
 #include "bvh/bottom_up_algorithm.hpp"
 #include "bvh/prefix_sum.hpp"
+#include "bvh/platform.hpp"
 
 namespace bvh {
 
@@ -33,6 +34,9 @@ public:
     {}
 
     void collapse() {
+        if (bvh__unlikely(bvh.nodes[0].is_leaf))
+            return;
+
         std::unique_ptr<size_t[]> primitive_indices_copy;
         std::unique_ptr<typename Bvh::Node[]> nodes_copy;
 
@@ -82,6 +86,8 @@ public:
                 nodes_copy = std::make_unique<typename Bvh::Node[]>(node_index[bvh.node_count / 2]);
                 primitive_indices_copy = std::make_unique<size_t[]>(primitive_counts[0]);
                 nodes_copy[0] = bvh.nodes[0];
+                nodes_copy[0].first_child_or_primitive =
+                    node_index[(bvh.nodes[0].first_child_or_primitive - 1) / 2];
             }
 
             #pragma omp for
@@ -130,9 +136,11 @@ public:
                 nodes_copy[j + 0] = bvh.nodes[i + 0];
                 nodes_copy[j + 1] = bvh.nodes[i + 1];
                 if (!bvh.nodes[i + 0].is_leaf)
-                    nodes_copy[j + 0].first_child_or_primitive = node_index[(bvh.nodes[i + 0].first_child_or_primitive - 1) / 2];
+                    nodes_copy[j + 0].first_child_or_primitive =
+                        node_index[(bvh.nodes[i + 0].first_child_or_primitive - 1) / 2];
                 if (!bvh.nodes[i + 1].is_leaf)
-                    nodes_copy[j + 1].first_child_or_primitive = node_index[(bvh.nodes[i + 1].first_child_or_primitive - 1) / 2];
+                    nodes_copy[j + 1].first_child_or_primitive =
+                        node_index[(bvh.nodes[i + 1].first_child_or_primitive - 1) / 2];
             }
         }
 
