@@ -32,7 +32,7 @@ public:
     {}
 
 private:
-    std::array<size_t, 6> conflicts(size_t in, size_t out) {
+    std::array<size_t, 6> get_conflicts(size_t in, size_t out) {
         // Return an array of re-insertion conflicts for the given nodes
         auto parent_in = parents[in];
         return std::array<size_t, 6> {
@@ -162,11 +162,12 @@ public:
                 for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second <= 0)
                         continue;
-                    // Encode locks into 64bits using the highest 32 bits for the cost and
-                    // the lowest 32 bits for the index of the node requesting the re-insertion
+                    // Encode locks into 64 bits using the highest 32 bits for the cost and the
+                    // lowest 32 bits for the index of the node requesting the re-insertion.
+                    // This takes advantage of the fact that IEEE-754 floats can be compared
+                    // with regular integer comparisons.
                     auto lock = (int64_t(as<int32_t>(float(outs[i].second))) << 32) | (int64_t(i) & INT64_C(0xFFFFFFFF));
-                    // This takes advantage of the fact that IEEE-754 floats can be compared with regular integer comparisons
-                    for (auto c : conflicts(i, outs[i].first))
+                    for (auto c : get_conflicts(i, outs[i].first))
                         atomic_max(locks[c], lock);
                 }
 
@@ -175,9 +176,9 @@ public:
                 for (size_t i = first_node; i < bvh.node_count; i += u) {
                     if (outs[i].second <= 0)
                         continue;
-                    auto conflict_list = conflicts(i, outs[i].first);
+                    auto conflicts = get_conflicts(i, outs[i].first);
                     // Make sure that this node owns all the locks for each and every conflicting node
-                    bool is_conflict_free = std::all_of(conflict_list .begin(), conflict_list .end(), [&] (size_t j) {
+                    bool is_conflict_free = std::all_of(conflicts .begin(), conflicts .end(), [&] (size_t j) {
                         return (locks[j] & INT64_C(0xFFFFFFFF)) == i;
                     });
                     if (!is_conflict_free)
@@ -191,7 +192,7 @@ public:
                         reinsert(i, outs[i].first);
                 }
 
-                // Refit the nodes that have changed
+                // Update the bounding boxes of each node in the tree
                 refit_in_parallel([] (typename Bvh::Node&) {});
             }
 
