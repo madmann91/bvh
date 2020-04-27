@@ -74,6 +74,7 @@ protected:
                 { previous_flag = flags[j]; flags[j]++; }
                 if (previous_flag != 1)
                     break;
+                flags[j] = 0;
 
                 process_inner_node(j);
             } while (j != 0);

@@ -5,6 +5,7 @@
 
 #include "bvh/bvh.hpp"
 #include "bvh/sah_based_algorithm.hpp"
+#include "bvh/hierarchy_refitter.hpp"
 
 namespace bvh {
 
@@ -13,43 +14,24 @@ namespace bvh {
 /// article "Parallel Reinsertion for Bounding Volume Hierarchy Optimization",
 /// by D. Meister and J. Bittner.
 template <typename Bvh>
-class ParallelReinsertionOptimizer : public SahBasedAlgorithm<Bvh> {
+class ParallelReinsertionOptimizer :
+    public SahBasedAlgorithm<Bvh>,
+    protected HierarchyRefitter<Bvh>
+{
     using Scalar    = typename Bvh::ScalarType;
     using Insertion = std::pair<size_t, Scalar>;
 
     using SahBasedAlgorithm<Bvh>::compute_cost;
-
-    Bvh& bvh;
-    std::unique_ptr<size_t[]> parents;
+    using HierarchyRefitter<Bvh>::bvh;
+    using HierarchyRefitter<Bvh>::parents;
+    using HierarchyRefitter<Bvh>::refit_in_parallel;
 
 public:
     ParallelReinsertionOptimizer(Bvh& bvh)
-        : bvh(bvh), parents(new size_t[bvh.node_count])
-    {
-        // Compute the index of the parent of each node
-        parents[0] = std::numeric_limits<size_t>::max();
-        #pragma omp parallel for
-        for (size_t i = 0; i < bvh.node_count; ++i) {
-            if (bvh.nodes[i].is_leaf)
-                continue;
-            auto first_child = bvh.nodes[i].first_child_or_primitive;
-            parents[first_child + 0] = i;
-            parents[first_child + 1] = i;
-        }
-    }
+        : HierarchyRefitter<Bvh>(bvh)
+    {}
 
 private:
-    void refit(size_t child) {
-        // Refit all nodes that are on the path between the given node and the root
-        auto bbox = bvh.nodes[child].bounding_box_proxy().to_bounding_box();
-        while (child != 0) {
-            auto parent  = parents[child];
-            auto sibling = bvh.sibling(child);
-            bvh.nodes[parent].bounding_box_proxy() = bbox.extend(bvh.nodes[sibling].bounding_box_proxy());
-            child = parent;
-        }
-    }
-
     std::array<size_t, 6> conflicts(size_t in, size_t out) {
         // Return an array of re-insertion conflicts for the given nodes
         auto parent_in = parents[in];
@@ -210,13 +192,7 @@ public:
                 }
 
                 // Refit the nodes that have changed
-                #pragma omp for
-                for (size_t i = first_node; i < bvh.node_count; i += u) {
-                    if (outs[i].second > 0) {
-                        refit(i);
-                        refit(outs[i].first);
-                    }
-                }
+                refit_in_parallel([] (typename Bvh::Node&) {});
             }
 
             // Compare the old SAH cost to the new one and decrease the number
