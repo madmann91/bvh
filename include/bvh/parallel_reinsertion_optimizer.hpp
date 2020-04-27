@@ -17,7 +17,7 @@ class ParallelReinsertionOptimizer : public SahBasedAlgorithm<Bvh> {
     using Scalar    = typename Bvh::ScalarType;
     using Insertion = std::pair<size_t, Scalar>;
 
-    using SahBasedAlgorithm<Bvh>::cost;
+    using SahBasedAlgorithm<Bvh>::compute_cost;
 
     Bvh& bvh;
     std::unique_ptr<size_t[]> parents;
@@ -159,7 +159,7 @@ public:
         auto locks = std::make_unique<std::atomic<int64_t>[]>(bvh.node_count);
         auto outs  = std::make_unique<Insertion[]>(bvh.node_count);
 
-        auto old_cost = cost(bvh);
+        auto old_cost = compute_cost(bvh);
         for (size_t iteration = 0; ; ++iteration) {
             size_t first_node = iteration % u + 1;
 
@@ -222,7 +222,7 @@ public:
             // Compare the old SAH cost to the new one and decrease the number
             // of nodes that are ignored during the optimization if the change
             // in cost is below the threshold.
-            auto new_cost = cost(bvh);
+            auto new_cost = compute_cost(bvh);
             if (std::abs(new_cost - old_cost) <= threshold || iteration >= u) {
                 if (u <= 1)
                     break;

@@ -18,7 +18,7 @@ public:
 protected:
     ~SahBasedAlgorithm() {}
 
-    Scalar cost(const Bvh& bvh) const {
+    Scalar compute_cost(const Bvh& bvh) const {
         // Compute the SAH cost for the entire BVH
         Scalar cost(0);
         #pragma omp parallel for reduction(+: cost)
@@ -28,7 +28,7 @@ protected:
             else
                 cost += traversal_cost * bvh.nodes[i].bounding_box_proxy().half_area();
         }
-        return cost;
+        return cost / bvh.nodes[0].bounding_box_proxy().half_area();
     }
 };
 
