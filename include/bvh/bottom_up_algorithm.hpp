@@ -49,7 +49,7 @@ protected:
     ~BottomUpAlgorithm() {}
 
     template <typename ProcessLeaf, typename ProcessInnerNode>
-    void traverse(
+    void traverse_in_parallel(
         const ProcessLeaf& process_leaf,
         const ProcessInnerNode& process_inner_node)
     {

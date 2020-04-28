@@ -59,7 +59,7 @@ public:
             // data as integers, because the area is positive, and
             // positive floating point numbers can be compared like
             // integers (mandated by IEEE-754).
-            radix_sort.sort(
+            radix_sort.sort_in_parallel(
                 sorted_keys,
                 unsorted_keys,
                 sorted_indices,

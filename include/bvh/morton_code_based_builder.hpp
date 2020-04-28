@@ -65,7 +65,7 @@ protected:
             }
 
             // Sort primitives by morton code
-            radix_sort.sort(
+            radix_sort.sort_in_parallel(
                 sorted_morton_codes,
                 unsorted_morton_codes,
                 sorted_primitive_indices,

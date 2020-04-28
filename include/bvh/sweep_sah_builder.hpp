@@ -91,7 +91,7 @@ public:
                     sorted_references[axis][i] = i;
                 }
 
-                radix_sort.sort(
+                radix_sort.sort_in_parallel(
                     sorted_keys,
                     unsorted_keys,
                     sorted_references[axis],

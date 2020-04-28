@@ -11,7 +11,7 @@ template <typename Bvh>
 class HierarchyRefitter : public BottomUpAlgorithm<Bvh> {
 protected:
     using BottomUpAlgorithm<Bvh>::bvh;
-    using BottomUpAlgorithm<Bvh>::traverse;
+    using BottomUpAlgorithm<Bvh>::traverse_in_parallel;
     using BottomUpAlgorithm<Bvh>::parents;
 
     template <typename UpdateLeaf>
@@ -19,7 +19,7 @@ protected:
         bvh__assert_in_parallel();
 
         // Refit every node of the tree in parallel
-        traverse(
+        traverse_in_parallel(
             [&] (size_t i) { update_leaf(bvh.nodes[i]); },
             [&] (size_t i) {
                 auto& node = bvh.nodes[i];

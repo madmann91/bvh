@@ -21,7 +21,7 @@ class LeafCollapser : public SahBasedAlgorithm<Bvh>, public BottomUpAlgorithm<Bv
 
     PrefixSum<size_t> prefix_sum;
 
-    using BottomUpAlgorithm<Bvh, true>::traverse;
+    using BottomUpAlgorithm<Bvh, true>::traverse_in_parallel;
     using BottomUpAlgorithm<Bvh, true>::children;
     using BottomUpAlgorithm<Bvh, true>::parents;
     using BottomUpAlgorithm<Bvh, true>::bvh;
@@ -48,7 +48,7 @@ public:
         #pragma omp parallel
         {
             // Bottom-up traversal to collapse leaves
-            traverse(
+            traverse_in_parallel(
                 [&] (size_t i) { primitive_counts[i] = bvh.nodes[i].primitive_count; },
                 [&] (size_t i) {
                     auto& node = bvh.nodes[i];
@@ -79,7 +79,7 @@ public:
                     node_index[(first_child + 1) / 2] = 2;
                 });
 
-            prefix_sum.sum(node_index.get(), node_index.get(), bvh.node_count / 2 + 1);
+            prefix_sum.sum_in_parallel(node_index.get(), node_index.get(), bvh.node_count / 2 + 1);
 
             #pragma omp single
             {

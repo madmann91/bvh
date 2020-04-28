@@ -59,7 +59,7 @@ public:
                 split_indices[i] = 1 + priority * (Scalar(primitive_count) * split_factor / total_priority);
             }
 
-            prefix_sum.sum(split_indices.get(), split_indices.get(), primitive_count);
+            prefix_sum.sum_in_parallel(split_indices.get(), split_indices.get(), primitive_count);
 
             #pragma omp single
             {

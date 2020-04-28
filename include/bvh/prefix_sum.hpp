@@ -19,7 +19,7 @@ public:
 
     /// Performs the prefix sum. Must be called from a parallel region.
     template <typename F = std::plus<T>>
-    void sum(const T* input, T* output, size_t count, F f = F()) {
+    void sum_in_parallel(const T* input, T* output, size_t count, F f = F()) {
         bvh__assert_in_parallel();
 
         size_t thread_count = bvh__get_num_threads();

@@ -20,7 +20,7 @@ public:
 
     /// Performs the sort. Must be called from a parallel region.
     template <typename Key, typename Value>
-    void sort(
+    void sort_in_parallel(
         Key* bvh__restrict__& keys,
         Key* bvh__restrict__& keys_copy,
         Value* bvh__restrict__& values,

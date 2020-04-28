@@ -124,7 +124,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
             }
 
             // Perform a prefix sum to compute the insertion indices
-            prefix_sum.sum(merged_index + begin, merged_index + begin, end - begin);
+            prefix_sum.sum_in_parallel(merged_index + begin, merged_index + begin, end - begin);
             size_t merged_count   = merged_index[end - 1];
             size_t unmerged_count = end - begin - merged_count;
             size_t children_count = merged_count * 2;
