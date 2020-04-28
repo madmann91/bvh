@@ -35,6 +35,11 @@ struct Vector {
     Vector() = default;
     bvh__always_inline__ Vector(Scalar s) { std::fill(values, values + N, s); }
 
+    template <size_t M, std::enable_if_t<(M > N), int> = 0>
+    bvh__always_inline__ explicit Vector(const Vector<Scalar, M>& other) {
+        std::copy(other.values, other.values + N, values);
+    }
+
     template <typename... Args>
     bvh__always_inline__ Vector(Scalar first, Scalar second, Args... args) {
         set(first, second, args...);
@@ -63,34 +68,34 @@ struct Vector {
     bvh__always_inline__ Scalar  operator [] (size_t i) const { return values[i]; }
 };
 
-template <typename Scalar, size_t N, size_t M>
+template <typename Scalar, size_t N>
 bvh__always_inline__
-inline Vector<Scalar, std::min(N, M)> operator + (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] + b[i]; });
+inline Vector<Scalar, N> operator + (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+    return Vector<Scalar, N>([=] (size_t i) { return a[i] + b[i]; });
 }
 
-template <typename Scalar, size_t N, size_t M>
+template <typename Scalar, size_t N>
 bvh__always_inline__
-inline Vector<Scalar, std::min(N, M)> operator - (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] - b[i]; });
+inline Vector<Scalar, N> operator - (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+    return Vector<Scalar, N>([=] (size_t i) { return a[i] - b[i]; });
 }
 
-template <typename Scalar, size_t N, size_t M>
+template <typename Scalar, size_t N>
 bvh__always_inline__
-inline Vector<Scalar, std::min(N, M)> operator * (const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return a[i] * b[i]; });
+inline Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+    return Vector<Scalar, N>([=] (size_t i) { return a[i] * b[i]; });
 }
 
-template <typename Scalar, size_t N, size_t M>
+template <typename Scalar, size_t N>
 bvh__always_inline__
-inline Vector<Scalar, std::min(N, M)> min(const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return std::min(a[i], b[i]); });
+inline Vector<Scalar, N> min(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+    return Vector<Scalar, N>([=] (size_t i) { return std::min(a[i], b[i]); });
 }
 
-template <typename Scalar, size_t N, size_t M>
+template <typename Scalar, size_t N>
 bvh__always_inline__
-inline Vector<Scalar, std::min(N, M)> max(const Vector<Scalar, N>& a, const Vector<Scalar, M>& b) {
-    return Vector<Scalar, std::min(N, M)>([=] (size_t i) { return std::max(a[i], b[i]); });
+inline Vector<Scalar, N> max(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+    return Vector<Scalar, N>([=] (size_t i) { return std::max(a[i], b[i]); });
 }
 
 template <typename Scalar, size_t N>
