@@ -138,7 +138,7 @@ private:
 
 public:
     void optimize(size_t u = 9, Scalar threshold = 0.1) {
-        auto locks = std::make_unique<std::atomic<int64_t>[]>(bvh.node_count);
+        auto locks = std::make_unique<std::atomic<uint64_t>[]>(bvh.node_count);
         auto outs  = std::make_unique<Insertion[]>(bvh.node_count);
 
         auto old_cost = compute_cost(bvh);
@@ -166,7 +166,7 @@ public:
                     // lowest 32 bits for the index of the node requesting the re-insertion.
                     // This takes advantage of the fact that IEEE-754 floats can be compared
                     // with regular integer comparisons.
-                    auto lock = (int64_t(as<int32_t>(float(outs[i].second))) << 32) | (int64_t(i) & INT64_C(0xFFFFFFFF));
+                    auto lock = (uint64_t(as<uint32_t>(float(outs[i].second))) << 32) | (uint64_t(i) & UINT64_C(0xFFFFFFFF));
                     for (auto c : get_conflicts(i, outs[i].first))
                         atomic_max(locks[c], lock);
                 }
@@ -178,8 +178,8 @@ public:
                         continue;
                     auto conflicts = get_conflicts(i, outs[i].first);
                     // Make sure that this node owns all the locks for each and every conflicting node
-                    bool is_conflict_free = std::all_of(conflicts .begin(), conflicts .end(), [&] (size_t j) {
-                        return (locks[j] & INT64_C(0xFFFFFFFF)) == i;
+                    bool is_conflict_free = std::all_of(conflicts.begin(), conflicts.end(), [&] (size_t j) {
+                        return (locks[j] & UINT64_C(0xFFFFFFFF)) == i;
                     });
                     if (!is_conflict_free)
                         outs[i] = Insertion { 0, 0 };
