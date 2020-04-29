@@ -70,21 +70,22 @@ private:
         const Ray<Scalar>& ray,
         const PrecomputedData& data) const
     {
-        auto distance = std::make_pair(ray.tmin, ray.tmax);
-        for (int i = 0; i < 3; ++i) {
-            auto intersect = [&] (Scalar p) {
-                return Robust
-                    ? (p - ray.origin[i]) * data.inverse_direction[i]
-                    : multiply_add(p, data.inverse_direction[i], data.scaled_origin[i]);
-            };
-            auto entry = intersect(node.bounds[i * 2 +     data.octant[i]]);
-            auto exit  = intersect(node.bounds[i * 2 + 1 - data.octant[i]]);
-
-            // Note: This order for the min/max operations is guaranteed not to produce NaNs
-            distance.first  = robust_max(entry, distance.first);
-            distance.second = robust_min(exit,  distance.second);
-        }
-        return distance;
+        Vector3<Scalar> entry, exit;
+        auto intersect_axis = [&] (Scalar p, int i) {
+            return Robust
+                ? (p - ray.origin[i]) * data.inverse_direction[i]
+                : multiply_add(p, data.inverse_direction[i], data.scaled_origin[i]);
+        };
+        entry[0] = intersect_axis(node.bounds[0 * 2 +     data.octant[0]], 0);
+        entry[1] = intersect_axis(node.bounds[1 * 2 +     data.octant[1]], 1);
+        entry[2] = intersect_axis(node.bounds[2 * 2 +     data.octant[2]], 2);
+        exit [0] = intersect_axis(node.bounds[0 * 2 + 1 - data.octant[0]], 0);
+        exit [1] = intersect_axis(node.bounds[1 * 2 + 1 - data.octant[1]], 1);
+        exit [2] = intersect_axis(node.bounds[2 * 2 + 1 - data.octant[2]], 2);
+        // Note: This order for the min/max operations is guaranteed not to produce NaNs
+        return std::make_pair(
+            robust_max(entry[0], robust_max(entry[1], robust_max(entry[2], ray.tmin))),
+            robust_min(exit [0], robust_min(exit [1], robust_min(exit [2], ray.tmax))));
     }
 
     template <typename Intersector, typename Statistics>
