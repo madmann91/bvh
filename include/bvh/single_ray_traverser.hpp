@@ -39,49 +39,52 @@ private:
         bool empty() const { return size == 0; }
     };
 
-    struct Octant {
-        Octant(int x, int y, int z)
-            : x(x), y(y), z(z)
-        {}
+    // Precomputed data for the ray-node intersector, including the inverse
+    // direction to avoid divisions, and the scaled origin to allow the use
+    // of FMA instructions (when applicable).
+    struct PrecomputedData {
+        std::array<int, 3> octant;
 
-        Octant(const Ray<Scalar>& ray)
-            : x(ray.direction[0] < Scalar(0))
-            , y(ray.direction[1] < Scalar(0))
-            , z(ray.direction[2] < Scalar(0))
-        {}
+        Vector3<Scalar> scaled_origin;
+        Vector3<Scalar> inverse_direction;
 
-        int x, y, z;
+        // Padded inverse direction to avoid false-negatives in the ray-node test.
+        // Only used when the robust ray-node intersection code is enabled.
+        Vector3<Scalar> padded_inverse_direction;
+
+        PrecomputedData(const Ray<Scalar>& ray)
+            : octant { ray.direction[0] < Scalar(0), ray.direction[1] < Scalar(0), ray.direction[2] < Scalar(0) }
+        {
+            inverse_direction = ray.direction.inverse();
+            scaled_origin     = -ray.origin * inverse_direction;
+
+            padded_inverse_direction = Vector3<Scalar>(
+                add_ulp_magnitude(inverse_direction[0], 2),
+                add_ulp_magnitude(inverse_direction[1], 2),
+                add_ulp_magnitude(inverse_direction[2], 2));
+        }
     };
 
     std::pair<Scalar, Scalar> intersect_node(
         const typename Bvh::Node& node,
         const Ray<Scalar>& ray,
-        const Vector3<Scalar>& inverse_origin,
-        const Vector3<Scalar>& inverse_direction,
-        const Vector3<Scalar>& padded_inverse_direction,
-        const Octant& octant) const
+        const PrecomputedData& data) const
     {
-        Vector3<Scalar> entry, exit;
-        if (Robust) {
-            entry[0] = (node.bounds[0 +     octant.x] - ray.origin[0]) * inverse_direction[0];
-            entry[1] = (node.bounds[2 +     octant.y] - ray.origin[1]) * inverse_direction[1];
-            entry[2] = (node.bounds[4 +     octant.z] - ray.origin[2]) * inverse_direction[2];
-            exit[0]  = (node.bounds[0 + 1 - octant.x] - ray.origin[0]) * padded_inverse_direction[0];
-            exit[1]  = (node.bounds[2 + 1 - octant.y] - ray.origin[1]) * padded_inverse_direction[1];
-            exit[2]  = (node.bounds[4 + 1 - octant.z] - ray.origin[2]) * padded_inverse_direction[2];
-        } else {
-            entry[0] = multiply_add(node.bounds[0 +     octant.x], inverse_direction[0], inverse_origin[0]);
-            entry[1] = multiply_add(node.bounds[2 +     octant.y], inverse_direction[1], inverse_origin[1]);
-            entry[2] = multiply_add(node.bounds[4 +     octant.z], inverse_direction[2], inverse_origin[2]);
-            exit[0]  = multiply_add(node.bounds[0 + 1 - octant.x], inverse_direction[0], inverse_origin[0]);
-            exit[1]  = multiply_add(node.bounds[2 + 1 - octant.y], inverse_direction[1], inverse_origin[1]);
-            exit[2]  = multiply_add(node.bounds[4 + 1 - octant.z], inverse_direction[2], inverse_origin[2]);
+        auto distance = std::make_pair(ray.tmin, ray.tmax);
+        for (int i = 0; i < 3; ++i) {
+            auto intersect = [&] (Scalar p) {
+                return Robust
+                    ? (p - ray.origin[i]) * data.inverse_direction[i]
+                    : multiply_add(p, data.inverse_direction[i], data.scaled_origin[i]);
+            };
+            auto entry = intersect(node.bounds[i * 2 +     data.octant[i]]);
+            auto exit  = intersect(node.bounds[i * 2 + 1 - data.octant[i]]);
+
+            // Note: This order for the min/max operations is guaranteed not to produce NaNs
+            distance.first  = robust_max(entry, distance.first);
+            distance.second = robust_min(exit,  distance.second);
         }
-        // Note: This order for the min/max operations is guaranteed not to produce NaNs
-        return std::make_pair(
-            robust_max(entry[0], robust_max(entry[1], robust_max(entry[2], ray.tmin))),
-            robust_min(exit [0], robust_min(exit [1], robust_min(exit [2], ray.tmax)))
-        );
+        return distance;
     }
 
     template <typename Intersector, typename Statistics>
@@ -115,20 +118,7 @@ private:
         if (bvh__unlikely(bvh.nodes[0].is_leaf))
             return intersect_leaf(bvh.nodes[0], ray, best_hit, intersector, statistics);
 
-        // Precompute the inverse direction to avoid divisions and refactor
-        // the computation to allow the use of FMA instructions (when available).
-        auto inverse_direction = ray.direction.inverse();
-        auto inverse_origin    = -ray.origin * inverse_direction;
-
-        // Padded inverse direction to avoid false-negatives in the ray-node test.
-        // Only used when the robust ray-node intersection code is enabled.
-        auto padded_inverse_direction = Vector3<Scalar>(
-            add_ulp_magnitude(inverse_direction[0], 2),
-            add_ulp_magnitude(inverse_direction[1], 2),
-            add_ulp_magnitude(inverse_direction[2], 2));
-
-        // Precompute the octant of the ray to speed up the ray-node test
-        Octant octant(ray);
+        PrecomputedData data(ray);
 
         // This traversal loop is eager, because it immediately processes leaves instead of pushing them on the stack.
         // This is generally beneficial for performance because intersections will likely be found which will
@@ -141,8 +131,8 @@ private:
             auto first_child = node->first_child_or_primitive;
             const auto* left_child  = &bvh.nodes[first_child + 0];
             const auto* right_child = &bvh.nodes[first_child + 1];
-            auto distance_left  = intersect_node(*left_child,  ray, inverse_origin, inverse_direction, padded_inverse_direction, octant);
-            auto distance_right = intersect_node(*right_child, ray, inverse_origin, inverse_direction, padded_inverse_direction, octant);
+            auto distance_left  = intersect_node(*left_child,  ray, data);
+            auto distance_right = intersect_node(*right_child, ray, data);
 
             if (bvh__unlikely(distance_left.first <= distance_left.second)) {
                 if (left_child->is_leaf) {
