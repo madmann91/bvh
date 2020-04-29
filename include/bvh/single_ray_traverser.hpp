@@ -53,7 +53,11 @@ private:
         Vector3<Scalar> padded_inverse_direction;
 
         PrecomputedData(const Ray<Scalar>& ray)
-            : octant { ray.direction[0] < Scalar(0), ray.direction[1] < Scalar(0), ray.direction[2] < Scalar(0) }
+            : octant {
+                ray.direction[0] < Scalar(0),
+                ray.direction[1] < Scalar(0),
+                ray.direction[2] < Scalar(0)
+            }
         {
             inverse_direction = ray.direction.inverse();
             scaled_origin     = -ray.origin * inverse_direction;
@@ -65,6 +69,7 @@ private:
         }
     };
 
+    bvh__always_inline__
     std::pair<Scalar, Scalar> intersect_node(
         const typename Bvh::Node& node,
         const Ray<Scalar>& ray,
@@ -89,6 +94,7 @@ private:
     }
 
     template <typename Intersector, typename Statistics>
+    bvh__always_inline__
     std::optional<typename Intersector::Result>& intersect_leaf(
         const typename Bvh::Node& node,
         Ray<Scalar>& ray,
@@ -112,7 +118,9 @@ private:
     }
 
     template <typename Intersector, typename Statistics>
-    std::optional<typename Intersector::Result> intersect(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
+    bvh__always_inline__
+    std::optional<typename Intersector::Result>
+    intersect(Ray<Scalar> ray, Intersector& intersector, Statistics& statistics) const {
         auto best_hit = std::optional<typename Intersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
@@ -186,7 +194,8 @@ public:
     /// Intersects the BVH with the given ray and intersector.
     template <typename Intersector>
     bvh__always_inline__
-    std::optional<typename Intersector::Result> traverse(const Ray<Scalar>& ray, Intersector& intersector) const {
+    std::optional<typename Intersector::Result>
+    traverse(const Ray<Scalar>& ray, Intersector& intersector) const {
         struct {
             struct Empty {
                 Empty& operator ++ (int)    { return *this; }
@@ -201,7 +210,8 @@ public:
     /// Record statistics on the number of traversal and intersection steps.
     template <typename Intersector>
     bvh__always_inline__
-    std::optional<typename Intersector::Result> traverse(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
+    std::optional<typename Intersector::Result>
+    traverse(const Ray<Scalar>& ray, Intersector& intersector, Statistics& statistics) const {
         return intersect(ray, intersector, statistics);
     }
 };
