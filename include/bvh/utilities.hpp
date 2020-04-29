@@ -119,7 +119,7 @@ struct RoundUpLog2<P, I, true> {
 
 // Returns the number of bits that are equal to zero,
 // starting from the most significant one.
-template <typename T>
+template <typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
 size_t count_leading_zeros(T value) {
     static constexpr size_t bit_count = sizeof(T) * CHAR_BIT;
     size_t a = 0;
