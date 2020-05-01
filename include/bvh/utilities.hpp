@@ -64,8 +64,8 @@ const T& robust_max(const T& x, const T& y) {
     return x > y ? x : y;
 }
 
-template <typename Scalar>
-void atomic_max(std::atomic<Scalar>& x, Scalar y) {
+template <typename T>
+void atomic_max(std::atomic<T>& x, T y) {
     auto z = x.load();
     while (z < y && !x.compare_exchange_weak(z, y)) ;
 }
@@ -104,28 +104,19 @@ T add_ulp_magnitude(T x, unsigned ulps) {
 }
 
 /// Computes the (rounded-up) compile-time log in base-2 of an unsigned integer.
-template <size_t P, size_t I = 0, bool Found = P == 0>
-struct RoundUpLog2 {};
+inline constexpr size_t round_up_log2(size_t i, size_t p = 0) {
+    return (1 << p) >= i ? p : round_up_log2(i, p + 1);
+}
 
-template <size_t P, size_t I>
-struct RoundUpLog2<P, I, false> {
-    static constexpr size_t value = RoundUpLog2<P, I + 1, (1 << (I + 1)) >= P>::value;
-};
-
-template <size_t P, size_t I>
-struct RoundUpLog2<P, I, true> {
-    static constexpr size_t value = I;
-};
-
-// Returns the number of bits that are equal to zero,
-// starting from the most significant one.
+/// Returns the number of bits that are equal to zero,
+/// starting from the most significant one.
 template <typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
 size_t count_leading_zeros(T value) {
     static constexpr size_t bit_count = sizeof(T) * CHAR_BIT;
     size_t a = 0;
     size_t b = bit_count;
     auto all = T(-1);
-    for (size_t i = 0; i < RoundUpLog2<bit_count>::value; i++) {
+    for (size_t i = 0; i < round_up_log2(bit_count); i++) {
         auto m = (a + b) / 2;
         auto mask = all << m;
         if (value & mask) a = m + 1;

@@ -20,7 +20,7 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     using ParentBuilder = MortonCodeBasedBuilder<Bvh, Morton>;
     using ParentBuilder::sort_primitives_by_morton_code;
 
-    using Level = typename SizedIntegerType<RoundUpLog2<sizeof(Morton) * CHAR_BIT + 1>::value>::Unsigned;
+    using Level = typename SizedIntegerType<round_up_log2(sizeof(Morton) * CHAR_BIT + 1)>::Unsigned;
     using Node  = typename Bvh::Node;
 
     Bvh& bvh;
