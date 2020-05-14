@@ -105,7 +105,7 @@ T add_ulp_magnitude(T x, unsigned ulps) {
 
 /// Computes the (rounded-up) compile-time log in base-2 of an unsigned integer.
 inline constexpr size_t round_up_log2(size_t i, size_t p = 0) {
-    return (1 << p) >= i ? p : round_up_log2(i, p + 1);
+    return (1U << p) >= i ? p : round_up_log2(i, p + 1);
 }
 
 /// Returns the number of bits that are equal to zero,
