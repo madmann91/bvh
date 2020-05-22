@@ -16,8 +16,6 @@ class RadixSort {
 public:
     static constexpr size_t bits_per_iteration = BitsPerIteration;
 
-    RadixSort() { bvh__assert_not_in_parallel(); }
-
     /// Performs the sort. Must be called from a parallel region.
     template <typename Key, typename Value>
     void sort_in_parallel(

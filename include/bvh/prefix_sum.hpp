@@ -15,8 +15,6 @@ namespace bvh {
 template <typename T>
 class PrefixSum {
 public:
-    PrefixSum() { bvh__assert_not_in_parallel(); }
-
     /// Performs the prefix sum. Must be called from a parallel region.
     template <typename F = std::plus<T>>
     void sum_in_parallel(const T* input, T* output, size_t count, F f = F()) {
