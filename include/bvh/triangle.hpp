@@ -4,6 +4,7 @@
 #include <optional>
 #include <cassert>
 
+#include "bvh/utilities.hpp"
 #include "bvh/vector.hpp"
 #include "bvh/bounding_box.hpp"
 #include "bvh/ray.hpp"
