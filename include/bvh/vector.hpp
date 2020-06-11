@@ -7,6 +7,7 @@
 #include <cmath>
 #include <type_traits>
 
+#include "bvh/fwd.hpp"
 #include "bvh/platform.hpp"
 
 namespace bvh {
@@ -131,9 +132,6 @@ inline Vector<Scalar, N> normalize(const Vector<Scalar, N>& v) {
     auto inv = Scalar(1) / length(v);
     return v * inv;
 }
-
-template <typename Scalar>
-using Vector3 = Vector<Scalar, 3>;
 
 template <typename Scalar>
 bvh__always_inline__
