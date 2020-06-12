@@ -7,7 +7,7 @@
 #include <cmath>
 #include <type_traits>
 
-#include "bvh/fwd.hpp"
+#include "bvh/forward.hpp"
 #include "bvh/platform.hpp"
 
 namespace bvh {
@@ -68,6 +68,9 @@ struct Vector {
     bvh__always_inline__ Scalar& operator [] (size_t i) { return values[i]; }
     bvh__always_inline__ Scalar  operator [] (size_t i) const { return values[i]; }
 };
+
+template <typename Scalar>
+using Vector3 = Vector<Scalar, 3>;
 
 template <typename Scalar, size_t N>
 bvh__always_inline__

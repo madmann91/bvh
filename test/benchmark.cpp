@@ -9,6 +9,7 @@
 
 #include <bvh/bvh.hpp>
 #include <bvh/binned_sah_builder.hpp>
+#include <bvh/forward.hpp>
 #include <bvh/sweep_sah_builder.hpp>
 #include <bvh/spatial_split_bvh_builder.hpp>
 #include <bvh/locally_ordered_clustering_builder.hpp>
