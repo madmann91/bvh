@@ -7,7 +7,6 @@
 #include <cmath>
 #include <type_traits>
 
-#include "bvh/forward.hpp"
 #include "bvh/platform.hpp"
 
 namespace bvh {
