@@ -6,7 +6,7 @@
 #include <bvh/ray.hpp>
 #include <bvh/sweep_sah_builder.hpp>
 #include <bvh/single_ray_traverser.hpp>
-#include <bvh/intersectors.hpp>
+#include <bvh/primitive_intersectors.hpp>
 
 using Scalar      = float;
 using Vector3     = bvh::Vector3<Scalar>;
@@ -66,7 +66,7 @@ int main() {
         0.0,                    // minimum distance
         100.0                   // maximum distance
     );
-    bvh::ClosestIntersector<false, Bvh, CustomPrimitive> intersector(bvh, primitives.data());
+    bvh::ClosestPrimitiveIntersector<Bvh, CustomPrimitive> intersector(bvh, primitives.data());
     bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
     auto hit = traverser.traverse(ray, intersector);

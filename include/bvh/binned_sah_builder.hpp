@@ -141,7 +141,7 @@ public:
         auto center_to_bin = bbox.diagonal().inverse() * Scalar(bin_count);
         auto bin_offset    = -bbox.min * center_to_bin;
         auto compute_bin_index = [=] (const Vector3<Scalar>& center, int axis) {
-            auto bin_index = multiply_add(center[axis], center_to_bin[axis], bin_offset[axis]);
+            auto bin_index = fast_multiply_add(center[axis], center_to_bin[axis], bin_offset[axis]);
             return std::min(bin_count - 1, size_t(std::max(Scalar(0), bin_index)));
         };
 

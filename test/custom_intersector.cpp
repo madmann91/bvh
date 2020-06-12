@@ -6,7 +6,6 @@
 #include <bvh/ray.hpp>
 #include <bvh/sweep_sah_builder.hpp>
 #include <bvh/single_ray_traverser.hpp>
-#include <bvh/intersectors.hpp>
 
 using Scalar      = float;
 using Vector3     = bvh::Vector3<Scalar>;
@@ -32,7 +31,7 @@ struct Intersector {
     };
 
     // Required member: intersect the primitive at index `bvh.primitive_indices[index]`
-    std::optional<Result> operator () (size_t /*index*/, const Ray& /*ray*/) const {
+    std::optional<Result> intersect(size_t /*index*/, const Ray& /*ray*/) const {
         // Note: a common optimization is to reorder the primitives such that
         // there is no need for an indirection through `bvh.primitive_indices`.
         return std::nullopt;

@@ -19,7 +19,7 @@
 #include <bvh/heuristic_primitive_splitter.hpp>
 #include <bvh/hierarchy_refitter.hpp>
 #include <bvh/single_ray_traverser.hpp>
-#include <bvh/intersectors.hpp>
+#include <bvh/primitive_intersectors.hpp>
 #include <bvh/triangle.hpp>
 
 using Scalar      = float;
@@ -109,7 +109,7 @@ void render(
     image_u = image_u * image_w;
     image_v = image_v * image_w * ratio;
 
-    bvh::ClosestIntersector<PreShuffle, Bvh, Triangle> intersector(bvh, triangles);
+    bvh::ClosestPrimitiveIntersector<Bvh, Triangle, PreShuffle> intersector(bvh, triangles);
     bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
     size_t traversal_steps = 0, intersections = 0;

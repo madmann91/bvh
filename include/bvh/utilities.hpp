@@ -34,7 +34,7 @@ inline double product_sign(double x, double y) {
     return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
 }
 
-inline float multiply_add(float x, float y, float z) {
+inline float fast_multiply_add(float x, float y, float z) {
 #ifdef FP_FAST_FMAF
     return std::fmaf(x, y, z);
 #else
