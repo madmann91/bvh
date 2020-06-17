@@ -88,8 +88,8 @@ private:
             auto distance_left  = node_intersector.intersect(*left_child,  ray);
             auto distance_right = node_intersector.intersect(*right_child, ray);
 
-            if (bvh__unlikely(distance_left.first <= distance_left.second)) {
-                if (left_child->is_leaf) {
+            if (distance_left.first <= distance_left.second) {
+                if (bvh__unlikely(left_child->is_leaf)) {
                     if (intersect_leaf(*left_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;
@@ -98,8 +98,8 @@ private:
             } else
                 left_child = nullptr;
 
-            if (bvh__unlikely(distance_right.first <= distance_right.second)) {
-                if (right_child->is_leaf) {
+            if (distance_right.first <= distance_right.second) {
+                if (bvh__unlikely(right_child->is_leaf)) {
                     if (intersect_leaf(*right_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;
