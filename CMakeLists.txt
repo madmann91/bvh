@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.9)
 
 project(bvh CXX)
 
@@ -10,10 +10,7 @@ target_include_directories(bvh INTERFACE include/)
 if (NOT MSVC)
     find_package(OpenMP QUIET)
     if (OpenMP_CXX_FOUND)
-        target_link_libraries(bvh INTERFACE ${OpenMP_CXX_LIBRARIES})
-        target_include_directories(bvh INTERFACE ${OpenMP_CXX_INCLUDE_DIRS})
-        target_link_options(bvh INTERFACE ${OpenMP_CXX_FLAGS})
-        target_compile_options(bvh INTERFACE ${OpenMP_CXX_FLAGS})
+        target_link_libraries(bvh INTERFACE OpenMP::OpenMP_CXX)
     endif ()
 else ()
     message(STATUS "OpenMP is disabled because MSVC only supports OpenMP 2.0.")
