@@ -42,7 +42,7 @@ inline float fast_multiply_add(float x, float y, float z) {
 #endif
 }
 
-inline double multiply_add(double x, double y, double z) {
+inline double fast_multiply_add(double x, double y, double z) {
 #ifdef FP_FAST_FMA
     return std::fma(x, y, z);
 #else
