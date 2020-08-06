@@ -91,8 +91,6 @@ struct Triangle {
     }
 
     std::optional<Intersection> intersect(const Ray<Scalar>& ray) const {
-        static constexpr Scalar tolerance = Scalar(1e-9);
-
         auto c = p0 - ray.origin;
         auto r = cross(ray.direction, c);
         auto inv_det = Scalar(1.0) / dot(n, ray.direction);
