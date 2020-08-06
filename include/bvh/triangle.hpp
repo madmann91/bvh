@@ -95,7 +95,7 @@ struct Triangle {
 
         auto c = p0 - ray.origin;
         auto r = cross(ray.direction, c);
-        auto inv_det = Scalar(1.0) / dot(n, ray.direction):
+        auto inv_det = Scalar(1.0) / dot(n, ray.direction);
 
         auto u = dot(r, e2) * inv_det;
         auto v = dot(r, e1) * inv_det;
