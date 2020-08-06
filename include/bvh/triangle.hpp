@@ -95,18 +95,16 @@ struct Triangle {
 
         auto c = p0 - ray.origin;
         auto r = cross(ray.direction, c);
-        auto det = dot(n, ray.direction);
-        auto abs_det = std::fabs(det);
+        auto inv_det = Scalar(1.0) / dot(n, ray.direction):
 
-        auto u = product_sign(dot(r, e2), det);
-        auto v = product_sign(dot(r, e1), det);
-        auto w = abs_det - u - v;
+        auto u = dot(r, e2) * inv_det;
+        auto v = dot(r, e1) * inv_det;
+        auto w = Scalar(1.0) - u - v;
 
-        if (u >= -tolerance && v >= -tolerance && w >= -tolerance) {
-            auto t = product_sign(dot(n, c), det);
-            if (t >= abs_det * ray.tmin && abs_det * ray.tmax > t) {
-                auto inv_det = Scalar(1.0) / abs_det;
-                return std::make_optional(Intersection{ t * inv_det, u * inv_det, v * inv_det });
+        if (u >= 0 && v >= 0 && w >= 0) {
+            auto t = dot(n, c) * inv_det;
+            if (t >= ray.tmin && t < ray.tmax) {
+                return std::make_optional(Intersection{ t, u, v });
             }
         }
 
