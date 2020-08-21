@@ -59,7 +59,10 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
             for (size_t i = 0; i <= search_radius; ++i)
                 distance_matrix[i] = &distances[i * search_radius];
 
-            // Initialize distance matrix
+            // Initialize the distance matrix, which caches the distances between
+            // neighboring nodes in the array. A brute force approach that recomputes the
+            // distances for every neighbor can be implemented without a distance matrix,
+            // but would be slower for larger search radii.
             for (size_t i = search_range(chunk_begin, begin, end).first; i < chunk_begin; ++i) {
                 auto search_end = search_range(i, begin, end).second;
                 for (size_t j = i + 1; j < search_end; ++j) {
@@ -77,7 +80,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                 Scalar best_distance = std::numeric_limits<Scalar>::max();
                 size_t best_neighbor = -1;
 
-                // Backward search
+                // Backward search (using the previously-computed distances stored in the distance matrix)
                 for (size_t j = search_begin; j < i; ++j) {
                     auto distance = distance_matrix[i - j][i - j - 1];
                     if (distance < best_distance) {
@@ -86,7 +89,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                     }
                 }
 
-                // Forward search
+                // Forward search (caching computed distances in the distance matrix)
                 for (size_t j = i + 1; j < search_end; ++j) {
                     auto distance = input[i]
                         .bounding_box_proxy()
