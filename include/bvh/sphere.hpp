@@ -33,7 +33,7 @@ struct Sphere  {
         return origin;
     }
 
-    BoundingBox<Scalar> bbox() const {
+    BoundingBox<Scalar> bounding_box() const {
         return BoundingBox<Scalar>(origin - Vector3<Scalar>(radius), origin + Vector3<Scalar>(radius));
     }
 
