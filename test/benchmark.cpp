@@ -137,9 +137,9 @@ void render(
             } else {
                 if (CollectStatistics) {
                     auto combined = statistics.traversal_steps + statistics.intersections; 
-                    pixels[index    ] = std::min(statistics.traversal_steps * statistics_weights[0], 1.0f);
-                    pixels[index + 1] = std::min(statistics.intersections   * statistics_weights[1], 1.0f);
-                    pixels[index + 2] = std::min(combined                   * statistics_weights[2], 1.0f);
+                    pixels[index    ] = std::min(statistics.traversal_steps * statistics_weights[0], Scalar(1.0f));
+                    pixels[index + 1] = std::min(statistics.intersections   * statistics_weights[1], Scalar(1.0f));
+                    pixels[index + 2] = std::min(combined                   * statistics_weights[2], Scalar(1.0f));
                 } else {
                     auto normal = bvh::normalize(triangles[hit->primitive_index].n);
                     pixels[index    ] = std::fabs(normal[0]);
