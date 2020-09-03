@@ -99,11 +99,12 @@ struct Triangle {
         auto v = dot(r, e1) * inv_det;
         auto w = Scalar(1.0) - u - v;
 
+        // These comparisons are designed to return false
+        // when one of t, u, or v is a NaN
         if (u >= 0 && v >= 0 && w >= 0) {
             auto t = dot(n, c) * inv_det;
-            if (t >= ray.tmin && t < ray.tmax) {
+            if (t >= ray.tmin && t < ray.tmax)
                 return std::make_optional(Intersection{ t, u, v });
-            }
         }
 
         return std::nullopt;
