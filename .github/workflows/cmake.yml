@@ -1,0 +1,32 @@
+name: Build and test
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    name: Build and test on ${{matrix.os}} in ${{matrix.build-type}} mode
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        build-type: [Debug, Release]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{runner.workspace}}/build
+
+    - name: Configure CMake
+      working-directory: ${{runner.workspace}}/build
+      run: cmake ${{runner.workspace}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}}
+
+    - name: Build
+      working-directory: ${{runner.workspace}}/build
+      run: cmake --build . --config $BUILD_TYPE
+
+    - name: Test
+      working-directory: ${{runner.workspace}}/build
+      run: ctest -C ${{matrix.build-type}}
