@@ -55,10 +55,17 @@ protected:
     {
         bvh__assert_in_parallel();
 
+        #pragma omp single nowait
+        {
+            // Special case if the BVH is just a leaf
+            if (bvh.node_count == 1)
+                process_leaf(0);
+        }
+
         #pragma omp for
         for (size_t i = 1; i < bvh.node_count; ++i) {
             // Only process leaves
-            if (MaintainChildIndices ? children[i] != 0 : bvh.nodes[i].is_leaf)
+            if (MaintainChildIndices ? children[i] != 0 : !bvh.nodes[i].is_leaf)
                 continue;
 
             process_leaf(i);
