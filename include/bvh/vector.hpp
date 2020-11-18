@@ -11,20 +11,21 @@
 
 namespace bvh {
 
+template <typename, size_t> struct Vector;
+
 /// Helper class to set the elements of a vector.
-template <size_t I, size_t N>
+template <size_t I, typename Scalar, size_t N>
 struct VectorSetter {
-    template <typename Vector, typename Scalar, typename... Args>
-    bvh__always_inline__ static void set(Vector& v, Scalar s, Args... args) {
+    template <typename... Args>
+    bvh__always_inline__ static void set(Vector<Scalar, N>& v, Scalar s, Args... args) {
         v[I] = s;
-        VectorSetter<I + 1, N>::set(v, args...);
+        VectorSetter<I + 1, Scalar, N>::set(v, args...);
     }
 };
 
-template <size_t N>
-struct VectorSetter<N, N> {
-    template <typename Vector>
-    bvh__always_inline__ static void set(Vector&) {}
+template <typename Scalar, size_t N>
+struct VectorSetter<N, Scalar, N> {
+    bvh__always_inline__ static void set(Vector<Scalar, N>&) {}
 };
 
 /// An N-dimensional vector class.
@@ -53,7 +54,7 @@ struct Vector {
 
     template <typename... Args>
     bvh__always_inline__ void set(Args... args) {
-        VectorSetter<0, N>::set(*this, args...);
+        VectorSetter<0, Scalar, N>::set(*this, Scalar(args)...);
     }
 
     bvh__always_inline__ Vector operator - () const {
