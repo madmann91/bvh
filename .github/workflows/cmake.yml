@@ -21,13 +21,13 @@ jobs:
 
     - name: Configure CMake
       working-directory: ${{runner.workspace}}/build
-      shell: bash
+      shell: bash # Necessary because of the $GITHUB_WORKSPACE variable
       run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{matrix.build-type}}
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
-      run: cmake --build . --config $BUILD_TYPE
+      run: cmake --build .
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
-      run: ctest -C ${{matrix.build-type}}
+      run: ctest
