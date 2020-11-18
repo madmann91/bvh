@@ -59,7 +59,7 @@ struct AnyPrimitiveIntersector : public PrimitiveIntersector<Bvh, Primitive, Pre
     using Scalar = typename Primitive::ScalarType;
 
     struct Result {
-        float t;
+        Scalar t;
         Scalar distance() const { return t; }
     };
 
