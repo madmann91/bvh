@@ -30,4 +30,4 @@ jobs:
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
-      run: ctest
+      run: ctest -C ${{matrix.build-type}}
