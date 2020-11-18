@@ -1,4 +1,5 @@
-# bvh [![Build Status](https://travis-ci.org/madmann91/bvh.svg?branch=master)](https://travis-ci.org/madmann91/bvh)
+# bvh [![Build Status](https://github.com/madmann91/bvh/workflows/build-and-test/badge.svg)
+
 
 This is a modern C++17 header-only BVH library optimized for ray-tracing. Traversal and
 construction routines support different primitive types. The design is such that the

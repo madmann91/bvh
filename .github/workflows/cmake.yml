@@ -1,4 +1,4 @@
-name: Build and test
+name: build-and-test
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
 
     - name: Configure CMake
       working-directory: ${{runner.workspace}}/build
+      shell: bash
       run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{matrix.build-type}}
 
     - name: Build
