@@ -12,7 +12,9 @@
 namespace bvh {
 
 /// Triangle primitive, defined by three points, and using the Moeller-Trumbore test.
-template <typename Scalar>
+/// By default, the normal is left-handed, which minimizes the number of operations in
+/// the intersection routine.
+template <typename Scalar, bool LeftHandedNormal = true>
 struct Triangle {
     struct Intersection {
         Scalar t, u, v;
@@ -28,7 +30,7 @@ struct Triangle {
     Triangle(const Vector3<Scalar>& p0, const Vector3<Scalar>& p1, const Vector3<Scalar>& p2)
         : p0(p0), e1(p0 - p1), e2(p2 - p0)
     {
-        n = cross(e1, e2);
+        n = LeftHandedNormal ? cross(e1, e2) : cross(e2, e1);
     }
 
     Vector3<Scalar> p1() const { return p0 - e1; }
@@ -91,9 +93,11 @@ struct Triangle {
     }
 
     std::optional<Intersection> intersect(const Ray<Scalar>& ray) const {
+        auto negate_when_right_handed = [] (Scalar x) { return LeftHandedNormal ? x : -x; };
+
         auto c = p0 - ray.origin;
         auto r = cross(ray.direction, c);
-        auto inv_det = Scalar(1.0) / dot(n, ray.direction);
+        auto inv_det = negate_when_right_handed(1.0) / dot(n, ray.direction);
 
         auto u = dot(r, e2) * inv_det;
         auto v = dot(r, e1) * inv_det;
@@ -102,7 +106,7 @@ struct Triangle {
         // These comparisons are designed to return false
         // when one of t, u, or v is a NaN
         if (u >= 0 && v >= 0 && w >= 0) {
-            auto t = dot(n, c) * inv_det;
+            auto t = negate_when_right_handed(dot(n, c)) * inv_det;
             if (t >= ray.tmin && t < ray.tmax)
                 return std::make_optional(Intersection{ t, u, v });
         }
