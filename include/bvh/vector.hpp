@@ -64,6 +64,18 @@ struct Vector {
         return Vector([this] (size_t i) { return Scalar(1) / values[i]; });
     }
 
+    bvh__always_inline__ Vector& operator += (const Vector& other) {
+        return *this = *this + other;
+    }
+
+    bvh__always_inline__ Vector& operator -= (const Vector& other) {
+        return *this = *this - other;
+    }
+
+    bvh__always_inline__ Vector& operator *= (const Vector& other) {
+        return *this = *this * other;
+    }
+
     bvh__always_inline__ Scalar& operator [] (size_t i) { return values[i]; }
     bvh__always_inline__ Scalar  operator [] (size_t i) const { return values[i]; }
 };
