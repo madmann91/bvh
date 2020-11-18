@@ -26,7 +26,7 @@ jobs:
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
-      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DBUILD_TESTING=ON --build .
+      run: cmake --build . --config ${{matrix.build-type}}
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
