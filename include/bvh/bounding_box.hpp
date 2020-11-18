@@ -62,6 +62,13 @@ struct BoundingBox {
         return diagonal()[largest_axis()];
     }
 
+    bvh__always_inline__ bool is_contained_in(const BoundingBox& other) const {
+        return
+            max[0] <= other.max[0] && min[0] >= other.min[0] &&
+            max[1] <= other.max[1] && min[1] >= other.min[1] &&
+            max[2] <= other.max[2] && min[2] >= other.min[2];
+    }
+
     bvh__always_inline__ static BoundingBox full() {
         return BoundingBox(
             Vector3<Scalar>(-std::numeric_limits<Scalar>::max()),
