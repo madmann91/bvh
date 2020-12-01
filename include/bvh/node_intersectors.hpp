@@ -1,6 +1,8 @@
 #ifndef BVH_NODE_INTERSECTORS_HPP
 #define BVH_NODE_INTERSECTORS_HPP
 
+#include <cmath>
+
 #include "bvh/vector.hpp"
 #include "bvh/ray.hpp"
 #include "bvh/platform.hpp"
@@ -17,9 +19,9 @@ struct NodeIntersector {
 
     NodeIntersector(const Ray<Scalar>& ray)
         : octant {
-            ray.direction[0] < Scalar(0),
-            ray.direction[1] < Scalar(0),
-            ray.direction[2] < Scalar(0)
+            std::signbit(ray.direction[0]),
+            std::signbit(ray.direction[1]),
+            std::signbit(ray.direction[2])
         }
     {}
 
