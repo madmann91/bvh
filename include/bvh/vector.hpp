@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <type_traits>
 
 #include "bvh/platform.hpp"
@@ -63,6 +64,13 @@ struct Vector {
 
     bvh__always_inline__ Vector inverse() const {
         return Vector([this] (size_t i) { return Scalar(1) / values[i]; });
+    }
+
+    bvh__always_inline__ Vector safe_inverse() const {
+        static constexpr auto threshold = std::numeric_limits<Scalar>::epsilon();
+        return Vector([&] (size_t i) {
+            return Scalar(1) / (std::fabs(values[i]) < threshold ? threshold : values[i]);
+        });
     }
 
     bvh__always_inline__ Vector& operator += (const Vector& other) {

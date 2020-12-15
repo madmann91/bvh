@@ -132,7 +132,7 @@ void render(
                 traversal_steps += statistics.traversal_steps;
                 intersections   += statistics.intersections;
             }
-            if(!hit) {
+            if (!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             } else {
                 if (CollectStatistics) {
