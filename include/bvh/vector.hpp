@@ -69,7 +69,7 @@ struct Vector {
     bvh__always_inline__ Vector safe_inverse() const {
         static constexpr auto threshold = std::numeric_limits<Scalar>::epsilon();
         return Vector([&] (size_t i) {
-            return Scalar(1) / (std::fabs(values[i]) < threshold ? threshold : values[i]);
+            return Scalar(1) / (std::fabs(values[i]) < threshold ? std::copysign(threshold, values[i]) : values[i]);
         });
     }
 
