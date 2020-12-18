@@ -189,6 +189,8 @@ public:
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
+        assert(primitive_count > 0);
+
         auto primitive_indices =
             sort_primitives_by_morton_code(global_bbox, centers, primitive_count).first;
 

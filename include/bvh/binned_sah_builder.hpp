@@ -42,6 +42,8 @@ public:
         const Vector3<Scalar>* centers,
         size_t primitive_count)
     {
+        assert(primitive_count > 0);
+
         // Allocate buffers
         bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * primitive_count + 1);
         bvh.primitive_indices = std::make_unique<size_t[]>(primitive_count);

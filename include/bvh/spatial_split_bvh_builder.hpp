@@ -54,6 +54,8 @@ public:
         Scalar alpha = Scalar(1e-5),
         Scalar split_factor = Scalar(0.75))
     {
+        assert(primitive_count > 0);
+
         size_t max_reference_count = primitive_count + primitive_count * split_factor;
         size_t reference_count = 0;
 
