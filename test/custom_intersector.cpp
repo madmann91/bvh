@@ -47,7 +47,7 @@ int main() {
     std::vector<Vector3> centers;
 
     // Fill the bboxes and centers with the proper values taken from the geometry of interest
-    bboxes.emplace_back(Vector3(-1, -1, -1), Vector3(-1, -1, -1));
+    bboxes.emplace_back(Vector3(-1, -1, -1), Vector3(1, 1, 1));
     centers.emplace_back(0, 0, 0);
 
     assert(bboxes.size() == centers.size());
