@@ -153,7 +153,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                             .bounding_box_proxy()
                             .to_bounding_box()
                             .extend(input[i].bounding_box_proxy());
-                        unmerged_node.is_leaf = false;
+                        unmerged_node.primitive_count = 0;
                         unmerged_node.first_child_or_primitive = first_child;
                         output[first_child + 0] = input[i];
                         output[first_child + 1] = input[j];
@@ -206,7 +206,6 @@ public:
         for (size_t i = 0; i < primitive_count; ++i) {
             auto& node = nodes[begin + i];
             node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
-            node.is_leaf                  = true;
             node.primitive_count          = 1;
             node.first_child_or_primitive = i;
         }

@@ -36,7 +36,7 @@ protected:
         #pragma omp parallel for
         for (size_t i = 0; i < bvh.node_count; i++) {
             auto& node = bvh.nodes[i];
-            if (node.is_leaf)
+            if (node.is_leaf())
                 continue;
             auto first_child = node.first_child_or_primitive;
             parents[first_child + 0] = i;
@@ -65,7 +65,7 @@ protected:
         #pragma omp for
         for (size_t i = 1; i < bvh.node_count; ++i) {
             // Only process leaves
-            if (MaintainChildIndices ? children[i] != 0 : !bvh.nodes[i].is_leaf)
+            if (MaintainChildIndices ? children[i] != 0 : !bvh.nodes[i].is_leaf())
                 continue;
 
             process_leaf(i);

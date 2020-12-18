@@ -24,9 +24,10 @@ struct Bvh {
     // single precision and 64 bytes in double precision.
     struct Node {
         Scalar bounds[6];
-        bool is_leaf : 1;
-        IndexType primitive_count : sizeof(IndexType) * CHAR_BIT - 1;
+        IndexType primitive_count;
         IndexType first_child_or_primitive;
+
+        bool is_leaf() const { return primitive_count != 0; }
 
         /// Accessor to simplify the manipulation of the bounding box of a node.
         /// This type is convertible to a `BoundingBox`.

@@ -38,7 +38,7 @@ bool check_bvh(const Bvh& bvh, const std::vector<Primitive>& primitives) {
     return std::all_of(
         bvh.nodes.get(), bvh.nodes.get() + bvh.node_count,
         [&] (const Bvh::Node& node) {
-            if (node.is_leaf) {
+            if (node.is_leaf()) {
                 return std::all_of(
                     bvh.primitive_indices.get() + node.first_child_or_primitive,
                     bvh.primitive_indices.get() + node.first_child_or_primitive + node.primitive_count,
@@ -78,7 +78,7 @@ static bool create_and_refit_bvh(size_t primitive_count) {
     // Refit the BVH
     bvh::HierarchyRefitter<Bvh> refitter(bvh);
     refitter.refit([&] (Bvh::Node& leaf) {
-        assert(leaf.is_leaf);
+        assert(leaf.is_leaf());
         auto bbox = BoundingBox::empty();
         for (size_t i = 0; i < leaf.primitive_count; ++i) {
             auto& triangle = triangles[bvh.primitive_indices[leaf.first_child_or_primitive + i]];

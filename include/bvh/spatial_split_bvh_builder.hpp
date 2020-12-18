@@ -237,8 +237,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         auto& right = bvh.nodes[first_child + 1];
         parent.first_child_or_primitive = first_child;
         parent.primitive_count          = 0;
-        parent.is_leaf                  = false;
-                
+
         left.bounding_box_proxy()  = left_bbox;
         right.bounding_box_proxy() = right_bbox;
 
@@ -512,7 +511,6 @@ public:
                 bvh.primitive_indices[first_primitive + i] = references[0][begin + i].primitive_index;
             node.first_child_or_primitive = first_primitive;
             node.primitive_count          = primitive_count;
-            node.is_leaf                  = true;
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {

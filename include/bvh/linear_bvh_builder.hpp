@@ -87,7 +87,7 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
                         .bounding_box_proxy()
                         .to_bounding_box()
                         .extend(input_nodes[i + 1].bounding_box_proxy());
-                    unmerged_node.is_leaf = false;
+                    unmerged_node.primitive_count = 0;
                     unmerged_node.first_child_or_primitive = first_child;
                     output_nodes[first_child + 0] = input_nodes[i + 0];
                     output_nodes[first_child + 1] = input_nodes[i + 1];
@@ -150,7 +150,6 @@ public:
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto& node = nodes[begin + i];
                 node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
-                node.is_leaf                  = true;
                 node.primitive_count          = 1;
                 node.first_child_or_primitive = i;
             }
@@ -179,9 +178,6 @@ public:
             begin        = next_begin;
             end          = next_end;
         }
-
-        nodes[0].first_child_or_primitive = 1;
-        nodes[0].is_leaf = false;
 
         std::swap(bvh.nodes, nodes);
         std::swap(bvh.primitive_indices, primitive_indices);

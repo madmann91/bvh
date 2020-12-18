@@ -168,7 +168,6 @@ public:
         auto make_leaf = [] (typename Bvh::Node& node, size_t begin, size_t end) {
             node.first_child_or_primitive = begin;
             node.primitive_count          = end - begin;
-            node.is_leaf                  = true;
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {
@@ -242,8 +241,7 @@ public:
         auto& right = bvh.nodes[first_child + 1];
         node.first_child_or_primitive = first_child;
         node.primitive_count          = 0;
-        node.is_leaf                  = false;
-                
+
         left.bounding_box_proxy()  = left_bbox;
         right.bounding_box_proxy() = right_bbox;
         WorkItem first_item (first_child + 0, item.begin, split_index, item.depth + 1);

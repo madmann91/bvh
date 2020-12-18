@@ -23,7 +23,7 @@ protected:
         Scalar cost(0);
         #pragma omp parallel for reduction(+: cost)
         for (size_t i = 0; i < bvh.node_count; ++i) {
-            if (bvh.nodes[i].is_leaf)
+            if (bvh.nodes[i].is_leaf())
                 cost += bvh.nodes[i].bounding_box_proxy().half_area() * bvh.nodes[i].primitive_count;
             else
                 cost += traversal_cost * bvh.nodes[i].bounding_box_proxy().half_area();

@@ -81,7 +81,7 @@ public:
             // Remap children indices to the new layout
             #pragma omp for
             for (size_t i = 0; i < bvh.node_count; ++i) {
-                if (nodes_copy[i].is_leaf)
+                if (nodes_copy[i].is_leaf())
                     continue;
                 nodes_copy[i].first_child_or_primitive =
                     unsorted_indices[(nodes_copy[i].first_child_or_primitive - 1) / 2];

@@ -34,7 +34,7 @@ public:
     {}
 
     void collapse() {
-        if (bvh__unlikely(bvh.nodes[0].is_leaf))
+        if (bvh__unlikely(bvh.nodes[0].is_leaf()))
             return;
 
         std::unique_ptr<size_t[]> primitive_indices_copy;
@@ -52,7 +52,7 @@ public:
                 [&] (size_t i) { primitive_counts[i] = bvh.nodes[i].primitive_count; },
                 [&] (size_t i) {
                     auto& node = bvh.nodes[i];
-                    assert(!node.is_leaf);
+                    assert(!node.is_leaf());
                     auto first_child  = node.first_child_or_primitive;
                     auto& left_child  = bvh.nodes[first_child + 0];
                     auto& right_child = bvh.nodes[first_child + 1];
@@ -63,7 +63,7 @@ public:
                     primitive_counts[i] = total_primitive_count;
 
                     // Compute the cost of collapsing this node when both children are leaves
-                    if (left_child.is_leaf && right_child.is_leaf) {
+                    if (left_child.is_leaf() && right_child.is_leaf()) {
                         auto collapse_cost =
                             node.bounding_box_proxy().to_bounding_box().half_area() * (Scalar(total_primitive_count) - traversal_cost);
                         auto base_cost =
@@ -71,7 +71,7 @@ public:
                             right_child.bounding_box_proxy().to_bounding_box().half_area() * right_primitive_count;
                         if (collapse_cost <= base_cost) {
                             node_index[(first_child + 1) / 2] = 0;
-                            node.is_leaf = true;
+                            node.primitive_count = total_primitive_count;
                             return;
                         }
                     }
@@ -92,7 +92,7 @@ public:
 
             #pragma omp for
             for (size_t i = 1; i < bvh.node_count; i++) {
-                if (!bvh.nodes[i].is_leaf || node_index[(i - 1) / 2] == node_index[(i + 1) / 2])
+                if (!bvh.nodes[i].is_leaf() || node_index[(i - 1) / 2] == node_index[(i + 1) / 2])
                     continue;
 
                 // Find the index of the first primitive in this subtree
@@ -135,10 +135,10 @@ public:
                     continue;
                 nodes_copy[j + 0] = bvh.nodes[i + 0];
                 nodes_copy[j + 1] = bvh.nodes[i + 1];
-                if (!bvh.nodes[i + 0].is_leaf)
+                if (!bvh.nodes[i + 0].is_leaf())
                     nodes_copy[j + 0].first_child_or_primitive =
                         node_index[(bvh.nodes[i + 0].first_child_or_primitive - 1) / 2];
-                if (!bvh.nodes[i + 1].is_leaf)
+                if (!bvh.nodes[i + 1].is_leaf())
                     nodes_copy[j + 1].first_child_or_primitive =
                         node_index[(bvh.nodes[i + 1].first_child_or_primitive - 1) / 2];
             }

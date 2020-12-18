@@ -47,7 +47,7 @@ private:
         PrimitiveIntersector& primitive_intersector,
         Statistics& statistics) const
     {
-        assert(node.is_leaf);
+        assert(node.is_leaf());
         size_t begin = node.first_child_or_primitive;
         size_t end   = begin + node.primitive_count;
         statistics.intersections += end - begin;
@@ -69,7 +69,7 @@ private:
         auto best_hit = std::optional<typename PrimitiveIntersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
-        if (bvh__unlikely(bvh.nodes[0].is_leaf))
+        if (bvh__unlikely(bvh.nodes[0].is_leaf()))
             return intersect_leaf(bvh.nodes[0], ray, best_hit, primitive_intersector, statistics);
 
         NodeIntersector node_intersector(ray);
@@ -89,7 +89,7 @@ private:
             auto distance_right = node_intersector.intersect(*right_child, ray);
 
             if (distance_left.first <= distance_left.second) {
-                if (bvh__unlikely(left_child->is_leaf)) {
+                if (bvh__unlikely(left_child->is_leaf())) {
                     if (intersect_leaf(*left_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;
@@ -99,7 +99,7 @@ private:
                 left_child = nullptr;
 
             if (distance_right.first <= distance_right.second) {
-                if (bvh__unlikely(right_child->is_leaf)) {
+                if (bvh__unlikely(right_child->is_leaf())) {
                     if (intersect_leaf(*right_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;

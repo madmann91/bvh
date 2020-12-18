@@ -140,7 +140,7 @@ public:
         #pragma omp parallel for
         for (size_t i = 0; i < bvh.node_count; ++i) {
             auto& node = bvh.nodes[i];
-            if (node.is_leaf) {
+            if (node.is_leaf()) {
                 auto begin = bvh.primitive_indices.get() + node.first_child_or_primitive;
                 auto end   = begin + node.primitive_count;
                 std::transform(begin, end, begin, [&] (size_t i) { return original_indices[i]; });

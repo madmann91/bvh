@@ -54,16 +54,16 @@ private:
         // Re-insert it into the destination
         bvh.nodes[out].bounding_box_proxy().extend(bvh.nodes[in].bounding_box_proxy());
         bvh.nodes[out].first_child_or_primitive = std::min(in, sibling_in);
-        bvh.nodes[out].is_leaf = false;
+        bvh.nodes[out].primitive_count = 0;
         bvh.nodes[sibling_in] = out_node;
         bvh.nodes[parent_in] = sibling_node;
 
         // Update parent-child indices
-        if (!out_node.is_leaf) {
+        if (!out_node.is_leaf()) {
             parents[out_node.first_child_or_primitive + 0] = sibling_in;
             parents[out_node.first_child_or_primitive + 1] = sibling_in;
         }
-        if (!sibling_node.is_leaf) {
+        if (!sibling_node.is_leaf()) {
             parents[sibling_node.first_child_or_primitive + 0] = parent_in;
             parents[sibling_node.first_child_or_primitive + 1] = parent_in;
         }
@@ -96,7 +96,7 @@ private:
                     out_best = out;
                 }
                 d = d + bbox_out.half_area() - bbox_merged.half_area();
-                if (bvh.nodes[out].is_leaf || d_bound + d <= d_best)
+                if (bvh.nodes[out].is_leaf() || d_bound + d <= d_best)
                     down = false;
                 else
                     out = bvh.nodes[out].first_child_or_primitive;
