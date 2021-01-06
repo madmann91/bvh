@@ -35,7 +35,7 @@ struct Vector {
     Scalar values[N];
 
     Vector() = default;
-    bvh__always_inline__ Vector(Scalar s) { std::fill(values, values + N, s); }
+    explicit bvh__always_inline__ Vector(Scalar s) { std::fill(values, values + N, s); }
 
     template <size_t M, std::enable_if_t<(M > N), int> = 0>
     bvh__always_inline__ explicit Vector(const Vector<Scalar, M>& other) {

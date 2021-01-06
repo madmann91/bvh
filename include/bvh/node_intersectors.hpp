@@ -27,7 +27,7 @@ struct NodeIntersector {
 
     template <bool IsMin>
     bvh__always_inline__
-    Scalar intersect_axis(int axis, const Vector3<Scalar>& p, const Ray<Scalar>& ray) const {
+    Scalar intersect_axis(int axis, Scalar p, const Ray<Scalar>& ray) const {
         return static_cast<const Derived*>(this)->template intersect_axis<IsMin>(axis, p, ray);
     }
 
@@ -71,8 +71,8 @@ struct RobustNodeIntersector : public NodeIntersector<Bvh, RobustNodeIntersector
 
     template <bool IsMin>
     bvh__always_inline__
-    Scalar intersect_axis(int axis, const Vector3<Scalar>& p, const Ray<Scalar>& ray) const {
-        return (p[axis] - ray.origin[axis]) * (IsMin ? inverse_direction[axis] : padded_inverse_direction[axis]);
+    Scalar intersect_axis(int axis, Scalar p, const Ray<Scalar>& ray) const {
+        return (p - ray.origin[axis]) * (IsMin ? inverse_direction[axis] : padded_inverse_direction[axis]);
     }
 
     using NodeIntersector<Bvh, RobustNodeIntersector<Bvh>>::intersect;
@@ -95,8 +95,8 @@ struct FastNodeIntersector : public NodeIntersector<Bvh, FastNodeIntersector<Bvh
 
     template <bool>
     bvh__always_inline__
-    Scalar intersect_axis(int axis, const Vector3<Scalar>& p, const Ray<Scalar>&) const {
-        return fast_multiply_add(p[axis], inverse_direction[axis], scaled_origin[axis]);
+    Scalar intersect_axis(int axis, Scalar p, const Ray<Scalar>&) const {
+        return fast_multiply_add(p, inverse_direction[axis], scaled_origin[axis]);
     }
 
     using NodeIntersector<Bvh, FastNodeIntersector<Bvh>>::intersect;
