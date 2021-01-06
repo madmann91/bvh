@@ -20,7 +20,7 @@ private:
     using Scalar = typename Bvh::ScalarType;
 
     struct Stack {
-        using Element = const typename Bvh::Node*;
+        using Element = typename Bvh::IndexType;
 
         Element elements[stack_size];
         size_t size = 0;
@@ -78,13 +78,11 @@ private:
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
         Stack stack;
-        const auto* node = bvh.nodes.get();
+        const auto* left_child = bvh.nodes.get() + bvh.nodes[0].first_child_or_primitive;
         while (true) {
             statistics.traversal_steps++;
 
-            auto first_child = node->first_child_or_primitive;
-            const auto* left_child  = &bvh.nodes[first_child + 0];
-            const auto* right_child = &bvh.nodes[first_child + 1];
+            const auto* right_child = left_child + 1;
             auto distance_left  = node_intersector.intersect(*left_child,  ray);
             auto distance_right = node_intersector.intersect(*right_child, ray);
 
@@ -109,16 +107,18 @@ private:
                 right_child = nullptr;
 
             if (bvh__likely((left_child != NULL) ^ (right_child != NULL))) {
-                node = left_child != NULL ? left_child : right_child;
+                left_child = bvh.nodes.get() + (left_child != NULL
+                    ? left_child->first_child_or_primitive
+                    : right_child->first_child_or_primitive);
             } else if (bvh__unlikely((left_child != NULL) & (right_child != NULL))) {
                 if (distance_left.first > distance_right.first)
                     std::swap(left_child, right_child);
-                stack.push(right_child);
-                node = left_child;
+                stack.push(right_child->first_child_or_primitive);
+                left_child = bvh.nodes.get() + left_child->first_child_or_primitive;
             } else {
                 if (stack.empty())
                     break;
-                node = stack.pop();
+                left_child = bvh.nodes.get() + stack.pop();
             }
         }
 
