@@ -66,6 +66,7 @@ set(cornell_scene_reference ${CMAKE_CURRENT_SOURCE_DIR}/scene/cornell_box_refere
 foreach (build_options_as_string
     "--builder sweep_sah"
     "--builder binned_sah"
+    "--builder binned_sah --permute"
     "--builder spatial_split"
     "--builder locally_ordered_clustering"
     "--builder locally_ordered_clustering --collapse-leaves"
