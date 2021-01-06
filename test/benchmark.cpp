@@ -52,7 +52,7 @@ static void usage() {
         "  --help                  Shows this message.\n"
         "  --builder <name>        Sets the BVH builder to use (defaults to 'binned_sah').\n"
         "  --optimizer <name>      Sets the BVH optimizer to use (none by default).\n"
-        "  --pre-shuffle           Activates the pre-shuffling optimization (disabled by default).\n"
+        "  --permute               Activates the primitive permutation optimization (disabled by default).\n"
         "  --optimize-layout       Activates the node layout optimization (disabled by default).\n"
         "  --collapse-leaves       Activates the leaf collapse optimization (disabled by default).\n"
         "  --parallel-reinsertion  Activates the parallel reinsertion optimization (disabled by default).\n"
@@ -92,7 +92,7 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool PreShuffle, bool CollectStatistics>
+template <bool Permute, bool CollectStatistics>
 void render(
     const Camera& camera,
     const Bvh& bvh,
@@ -109,7 +109,7 @@ void render(
     image_u = image_u * image_w;
     image_v = image_v * image_w * ratio;
 
-    bvh::ClosestPrimitiveIntersector<Bvh, Triangle, PreShuffle> intersector(bvh, triangles);
+    bvh::ClosestPrimitiveIntersector<Bvh, Triangle, Permute> intersector(bvh, triangles);
     bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
     size_t traversal_steps = 0, intersections = 0;
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
         Vector3(0, 1, 0),
         60
     };
-    bool pre_shuffle = false;
+    bool permute = false;
     bool optimize_layout = false;
     bool parallel_reinsertion = false;
     bool collapse_leaves = false;
@@ -237,8 +237,8 @@ int main(int argc, char** argv) {
                 if (i + 1 >= argc)
                     return not_enough_arguments(argv[i]);
                 builder_name = argv[++i];
-            } else if (!strcmp(argv[i], "--pre-shuffle")) {
-                pre_shuffle = true;
+            } else if (!strcmp(argv[i], "--permute")) {
+                permute = true;
             } else if (!strcmp(argv[i], "--optimize-layout")) {
                 optimize_layout = true;
             } else if (!strcmp(argv[i], "--parallel-reinsertion")) {
@@ -360,8 +360,8 @@ int main(int argc, char** argv) {
         std::cout << " + optimize-layout";
     if (collapse_leaves)
         std::cout << " + collapse-leaves";
-    if (pre_shuffle)
-        std::cout << " + pre-shuffle";
+    if (permute)
+        std::cout << " + permute";
     std::cout << ")..." << std::endl;
     profile("BVH construction", [&] {
         auto [bboxes, centers] =
@@ -385,8 +385,8 @@ int main(int argc, char** argv) {
             bvh::LeafCollapser leaf_collapser(bvh);
             leaf_collapser.collapse();
         }
-        if (pre_shuffle)
-            shuffled_triangles = bvh::shuffle_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
+        if (permute)
+            shuffled_triangles = bvh::permute_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
     });
 
     // This is just to make sure that refitting works
@@ -399,7 +399,7 @@ int main(int argc, char** argv) {
 
     std::cout << "Rendering image (" << width << "x" << height << ")..." << std::endl;
     profile("Rendering", [&] {
-        if (pre_shuffle) {
+        if (permute) {
             if (collect_statistics)
                 render<true, true>(camera, bvh, shuffled_triangles.get(), pixels.get(), width, height, statistics_weights);
             else

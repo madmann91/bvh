@@ -125,9 +125,10 @@ size_t count_leading_zeros(T value) {
     return bit_count - b;
 }
 
-/// Shuffles primitives such that the primitive at index i is `primitives[indices[i]]`.
+/// Permutes primitives such that the primitive at index i is `primitives[indices[i]]`.
+/// Allows to remove indirections in the primitive intersectors.
 template <typename Primitive>
-std::unique_ptr<Primitive[]> shuffle_primitives(const Primitive* primitives, const size_t* indices, size_t primitive_count) {
+std::unique_ptr<Primitive[]> permute_primitives(const Primitive* primitives, const size_t* indices, size_t primitive_count) {
     auto primitives_copy = std::make_unique<Primitive[]>(primitive_count);
     #pragma omp parallel for
     for (size_t i = 0; i < primitive_count; ++i)
