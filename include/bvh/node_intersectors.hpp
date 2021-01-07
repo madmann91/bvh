@@ -42,8 +42,8 @@ struct NodeIntersector {
         exit [2] = intersect_axis<false>(2, node.bounds[2 * 2 + 1 - octant[2]], ray);
         // Note: This order for the min/max operations is guaranteed not to produce NaNs
         return std::make_pair(
-            robust_max(entry[0], robust_max(entry[1], robust_max(entry[2], ray.tmin))),
-            robust_min(exit [0], robust_min(exit [1], robust_min(exit [2], ray.tmax))));
+            robust_max(robust_max(entry[0], entry[1]), robust_max(entry[2], ray.tmin)),
+            robust_min(robust_min(exit [0], exit [1]), robust_min(exit [2], ray.tmax)));
     }
 
 protected:

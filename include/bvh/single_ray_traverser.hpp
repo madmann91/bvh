@@ -78,11 +78,11 @@ private:
         // This is generally beneficial for performance because intersections will likely be found which will
         // allow to cull more subtrees with the ray-box test of the traversal loop.
         Stack stack;
-        const auto* left_child = bvh.nodes.get() + bvh.nodes[0].first_child_or_primitive;
+        auto* left_child = &bvh.nodes[bvh.nodes[0].first_child_or_primitive];
         while (true) {
             statistics.traversal_steps++;
 
-            const auto* right_child = left_child + 1;
+            auto* right_child = left_child + 1;
             auto distance_left  = node_intersector.intersect(*left_child,  ray);
             auto distance_right = node_intersector.intersect(*right_child, ray);
 
@@ -106,19 +106,19 @@ private:
             } else
                 right_child = nullptr;
 
-            if (bvh__likely((left_child != NULL) ^ (right_child != NULL))) {
-                left_child = bvh.nodes.get() + (left_child != NULL
-                    ? left_child->first_child_or_primitive
-                    : right_child->first_child_or_primitive);
-            } else if (bvh__unlikely((left_child != NULL) & (right_child != NULL))) {
-                if (distance_left.first > distance_right.first)
-                    std::swap(left_child, right_child);
-                stack.push(right_child->first_child_or_primitive);
-                left_child = bvh.nodes.get() + left_child->first_child_or_primitive;
+            if (left_child) {
+                if (right_child) {
+                    if (distance_left.first > distance_right.first)
+                        std::swap(left_child, right_child);
+                    stack.push(right_child->first_child_or_primitive);
+                }
+                left_child = &bvh.nodes[left_child->first_child_or_primitive];
+            } else if (right_child) {
+                left_child = &bvh.nodes[right_child->first_child_or_primitive];
             } else {
                 if (stack.empty())
                     break;
-                left_child = bvh.nodes.get() + stack.pop();
+                left_child = &bvh.nodes[stack.pop()];
             }
         }
 
