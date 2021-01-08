@@ -107,7 +107,7 @@ struct Triangle {
         // when one of t, u, or v is a NaN
         if (u >= 0 && v >= 0 && w >= 0) {
             auto t = negate_when_right_handed(dot(n, c)) * inv_det;
-            if (t >= ray.tmin && t < ray.tmax)
+            if (t >= ray.tmin && t <= ray.tmax)
                 return std::make_optional(Intersection{ t, u, v });
         }
 

@@ -45,12 +45,14 @@ struct Sphere  {
 
         auto delta = b * b - 4 * a * c;
         if (delta >= 0) {
-            auto inv = Scalar(0.5) / a;
-            auto t0 = -(b + std::sqrt(delta)) * inv;
-            auto t1 = -(b - std::sqrt(delta)) * inv;
-            auto t = std::fmin(t0 > ray.tmin ? t0 : t1, t1 > ray.tmin ? t1 : t0);
-            if (t > ray.tmin && t < ray.tmax)
-                return std::make_optional(Intersection { t });
+            auto inv = -Scalar(0.5) / a;
+            auto sqrt_delta = std::sqrt(delta);
+            auto t0 = (b + sqrt_delta) * inv;
+            if (t0 >= ray.tmin && t0 <= ray.tmax)
+                return std::make_optional(Intersection { t0 });
+            auto t1 = (b - sqrt_delta) * inv;
+            if (t1 >= ray.tmin && t1 <= ray.tmax)
+                return std::make_optional(Intersection { t1 });
         }
 
         return std::nullopt;
