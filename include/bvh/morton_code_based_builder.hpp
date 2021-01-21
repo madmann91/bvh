@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <memory>
 #include <cassert>
+#include <type_traits>
 
 #include "bvh/bounding_box.hpp"
 #include "bvh/vector.hpp"
@@ -20,6 +21,7 @@ class MortonCodeBasedBuilder {
     static constexpr size_t bits_per_iteration = 10;
 
 public:
+    static_assert(std::is_unsigned_v<Morton>);
     using MortonType = Morton;
 
     /// Maximum number of bits available per dimension.
