@@ -32,12 +32,27 @@ using Bvh         = bvh::Bvh<Scalar>;
 #include "obj.hpp"
 
 template <typename F>
-void profile(const char* task, F f) {
-    auto start_tick = std::chrono::high_resolution_clock::now();
-    f();
-    auto end_tick = std::chrono::high_resolution_clock::now();
-    size_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_tick - start_tick).count();
-    std::cout << task << " took " << ms << "ms" << std::endl;
+void profile(const char* task, F f, size_t runs = 1) {
+    using namespace std::chrono;
+    std::vector<double> timings;
+
+    for (size_t i = 0; i < runs; ++i) {
+        auto start_tick = high_resolution_clock::now();
+        f();
+        auto end_tick = high_resolution_clock::now();
+        timings.push_back(duration_cast<milliseconds>(end_tick - start_tick).count());
+    }
+
+    std::sort(timings.begin(), timings.end());
+    if (timings.size() == 1)
+        std::cout << task << " took " << timings.front() << "ms" << std::endl;
+    else {
+        std::cout
+            << task << " took "
+            << timings.front() << "/"
+            << timings[timings.size() / 2] << "/"
+            << timings.back() << "ms (min/med/max of " << runs << " runs)" << std::endl;
+    }
 }
 
 static int not_enough_arguments(const char* option) {
@@ -57,6 +72,7 @@ static void usage() {
         "  --collapse-leaves       Activates the leaf collapse optimization (disabled by default).\n"
         "  --parallel-reinsertion  Activates the parallel reinsertion optimization (disabled by default).\n"
         "  --pre-split <percent>   Activates pre-splitting and sets the percentage of references (disabled by default).\n"
+        "  --build-iterations <n>  Sets the number of construction iterations (equal to 1 by default).\n"
         "  --eye <x> <y> <z>       Sets the position of the camera.\n"
         "  --dir <x> <y> <z>       Sets the direction of the camera.\n"
         "  --up  <x> <y> <z>       Sets the up vector of the camera.\n"
@@ -197,6 +213,7 @@ int main(int argc, char** argv) {
     bool optimize_layout = false;
     bool parallel_reinsertion = false;
     bool collapse_leaves = false;
+    size_t build_iterations = 1;
     Scalar pre_split_factor = 0;
     bool collect_statistics = false;
     size_t rotation_axis = 3;
@@ -251,6 +268,14 @@ int main(int argc, char** argv) {
                 pre_split_factor = strtof(argv[++i], NULL) / Scalar(100.0);
                 if (pre_split_factor < 0) {
                     std::cerr << "Invalid pre-split factor." << std::endl;
+                    return 1;
+                }
+            } else if (!strcmp(argv[i], "--build-iterations")) {
+                if (i + 1 >= argc)
+                    return not_enough_arguments(argv[i]);
+                build_iterations = strtoull(argv[++i], NULL, 10);
+                if (build_iterations == 0) {
+                    std::cerr << "Invalid number of construction iterations." << std::endl;
                     return 1;
                 }
             } else if (!strcmp(argv[i], "--rotate")) {
@@ -387,7 +412,7 @@ int main(int argc, char** argv) {
         }
         if (permute)
             shuffled_triangles = bvh::permute_primitives(triangles.data(), bvh.primitive_indices.get(), reference_count);
-    });
+    }, build_iterations);
 
     // This is just to make sure that refitting works
     bvh::HierarchyRefitter refitter(bvh);
