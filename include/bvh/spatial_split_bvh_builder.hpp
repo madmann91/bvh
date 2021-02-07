@@ -179,7 +179,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
     BoundingBox<Scalar>* accumulated_bboxes;
     std::vector<bool>    reference_marks;
 
-    std::array<Reference* bvh__restrict__, 3> references;
+    std::array<Reference* bvh_restrict, 3> references;
 
     size_t& reference_count;
     size_t  primitive_count;

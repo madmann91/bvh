@@ -16,7 +16,7 @@ protected:
 
     template <typename UpdateLeaf>
     void refit_in_parallel(const UpdateLeaf& update_leaf) {
-        bvh__assert_in_parallel();
+        bvh::assert_in_parallel();
 
         // Refit every node of the tree in parallel
         traverse_in_parallel(

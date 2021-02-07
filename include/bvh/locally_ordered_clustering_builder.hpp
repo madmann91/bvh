@@ -36,10 +36,10 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
     }
 
     std::pair<size_t, size_t> cluster(
-        const Node* bvh__restrict__ input,
-        Node* bvh__restrict__ output,
-        size_t* bvh__restrict__ neighbors,
-        size_t* bvh__restrict__ merged_index,
+        const Node* bvh_restrict input,
+        Node* bvh_restrict output,
+        size_t* bvh_restrict neighbors,
+        size_t* bvh_restrict merged_index,
         size_t begin, size_t end,
         size_t previous_end)
     {
@@ -48,8 +48,8 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
 
         #pragma omp parallel if (end - begin > loop_parallel_threshold)
         {
-            auto thread_count = bvh__get_num_threads();
-            auto thread_id    = bvh__get_thread_num();
+            auto thread_count = bvh::get_thread_count();
+            auto thread_id    = bvh::get_thread_id();
             auto chunk_size   = (end - begin) / thread_count;
             auto chunk_begin  = begin + thread_id * chunk_size;
             auto chunk_end    = thread_id != thread_count - 1 ? chunk_begin + chunk_size : end;

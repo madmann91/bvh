@@ -39,7 +39,7 @@ private:
     };
 
     template <typename PrimitiveIntersector, typename Statistics>
-    bvh__always_inline__
+    bvh_always_inline
     std::optional<typename PrimitiveIntersector::Result>& intersect_leaf(
         const typename Bvh::Node& node,
         Ray<Scalar>& ray,
@@ -63,13 +63,13 @@ private:
     }
 
     template <typename PrimitiveIntersector, typename Statistics>
-    bvh__always_inline__
+    bvh_always_inline
     std::optional<typename PrimitiveIntersector::Result>
     intersect(Ray<Scalar> ray, PrimitiveIntersector& primitive_intersector, Statistics& statistics) const {
         auto best_hit = std::optional<typename PrimitiveIntersector::Result>(std::nullopt);
 
         // If the root is a leaf, intersect it and return
-        if (bvh__unlikely(bvh.nodes[0].is_leaf()))
+        if (bvh_unlikely(bvh.nodes[0].is_leaf()))
             return intersect_leaf(bvh.nodes[0], ray, best_hit, primitive_intersector, statistics);
 
         NodeIntersector node_intersector(ray);
@@ -87,7 +87,7 @@ private:
             auto distance_right = node_intersector.intersect(*right_child, ray);
 
             if (distance_left.first <= distance_left.second) {
-                if (bvh__unlikely(left_child->is_leaf())) {
+                if (bvh_unlikely(left_child->is_leaf())) {
                     if (intersect_leaf(*left_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;
@@ -97,7 +97,7 @@ private:
                 left_child = nullptr;
 
             if (distance_right.first <= distance_right.second) {
-                if (bvh__unlikely(right_child->is_leaf())) {
+                if (bvh_unlikely(right_child->is_leaf())) {
                     if (intersect_leaf(*right_child, ray, best_hit, primitive_intersector, statistics) &&
                         primitive_intersector.any_hit)
                         break;
@@ -140,7 +140,7 @@ public:
 
     /// Intersects the BVH with the given ray and intersector.
     template <typename PrimitiveIntersector>
-    bvh__always_inline__
+    bvh_always_inline
     std::optional<typename PrimitiveIntersector::Result>
     traverse(const Ray<Scalar>& ray, PrimitiveIntersector& intersector) const {
         struct {
@@ -156,7 +156,7 @@ public:
     /// Intersects the BVH with the given ray and intersector.
     /// Record statistics on the number of traversal and intersection steps.
     template <typename PrimitiveIntersector>
-    bvh__always_inline__
+    bvh_always_inline
     std::optional<typename PrimitiveIntersector::Result>
     traverse(const Ray<Scalar>& ray, PrimitiveIntersector& primitive_intersector, Statistics& statistics) const {
         return intersect(ray, primitive_intersector, statistics);

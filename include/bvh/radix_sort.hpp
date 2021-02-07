@@ -19,19 +19,19 @@ public:
     /// Performs the sort. Must be called from a parallel region.
     template <typename Key, typename Value>
     void sort_in_parallel(
-        Key* bvh__restrict__& keys,
-        Key* bvh__restrict__& keys_copy,
-        Value* bvh__restrict__& values,
-        Value* bvh__restrict__& values_copy,
+        Key* bvh_restrict& keys,
+        Key* bvh_restrict& keys_copy,
+        Value* bvh_restrict& values,
+        Value* bvh_restrict& values_copy,
         size_t count, size_t bit_count)
     {
-        bvh__assert_in_parallel();
+        bvh::assert_in_parallel();
 
         static constexpr size_t bucket_count = 1 << bits_per_iteration;
         static constexpr Key mask = (Key(1) << bits_per_iteration) - 1;
 
-        size_t thread_count = bvh__get_num_threads();
-        size_t thread_id    = bvh__get_thread_num();
+        size_t thread_count = bvh::get_thread_count();
+        size_t thread_id    = bvh::get_thread_id();
 
         // Allocate temporary storage
         #pragma omp single

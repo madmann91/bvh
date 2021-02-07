@@ -28,12 +28,12 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     PrefixSum<size_t> prefix_sum;
 
     std::pair<size_t, size_t> merge(
-        const Node* bvh__restrict__ input_nodes,
-        Node* bvh__restrict__ output_nodes,
-        const Level* bvh__restrict__ input_levels,
-        Level* bvh__restrict__ output_levels,
-        size_t* bvh__restrict__ merged_index,
-        size_t* bvh__restrict__ needs_merge,
+        const Node* bvh_restrict input_nodes,
+        Node* bvh_restrict output_nodes,
+        const Level* bvh_restrict input_levels,
+        Level* bvh_restrict output_levels,
+        size_t* bvh_restrict merged_index,
+        size_t* bvh_restrict needs_merge,
         size_t begin, size_t end,
         size_t previous_end)
     {

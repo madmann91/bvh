@@ -123,8 +123,8 @@ class SweepSahBuildTask : public TopDownBuildTask {
     const BoundingBox<Scalar>* bboxes;
     const Vector3<Scalar>* centers;
 
-    std::array<size_t* bvh__restrict__, 3> references;
-    std::array<Scalar* bvh__restrict__, 3> costs;
+    std::array<size_t* bvh_restrict, 3> references;
+    std::array<Scalar* bvh_restrict, 3> costs;
     Mark* marks;
 
     std::pair<Scalar, size_t> find_split(int axis, size_t begin, size_t end) {

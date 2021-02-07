@@ -23,7 +23,7 @@ protected:
     BottomUpAlgorithm(Bvh& bvh)
         : bvh(bvh)
     {
-        bvh__assert_not_in_parallel();
+        bvh::assert_not_in_parallel();
         parents = std::make_unique<size_t[]>(bvh.node_count);
         flags   = std::make_unique<int[]>(bvh.node_count);
 
@@ -49,7 +49,7 @@ protected:
         const ProcessLeaf& process_leaf,
         const ProcessInnerNode& process_inner_node)
     {
-        bvh__assert_in_parallel();
+        bvh::assert_in_parallel();
 
         #pragma omp single nowait
         {

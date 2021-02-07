@@ -33,7 +33,7 @@ public:
     {}
 
     void collapse() {
-        if (bvh__unlikely(bvh.nodes[0].is_leaf()))
+        if (bvh_unlikely(bvh.nodes[0].is_leaf()))
             return;
 
         std::unique_ptr<size_t[]> primitive_indices_copy;
