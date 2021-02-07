@@ -55,6 +55,16 @@ void profile(const char* task, F f, size_t runs = 1) {
     }
 }
 
+static size_t compute_bvh_depth(const Bvh& bvh, size_t node_index = 0) {
+    auto& node = bvh.nodes[node_index];
+    if (node.primitive_count == 0) {
+        return 1 + std::max(
+            compute_bvh_depth(bvh, node.first_child_or_primitive + 0),
+            compute_bvh_depth(bvh, node.first_child_or_primitive + 1));
+    } else
+        return 0;
+}
+
 static int not_enough_arguments(const char* option) {
     std::cerr << "Not enough arguments for '" << option << "'" << std::endl;
     return 1;
@@ -418,7 +428,10 @@ int main(int argc, char** argv) {
     bvh::HierarchyRefitter refitter(bvh);
     refitter.refit([] (Bvh::Node&) {});
 
-    std::cout << bvh.node_count << " node(s), " << reference_count << " reference(s)" << std::endl;
+    std::cout
+        << "BVH depth of " << compute_bvh_depth(bvh) << ", "
+        << bvh.node_count << " node(s), "
+        << reference_count << " reference(s)" << std::endl;
 
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);
 
