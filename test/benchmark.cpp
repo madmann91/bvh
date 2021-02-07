@@ -76,7 +76,6 @@ static void usage() {
         "\nOptions:\n"
         "  --help                  Shows this message.\n"
         "  --builder <name>        Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --optimizer <name>      Sets the BVH optimizer to use (none by default).\n"
         "  --permute               Activates the primitive permutation optimization (disabled by default).\n"
         "  --optimize-layout       Activates the node layout optimization (disabled by default).\n"
         "  --collapse-leaves       Activates the leaf collapse optimization (disabled by default).\n"
@@ -100,14 +99,12 @@ static void usage() {
         "    primitive intersections (i), and the sum of the two (s).\n"
         "    These statistics are then converted to bytes and stored in\n"
         "    the red, green, and blue channels of the image, respectively.\n\n"
-        "\nBuilders:\n"
+        "Builders:\n"
         "  binned_sah,\n"
         "  sweep_sah,\n"
         "  spatial_split,\n"
         "  locally_ordered_clustering,\n"
         "  linear\n"
-        "\nOptimizers:\n"
-        "  parallel_reinsertion\n"
         << std::endl;
 }
 
