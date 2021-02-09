@@ -248,10 +248,13 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         // - [item.begin...right_begin[ is the range of references on the left,
         // - [right_begin...right_end[ is the range of references on the right,
         // - [right_end...item.split_end[ is the free split space
+        assert(item.begin < right_begin && right_begin < right_end && right_end < item.split_end);
         size_t remaining_split_count = item.split_end - right_end;
         auto left_cost  = left_bbox.half_area() * (right_begin - item.begin);
         auto right_cost = right_bbox.half_area() * (right_end - right_begin);
-        size_t left_split_count = remaining_split_count * Scalar(left_cost / (left_cost + right_cost));
+        auto left_split_ratio = left_cost + right_cost > 0 ? left_cost / (left_cost + right_cost) : Scalar(0.5);
+        size_t left_split_count = remaining_split_count * left_split_ratio;
+        assert(left_split_count <= remaining_split_count);
 
         // Move references of the right child to leave some split space for the left one 
         if (left_split_count > 0) {
@@ -263,6 +266,8 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         size_t left_end = right_begin;
         right_begin += left_split_count;
         right_end   += left_split_count;
+        assert(right_begin < item.split_end);
+        assert(right_end <= item.split_end);
         return std::make_pair(
             WorkItem(first_child + 0, item.begin,  left_end,  right_begin,    item.depth + 1, is_sorted),
             WorkItem(first_child + 1, right_begin, right_end, item.split_end, item.depth + 1, is_sorted));
