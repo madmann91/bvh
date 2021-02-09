@@ -248,7 +248,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         // - [item.begin...right_begin[ is the range of references on the left,
         // - [right_begin...right_end[ is the range of references on the right,
         // - [right_end...item.split_end[ is the free split space
-        assert(item.begin < right_begin && right_begin < right_end && right_end < item.split_end);
+        assert(item.begin < right_begin && right_begin < right_end && right_end <= item.split_end);
         size_t remaining_split_count = item.split_end - right_end;
         auto left_cost  = left_bbox.half_area() * (right_begin - item.begin);
         auto right_cost = right_bbox.half_area() * (right_end - right_begin);
