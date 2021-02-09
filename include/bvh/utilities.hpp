@@ -38,6 +38,7 @@ inline float fast_multiply_add(float x, float y, float z) {
 #ifdef FP_FAST_FMAF
     return std::fmaf(x, y, z);
 #else
+    #pragma STDC FP_CONTRACT ON
     return x * y + z;
 #endif
 }
@@ -46,6 +47,7 @@ inline double fast_multiply_add(double x, double y, double z) {
 #ifdef FP_FAST_FMA
     return std::fma(x, y, z);
 #else
+    #pragma STDC FP_CONTRACT ON
     return x * y + z;
 #endif
 }
