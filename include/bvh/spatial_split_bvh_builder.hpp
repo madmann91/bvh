@@ -52,7 +52,7 @@ public:
         const Vector3<Scalar>* centers,
         size_t primitive_count,
         Scalar alpha = Scalar(1e-5),
-        Scalar split_factor = Scalar(0.75))
+        Scalar split_factor = Scalar(0.3))
     {
         assert(primitive_count > 0);
 
