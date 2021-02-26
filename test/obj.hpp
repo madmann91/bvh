@@ -5,6 +5,7 @@
 #include <string>
 #include <optional>
 #include <fstream>
+#include <cctype>
 
 namespace obj {
 

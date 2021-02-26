@@ -6,8 +6,7 @@ endif ()
 # Adds an executable target, and links 'bvh' to it.
 #
 #   SOURCES : The source files used to compile the program.
-#   NAME    : The name of the test program. The prefix 'bvh_'
-#             is prepended to this when declaring the CMake target.
+#   NAME    : The name of the test program.
 function (add_bvh_test_executable)
     set(single_value_args NAME)
     set(multi_value_args SOURCES)
