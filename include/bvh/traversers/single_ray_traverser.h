@@ -187,7 +187,7 @@ public:
                     continue;
                 }
             }
-            if (stack.is_empty())
+            if (proto_unlikely(stack.is_empty()))
                 break;
             top = stack.pop();
         }
