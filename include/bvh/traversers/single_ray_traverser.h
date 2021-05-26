@@ -24,6 +24,23 @@ class SingleRayTraverser {
     template <typename LeafIntersector>
     using Hit = std::invoke_result_t<LeafIntersector, Ray&, const Node&>;
 
+    template <size_t Capacity>
+    struct Stack {
+        Index elems[Capacity];
+        size_t size = 0;
+
+        bool is_empty() const { return size == 0; }
+        bool is_full() const { return size == Capacity; }
+        void push(Index i) {
+            assert(!is_full());
+            elems[size++] = i;
+        }
+        Index pop() {
+            assert(!is_empty());
+            return elems[--size];
+        }
+    };
+
 public:
     /// Default stack size used in `traverse()`.
     /// Should be enough for most uses.
@@ -98,7 +115,7 @@ public:
         Vec3 inv_dir;
 
         FastNodeIntersector(const Ray& ray)
-            : NodeIntersector<FastNodeIntersector>(ray) 
+            : NodeIntersector<FastNodeIntersector>(ray)
         {
             inv_dir    = safe_inverse(ray.dir);
             scaled_org = -ray.org * inv_dir;
@@ -113,23 +130,6 @@ public:
         }
 
         using NodeIntersector<FastNodeIntersector>::intersect_node;
-    };
-
-    template <size_t Capacity>
-    struct Stack {
-        Index elems[Capacity];
-        size_t size = 0;
-
-        bool is_empty() const { return size == 0; }
-        bool is_full() const { return size == Capacity; }
-        void push(Index i) {
-            assert(!is_full());
-            elems[size++] = i;
-        }
-        Index pop() {
-            assert(!is_empty());
-            return elems[--size];
-        }
     };
 
     /// Traverses the BVH with a given ray.
