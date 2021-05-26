@@ -12,6 +12,9 @@
 
 namespace bvh {
 
+/// Single ray traversal algorithm. Can be configured to be fully robust, or
+/// only partially robust. The fully robust variant is slightly slower, but is
+/// guaranteed not to produce false misses.
 template <typename Bvh>
 class SingleRayTraverser {
     using Scalar = typename Bvh::Scalar;
