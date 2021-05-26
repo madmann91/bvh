@@ -22,9 +22,6 @@
 //#include <bvh/leaf_collapser.hpp>
 //#include <bvh/heuristic_primitive_splitter.hpp>
 //#include <bvh/hierarchy_refitter.hpp>
-//#include <bvh/single_ray_traverser.hpp>
-//#include <bvh/primitive_intersectors.hpp>
-//#include <bvh/triangle.hpp>
 
 using Scalar   = float;
 using Vec3     = bvh::Vec3<Scalar>;
