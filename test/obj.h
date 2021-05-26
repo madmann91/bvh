@@ -58,7 +58,7 @@ inline std::vector<Triangle> load_from_stream(std::istream& is) {
     static constexpr size_t max_line = 1024;
     char line[max_line];
 
-    std::vector<Vector3> vertices;
+    std::vector<Vec3> vertices;
     std::vector<Triangle> triangles;
 
     while (is.getline(line, max_line)) {
@@ -72,7 +72,7 @@ inline std::vector<Triangle> load_from_stream(std::istream& is) {
             auto z = std::strtof(ptr, &ptr);
             vertices.emplace_back(x, y, z);
         } else if (*ptr == 'f' && std::isspace(ptr[1])) {
-            Vector3 points[2];
+            Vec3 points[2];
             ptr += 2;
             for (size_t i = 0; ; ++i) {
                 if (auto index = read_index(&ptr)) {
