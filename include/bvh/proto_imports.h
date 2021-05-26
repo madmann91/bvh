@@ -18,6 +18,9 @@ using proto::normalize;
 using proto::cross;
 using proto::dot;
 using proto::length;
+using proto::min;
+using proto::max;
+using proto::abs;
 
 } // namespace bvh
 
