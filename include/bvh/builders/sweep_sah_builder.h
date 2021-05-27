@@ -81,16 +81,27 @@ private:
 
                 // Right sweep to compute partial costs
                 auto right_bbox = BBox::empty();
+                size_t begin = item.begin;
                 for (size_t i = item.end - 1; i > item.begin; --i) {
                     right_bbox.extend(bboxes_[indices[i]]);
-                    costs_[i] = right_bbox.half_area() * (item.end - i);
+                    auto right_cost = right_bbox.half_area() * (item.end - i);
+                    if (proto_unlikely(right_cost >= split.cost)) {
+                        begin = i;
+                        break;
+                    }
+                    costs_[i] = right_cost;
                 }
 
                 // Left sweep to compute full cost
                 auto left_bbox = BBox::empty();
-                for (size_t i = item.begin; i < item.end; ++i) {
+                for (size_t i = item.begin; i < begin; ++i)
                     left_bbox.extend(bboxes_[indices[i]]);
-                    auto cost = left_bbox.half_area() * (i - item.begin + 1) + costs_[i + 1];
+                for (size_t i = begin; i < item.end; ++i) {
+                    left_bbox.extend(bboxes_[indices[i]]);
+                    auto left_cost = left_bbox.half_area() * (i - item.begin + 1);
+                    if (proto_unlikely(left_cost >= split.cost))
+                        break;
+                    auto cost = left_cost + costs_[i + 1];
                     if (cost < split.cost)
                         split = Split { axis, cost, i + 1 };
                 }
