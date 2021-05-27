@@ -58,13 +58,15 @@ private:
             Mark* marks,
             Scalar* costs,
             const std::array<size_t*, 3>& sorted_indices,
-            const BBox* bboxes)
+            const BBox* bboxes,
+            std::atomic<size_t>& node_count)
             : bvh_(bvh)
             , config_(config)
             , marks_(marks)
             , costs_(costs)
             , sorted_indices_(sorted_indices)
             , bboxes_(bboxes)
+            , node_count_(node_count)
         {}
 
         std::optional<std::pair<WorkItem, WorkItem>> run(WorkItem&& item) const {
@@ -144,7 +146,7 @@ private:
 
             // Create an inner node
             assert(split.prim_index > item.begin && split.prim_index < item.end);
-            auto left_index = std::atomic_ref(bvh_.node_count).fetch_add(2);
+            auto left_index = node_count_.fetch_add(2);
             bvh_.nodes[left_index + 0].bbox_proxy() = left_bbox;
             bvh_.nodes[left_index + 1].bbox_proxy() = right_bbox;
             node.first_index = left_index;
@@ -161,6 +163,7 @@ private:
         Scalar* costs_;
         std::array<size_t*, 3> sorted_indices_;
         const BBox* bboxes_;
+        std::atomic<size_t>& node_count_;
     };
 
     friend class TopDownScheduler<SweepSahBuilder>;
@@ -199,16 +202,15 @@ public:
                     return centers[i][axis] < centers[j][axis];
                 });
         }
-
-        // Compute a global bounding box around the root
         bvh.nodes[0].bbox_proxy() = global_bbox;
-        bvh.node_count = 1;
 
         // Start the root task and wait for the result
+        std::atomic<size_t> node_count(1);
         scheduler.run(
-            Task(bvh, config, marks.get(), costs.get(), sorted_indices, bboxes),
+            Task(bvh, config, marks.get(), costs.get(), sorted_indices, bboxes, node_count),
             WorkItem { 0, 0, prim_count });
 
+        bvh.node_count = node_count;
         bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);
         return bvh;
     }

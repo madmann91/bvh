@@ -87,11 +87,13 @@ private:
             Bvh& bvh,
             const Config& config,
             const BBox* bboxes,
-            const Vec3* centers)
+            const Vec3* centers,
+            std::atomic<size_t>& node_count)
             : bvh_(bvh)
             , config_(config)
             , bboxes_(bboxes)
             , centers_(centers)
+            , node_count_(node_count)
         {}
 
         std::optional<std::pair<WorkItem, WorkItem>> run(WorkItem&& item) const {
@@ -188,7 +190,7 @@ private:
 
             // Create an inner node
             assert(right_begin > item.begin && right_begin < item.end);
-            auto left_index = std::atomic_ref(bvh_.node_count).fetch_add(2);
+            auto left_index = node_count_.fetch_add(2);
             bvh_.nodes[left_index + 0].bbox_proxy() = left_bbox;
             bvh_.nodes[left_index + 1].bbox_proxy() = right_bbox;
             node.first_index = left_index;
@@ -203,6 +205,7 @@ private:
         const Config& config_;
         const BBox* bboxes_;
         const Vec3* centers_;
+        std::atomic<size_t>& node_count_;
     };
 
     friend class TopDownScheduler<BinnedSahBuilder>;
@@ -223,14 +226,13 @@ public:
         bvh.prim_indices = std::make_unique<size_t[]>(prim_count);
         bvh.nodes = std::make_unique<Node[]>(2 * prim_count - 1);
         std::iota(bvh.prim_indices.get(), bvh.prim_indices.get() + prim_count, 0);
-
-        // Compute a global bounding box around the root
         bvh.nodes[0].bbox_proxy() = global_bbox;
-        bvh.node_count = 1;
 
         // Start the root task and wait for the result
-        scheduler.run(Task(bvh, config, bboxes, centers), WorkItem { 0, 0, prim_count });
+        std::atomic<size_t> node_count(1);
+        scheduler.run(Task(bvh, config, bboxes, centers, node_count), WorkItem { 0, 0, prim_count });
 
+        bvh.node_count = node_count;
         bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);
         return bvh;
     }
