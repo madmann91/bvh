@@ -11,6 +11,7 @@
 
 #include <proto/bbox.h>
 #include <proto/vec.h>
+#include <proto/utils.h>
 
 #include "bvh/bvh.h"
 #include "bvh/builders/top_down_scheduler.h"
