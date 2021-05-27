@@ -131,7 +131,7 @@ private:
             std::stable_partition(sorted_indices_[other_axes[1]] + item.begin, sorted_indices_[other_axes[1]] + item.end, is_marked);
 
             // Create an inner node
-            assert(right_begin > item.begin && right_begin < item.end);
+            assert(split.prim_index > item.begin && split.prim_index < item.end);
             auto left_index = std::atomic_ref(bvh_.node_count).fetch_add(2);
             bvh_.nodes[left_index + 0].bbox_proxy() = left_bbox;
             bvh_.nodes[left_index + 1].bbox_proxy() = right_bbox;
