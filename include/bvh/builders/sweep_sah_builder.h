@@ -109,26 +109,26 @@ private:
 
             // Mark the primitives that are on each side of the split,
             // and compute the bounding boxes of the children.
-            auto left_bbox = BBox::empty(), right_bbox = BBox::empty();
-            for (size_t i = item.begin; i < split.prim_index; ++i) {
-                auto prim_index = sorted_indices_[split.axis][i];
-                left_bbox.extend(bboxes_[prim_index]);
-                marks_[prim_index] = 1;
-            }
-            for (size_t i = split.prim_index; i < item.end; ++i) {
-                auto prim_index = sorted_indices_[split.axis][i];
-                right_bbox.extend(bboxes_[prim_index]);
-                marks_[prim_index] = 0;
-            }
+            auto mark_primitives = [&] (size_t begin, size_t end, Mark mark) {
+                auto bbox = BBox::empty();
+                for (size_t i = begin; i < end; ++i) {
+                    auto prim_index = sorted_indices_[split.axis][i];
+                    bbox.extend(bboxes_[prim_index]);
+                    marks_[prim_index] = mark;
+                }
+                return bbox;
+            };
+            auto left_bbox  = mark_primitives(item.begin, split.prim_index, 1);
+            auto right_bbox = mark_primitives(split.prim_index, item.end,   0);
 
             // We now partition the set of objects based on whether they appear
             // on the left or the right side of the split.
             // It is important to use a stable partitioning algorithm here, so as
             // to keep the order of primitive indices intact.
-            int other_axes[2] = { (split.axis + 1) % 3, (split.axis + 2) % 3 };
             auto is_marked = [&] (size_t i) { return marks_[i] != 0; };
-            std::stable_partition(sorted_indices_[other_axes[0]] + item.begin, sorted_indices_[other_axes[0]] + item.end, is_marked);
-            std::stable_partition(sorted_indices_[other_axes[1]] + item.begin, sorted_indices_[other_axes[1]] + item.end, is_marked);
+            auto other_axes = std::array { (split.axis + 1) % 3, (split.axis + 2) % 3 };
+            for (auto axis : other_axes)
+                std::stable_partition(sorted_indices_[axis] + item.begin, sorted_indices_[axis] + item.end, is_marked);
 
             // Create an inner node
             assert(split.prim_index > item.begin && split.prim_index < item.end);
