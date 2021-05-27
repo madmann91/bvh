@@ -37,6 +37,7 @@ public:
 private:
     struct WorkItem {
         size_t node_index;
+        size_t depth;
         size_t begin, end;
 
         size_t size() const { return end - begin; }
@@ -102,7 +103,8 @@ private:
             node.prim_count  = item.size();
             node.first_index = item.begin;
 
-            if (item.size() <= config_.min_prims_per_leaf)
+            if (item.depth >= config_.max_depth ||
+                item.size() <= config_.min_prims_per_leaf)
                 return std::nullopt;
 
             std::array<Bin, bin_count> bins_per_axis[3];
@@ -196,8 +198,8 @@ private:
             node.first_index = left_index;
             node.prim_count = 0;
             return std::make_optional(std::pair {
-                WorkItem { left_index,     item.begin,  right_begin },
-                WorkItem { left_index + 1, right_begin, item.end    } });
+                WorkItem { left_index,     item.depth + 1, item.begin,  right_begin },
+                WorkItem { left_index + 1, item.depth + 1, right_begin, item.end    } });
         }
 
     private:
@@ -230,7 +232,7 @@ public:
 
         // Start the root task and wait for the result
         std::atomic<size_t> node_count(1);
-        scheduler.run(Task(bvh, config, bboxes, centers, node_count), WorkItem { 0, 0, prim_count });
+        scheduler.run(Task(bvh, config, bboxes, centers, node_count), WorkItem { 0, 0, 0, prim_count });
 
         bvh.node_count = node_count;
         bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);

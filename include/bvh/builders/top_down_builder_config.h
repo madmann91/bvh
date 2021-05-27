@@ -8,7 +8,10 @@ namespace bvh {
 /// Configuration parameters for the builder, with default values that should work for most uses.
 template <typename T>
 struct TopDownBuilderConfig {
-    ///< The algorithm stops when there are as many or fewer primitives in the current range.
+    /// Maximum allowed BVH depth.
+    size_t max_depth = 64;
+
+    /// The algorithm stops when there are as many or fewer primitives in the current range.
     size_t min_prims_per_leaf = 1;
 
     /// The algorithm makes sure that there are not more than this many
