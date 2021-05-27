@@ -56,17 +56,17 @@ private:
         Task(
             Bvh& bvh,
             const Config& config,
+            const BBox* bboxes,
             Mark* marks,
             Scalar* costs,
             const std::array<size_t*, 3>& sorted_indices,
-            const BBox* bboxes,
             std::atomic<size_t>& node_count)
             : bvh_(bvh)
             , config_(config)
+            , bboxes_(bboxes)
             , marks_(marks)
             , costs_(costs)
             , sorted_indices_(sorted_indices)
-            , bboxes_(bboxes)
             , node_count_(node_count)
         {}
 
@@ -161,10 +161,10 @@ private:
     private:
         Bvh& bvh_;
         const Config& config_;
+        const BBox* bboxes_;
         Mark* marks_;
         Scalar* costs_;
         std::array<size_t*, 3> sorted_indices_;
-        const BBox* bboxes_;
         std::atomic<size_t>& node_count_;
     };
 
@@ -200,16 +200,14 @@ public:
             auto indices = sorted_indices[axis];
             std::iota(indices, indices + prim_count, 0);
             std::sort(indices, indices + prim_count,
-                [&] (size_t i, size_t j) {
-                    return centers[i][axis] < centers[j][axis];
-                });
+                [&] (size_t i, size_t j) { return centers[i][axis] < centers[j][axis]; });
         }
         bvh.nodes[0].bbox_proxy() = global_bbox;
 
         // Start the root task and wait for the result
         std::atomic<size_t> node_count(1);
         scheduler.run(
-            Task(bvh, config, marks.get(), costs.get(), sorted_indices, bboxes, node_count),
+            Task(bvh, config, bboxes, marks.get(), costs.get(), sorted_indices, node_count),
             WorkItem { 0, 0, 0, prim_count });
 
         bvh.node_count = node_count;
