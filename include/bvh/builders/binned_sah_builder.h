@@ -114,10 +114,10 @@ private:
                 auto& bins = bins_per_axis[axis];
 
                 Bin left_accum, right_accum;
-                for (size_t i = bin_count; i > 0; --i) {
-                    auto& bin = bins[i - 1];
+                for (size_t i = bin_count - 1; i > 0; --i) {
+                    auto& bin = bins[i];
                     right_accum.merge(bin);
-                    right_cost[i - 1] = right_accum.cost();
+                    right_cost[i] = right_accum.cost();
                 }
 
                 for (size_t i = 0; i < bin_count - 1; ++i) {
@@ -219,9 +219,7 @@ public:
         // Start the root task and wait for the result
         scheduler.run(Task(bvh, config, bboxes, centers), WorkItem { 0, 0, prim_count });
 
-        auto nodes = std::make_unique<Node[]>(bvh.node_count);
-        std::copy_n(bvh.nodes.get(), bvh.node_count, nodes.get());
-        std::swap(bvh.nodes, nodes);
+        bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);
         return bvh;
     }
 };

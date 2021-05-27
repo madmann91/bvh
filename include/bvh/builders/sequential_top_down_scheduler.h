@@ -1,5 +1,5 @@
-#ifndef BVH_BUILDERS_SEQ_TOP_DOWN_SCHEDULER_H
-#define BVH_BUILDERS_SEQ_TOP_DOWN_SCHEDULER_H
+#ifndef BVH_BUILDERS_SEQUENTIAL_TOP_DOWN_SCHEDULER_H
+#define BVH_BUILDERS_SEQUENTIAL_TOP_DOWN_SCHEDULER_H
 
 #include <stack>
 
@@ -8,7 +8,7 @@
 namespace bvh {
     
 template <typename Builder>
-class SeqTopDownScheduler : public TopDownScheduler<Builder> {
+class SequentialTopDownScheduler : public TopDownScheduler<Builder> {
     using InnerTask = typename TopDownScheduler<Builder>::InnerTask;
     using WorkItem  = typename TopDownScheduler<Builder>::WorkItem;
 

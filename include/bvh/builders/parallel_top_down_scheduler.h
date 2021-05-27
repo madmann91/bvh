@@ -1,5 +1,5 @@
-#ifndef BVH_BUILDERS_PAR_TOP_DOWN_SCHEDULER_H
-#define BVH_BUILDERS_PAR_TOP_DOWN_SCHEDULER_H
+#ifndef BVH_BUILDERS_PARALLEL_TOP_DOWN_SCHEDULER_H
+#define BVH_BUILDERS_PARALLEL_TOP_DOWN_SCHEDULER_H
 
 #include <stack>
 
@@ -10,14 +10,14 @@
 namespace bvh {
     
 template <typename Builder>
-class ParTopDownScheduler : public TopDownScheduler<Builder> {
+class ParallelTopDownScheduler : public TopDownScheduler<Builder> {
     using InnerTask = typename TopDownScheduler<Builder>::InnerTask;
     using WorkItem  = typename TopDownScheduler<Builder>::WorkItem;
 
     class Task {
     public:
         Task(
-            ParTopDownScheduler& scheduler,
+            ParallelTopDownScheduler& scheduler,
             const InnerTask& inner_task,
             WorkItem&& first_item)
             : scheduler_(scheduler), inner_task_(inner_task), first_item_(std::move(first_item))
@@ -43,7 +43,7 @@ class ParTopDownScheduler : public TopDownScheduler<Builder> {
         }
 
     private:
-        ParTopDownScheduler& scheduler_;
+        ParallelTopDownScheduler& scheduler_;
         InnerTask inner_task_;
         WorkItem first_item_;
     };

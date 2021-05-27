@@ -11,7 +11,8 @@
 #include <bvh/bvh.h>
 #include <bvh/proto_imports.h>
 #include <bvh/builders/binned_sah_builder.h>
-#include <bvh/builders/seq_top_down_scheduler.h>
+#include <bvh/builders/sweep_sah_builder.h>
+#include <bvh/builders/sequential_top_down_scheduler.h>
 #include <bvh/traversers/single_ray_traverser.h>
 //#include <bvh/sweep_sah_builder.hpp>
 //#include <bvh/spatial_split_bvh_builder.hpp>
@@ -341,17 +342,18 @@ int main(int argc, char** argv) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             static constexpr size_t bin_count = 16;
             using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
-            bvh::SeqTopDownScheduler<Builder> scheduler;
+            bvh::SequentialTopDownScheduler<Builder> scheduler;
             bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
-    }/* else if (!strcmp(builder_name, "sweep_sah")) {
+    } else if (!strcmp(builder_name, "sweep_sah")) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            bvh::SweepSahBuilder<Bvh> builder(bvh);
-            builder.build(global_bbox, bboxes, centers, prim_count);
+            using Builder = bvh::SweepSahBuilder<Bvh>;
+            bvh::SequentialTopDownScheduler<Builder> scheduler;
+            bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
-    } else if (!strcmp(builder_name, "spatial_split")) {
+    } /*else if (!strcmp(builder_name, "spatial_split")) {
         builder = [] (Bvh& bvh, const Triangle* triangles, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             static constexpr size_t bin_count = 64;
             bvh::SpatialSplitBvhBuilder<Bvh, Triangle, bin_count> builder(bvh);
