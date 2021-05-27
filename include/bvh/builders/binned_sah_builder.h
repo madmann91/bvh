@@ -170,7 +170,7 @@ private:
                     return std::nullopt;
             } else {
                 // If the split is useful, we partition the set of objects based on the bins they fall in.
-                auto offset_and_scale = Bin::offset_and_scale(node.bbox().min[split.axis], node.bbox().max[split.axis]);
+                auto offset_and_scale = offsets_and_scales_per_axis[split.axis];
                 right_begin = std::partition(
                     bvh_.prim_indices.get() + item.begin,
                     bvh_.prim_indices.get() + item.end,
