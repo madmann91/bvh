@@ -104,7 +104,7 @@ private:
                 return std::nullopt;
 
             std::array<Bin, bin_count> bins_per_axis[3];
-            auto per_axis_offsets_and_scales = std::array {
+            auto offsets_and_scales_per_axis = std::array {
                 Bin::offset_and_scale(node.bbox().min[0], node.bbox().max[0]),
                 Bin::offset_and_scale(node.bbox().min[1], node.bbox().max[1]),
                 Bin::offset_and_scale(node.bbox().min[2], node.bbox().max[2]) };
@@ -112,7 +112,7 @@ private:
             for (size_t i = item.begin; i < item.end; ++i) {
                 for (int axis = 0; axis < 3; ++axis) {
                     auto prim_index = bvh_.prim_indices[i];
-                    auto bin_index = Bin::index(centers_[prim_index][axis], per_axis_offsets_and_scales[axis]);
+                    auto bin_index = Bin::index(centers_[prim_index][axis], offsets_and_scales_per_axis[axis]);
                     auto& bin = bins_per_axis[axis][bin_index];
                     bin.bbox.extend(bboxes_[prim_index]);
                     bin.prim_count++;
@@ -120,21 +120,21 @@ private:
             }
 
             Split split;
-            std::array<Scalar, bin_count> right_cost;
-            for (int axis = 0; axis < 3; ++axis) {
-                auto& bins = bins_per_axis[axis];
-
-                Bin left_accum, right_accum;
-                for (size_t i = bin_count - 1; i > 0; --i) {
-                    auto& bin = bins[i];
-                    right_accum.merge(bin);
-                    right_cost[i] = right_accum.cost();
+            Bin left_accums_per_axis[3], right_accums_per_axis[3];
+            std::array<Scalar, bin_count> right_costs_per_axis[3];
+            for (size_t i = bin_count - 1; i > 0; --i) {
+                for (int axis = 0; axis < 3; ++axis) {
+                    auto& bin = bins_per_axis[axis][i];
+                    right_accums_per_axis[axis].merge(bin);
+                    right_costs_per_axis[axis][i] = right_accums_per_axis[axis].cost();
                 }
+            }
 
-                for (size_t i = 0; i < bin_count - 1; ++i) {
-                    auto& bin = bins[i];
-                    left_accum.merge(bin);
-                    auto cost = left_accum.cost() + right_cost[i + 1];
+            for (size_t i = 0; i < bin_count - 1; ++i) {
+                for (int axis = 0; axis < 3; ++axis) {
+                    auto& bin = bins_per_axis[axis][i];
+                    left_accums_per_axis[axis].merge(bin);
+                    auto cost = left_accums_per_axis[axis].cost() + right_costs_per_axis[axis][i + 1];
                     if (cost < split.cost)
                         split = Split { axis, cost, i + 1 };
                 }
