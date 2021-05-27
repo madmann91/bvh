@@ -418,15 +418,16 @@ int main(int argc, char** argv) {
         //bvh::HeuristicPrimitiveSplitter<Triangle> splitter;
         //if (pre_split_factor > 0)
         //    std::tie(ref_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
-        std::vector<BBox> bboxes;
-        std::vector<Vec3> centers;
+        auto bboxes  = std::make_unique<BBox[]>(triangles.size());
+        auto centers = std::make_unique<Vec3[]>(triangles.size());
         auto global_bbox = BBox::empty();
-        for (auto& triangle : triangles) {
-            bboxes.push_back(triangle.bbox());
-            centers.push_back(triangle.center());
-            global_bbox.extend(bboxes.back());
+        for (size_t i = 0; i < triangles.size(); ++i) {
+            auto bbox = triangles[i].bbox();
+            bboxes[i]  = bbox;
+            centers[i] = triangles[i].center();
+            global_bbox.extend(bbox);
         }
-        ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.data(), centers.data(), ref_count);
+        ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), ref_count);
         //if (pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
         //if (parallel_reinsertion) {
