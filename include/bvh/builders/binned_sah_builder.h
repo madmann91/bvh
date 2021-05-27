@@ -110,34 +110,34 @@ private:
                 Bin::offset_and_scale(node.bbox().min[2], node.bbox().max[2]) };
 
             for (size_t i = item.begin; i < item.end; ++i) {
-                for (int axis = 0; axis < 3; ++axis) {
+                proto::static_for<0, 3>([&] (int axis) {
                     auto prim_index = bvh_.prim_indices[i];
                     auto bin_index = Bin::index(centers_[prim_index][axis], offsets_and_scales_per_axis[axis]);
                     auto& bin = bins_per_axis[axis][bin_index];
                     bin.bbox.extend(bboxes_[prim_index]);
                     bin.prim_count++;
-                }
+                });
             }
 
             Split split;
             Bin left_accums_per_axis[3], right_accums_per_axis[3];
             std::array<Scalar, bin_count> right_costs_per_axis[3];
             for (size_t i = bin_count - 1; i > 0; --i) {
-                for (int axis = 0; axis < 3; ++axis) {
+                proto::static_for<0, 3>([&] (int axis) {
                     auto& bin = bins_per_axis[axis][i];
                     right_accums_per_axis[axis].merge(bin);
                     right_costs_per_axis[axis][i] = right_accums_per_axis[axis].cost();
-                }
+                });
             }
 
             for (size_t i = 0; i < bin_count - 1; ++i) {
-                for (int axis = 0; axis < 3; ++axis) {
+                proto::static_for<0, 3>([&] (int axis) {
                     auto& bin = bins_per_axis[axis][i];
                     left_accums_per_axis[axis].merge(bin);
                     auto cost = left_accums_per_axis[axis].cost() + right_costs_per_axis[axis][i + 1];
                     if (cost < split.cost)
                         split = Split { axis, cost, i + 1 };
-                }
+                });
             }
 
             size_t right_begin = 0;
