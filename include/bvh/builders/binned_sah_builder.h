@@ -11,6 +11,7 @@
 
 #include <proto/bbox.h>
 #include <proto/vec.h>
+#include <proto/utils.h>
 
 #include "bvh/bvh.h"
 #include "bvh/builders/top_down_scheduler.h"
@@ -47,14 +48,28 @@ private:
 
         Bin() = default;
 
-        Bin& merge(const Bin& other) {
+        Bin& proto_always_inline merge(const Bin& other) {
             bbox.extend(other.bbox);
             prim_count += other.prim_count;
             return *this;
         }
 
-        Scalar cost() const {
+        Scalar proto_always_inline cost() const {
             return prim_count * bbox.half_area();
+        }
+
+        static proto_always_inline std::pair<Scalar, Scalar> offset_and_scale(Scalar min, Scalar max) {
+            auto scale = bin_count / (max - min);
+            auto offset = -min * scale;
+            return std::pair { offset, scale };
+        }
+
+        static proto_always_inline size_t index(Scalar pos, Scalar offset, Scalar scale) {
+            return std::min(bin_count - 1, size_t(std::max(ptrdiff_t{0}, ptrdiff_t(proto::fast_mul_add(pos, scale, offset)))));
+        }
+
+        static proto_always_inline size_t index(Scalar pos, std::pair<Scalar, Scalar> offset_and_scale) {
+            return index(pos, offset_and_scale.first, offset_and_scale.second);
         }
     };
 
@@ -65,15 +80,6 @@ private:
 
         operator bool () const { return axis >= 0; }
     };
-
-    static size_t bin_index(Scalar pos, Scalar min, Scalar max) {
-        auto scale = bin_count / (max - min);
-        return std::min(bin_count - 1, size_t(std::max(ptrdiff_t{0}, ptrdiff_t((pos - min) * scale))));
-    }
-
-    static size_t bin_index(int axis, const Vec3& pos, const BBox& bbox) {
-        return bin_index(pos[axis], bbox.min[axis], bbox.max[axis]);
-    }
 
     class Task {
     public:
@@ -98,11 +104,16 @@ private:
                 return std::nullopt;
 
             std::array<Bin, bin_count> bins_per_axis[3];
+            auto per_axis_offsets_and_scales = std::array {
+                Bin::offset_and_scale(node.bbox().min[0], node.bbox().max[0]),
+                Bin::offset_and_scale(node.bbox().min[1], node.bbox().max[1]),
+                Bin::offset_and_scale(node.bbox().min[2], node.bbox().max[2]) };
 
             for (size_t i = item.begin; i < item.end; ++i) {
                 for (int axis = 0; axis < 3; ++axis) {
                     auto prim_index = bvh_.prim_indices[i];
-                    auto& bin = bins_per_axis[axis][bin_index(axis, centers_[prim_index], node.bbox())];
+                    auto bin_index = Bin::index(centers_[prim_index][axis], per_axis_offsets_and_scales[axis]);
+                    auto& bin = bins_per_axis[axis][bin_index];
                     bin.bbox.extend(bboxes_[prim_index]);
                     bin.prim_count++;
                 }
@@ -159,11 +170,12 @@ private:
                     return std::nullopt;
             } else {
                 // If the split is useful, we partition the set of objects based on the bins they fall in.
+                auto offset_and_scale = Bin::offset_and_scale(node.bbox().min[split.axis], node.bbox().max[split.axis]);
                 right_begin = std::partition(
                     bvh_.prim_indices.get() + item.begin,
                     bvh_.prim_indices.get() + item.end,
                     [&] (size_t i) {
-                        return bin_index(split.axis, centers_[i], node.bbox()) < split.bin_index;
+                        return Bin::index(centers_[i][split.axis], offset_and_scale) < split.bin_index;
                     }) - bvh_.prim_indices.get();
 
                 // Compute the left and right bounding boxes
