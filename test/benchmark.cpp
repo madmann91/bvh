@@ -8,8 +8,10 @@
 #include <functional>
 #include <algorithm>
 
+#define TARGET_NAMESPACE bvh
+#include <proto/import.h>
+
 #include <bvh/bvh.h>
-#include <bvh/proto_imports.h>
 #include <bvh/builders/binned_sah_builder.h>
 #include <bvh/builders/sweep_sah_builder.h>
 #include <bvh/builders/sequential_top_down_scheduler.h>

@@ -1,8 +1,10 @@
 #include <vector>
 #include <iostream>
 
+#define TARGET_NAMESPACE bvh
+#include <proto/import.h>
+
 #include <bvh/bvh.h>
-#include <bvh/proto_imports.h>
 #include <bvh/builders/binned_sah_builder.h>
 #include <bvh/builders/sequential_top_down_scheduler.h>
 #include <bvh/traversers/single_ray_traverser.h>
