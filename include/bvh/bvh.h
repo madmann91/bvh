@@ -17,6 +17,7 @@ namespace bvh {
 /// - For inner nodes, the first child of an inner node is located at `first_index`,
 ///   and the second one is located at `first_index + 1`.
 /// - For leaf nodes, `first_index` is the index of the first primitive of the leaf.
+///
 template <typename T>
 struct Bvh {
     using Scalar = T;
@@ -75,6 +76,12 @@ struct Bvh {
     /// Each leaf covers a range of indices in that array, equal to:
     /// `[first_index, first_index + prim_count]`.
     std::unique_ptr<size_t[]> prim_indices;
+
+    static bool is_left_child(size_t i)  { return i % 2 == 1; }
+    static bool is_right_child(size_t i) { return !is_left_child(i); }
+    static size_t left_child(size_t i)  { return is_left_child(i)  ? i : i - 1; }
+    static size_t right_child(size_t i) { return is_right_child(i) ? i : i + 1; }
+    static size_t sibling(size_t i) { return is_left_child(i) ? i + 1 : i - 1; }
 
     size_t node_count = 0;
 };
