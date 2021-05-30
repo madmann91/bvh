@@ -1,8 +1,10 @@
 #include <vector>
 #include <iostream>
 
-#define TARGET_NAMESPACE bvh
-#include <proto/import.h>
+#include <proto/vec.h>
+#include <proto/bbox.h>
+#include <proto/ray.h>
+#include <proto/triangle.h>
 
 #include <bvh/bvh.h>
 #include <bvh/builders/binned_sah_builder.h>
@@ -10,10 +12,10 @@
 #include <bvh/traversers/single_ray_traverser.h>
 
 using Scalar   = float;
-using Triangle = bvh::Triangle<Scalar>;
-using Ray      = bvh::Ray<Scalar>;
-using Vec3     = bvh::Vec3<Scalar>;
-using BBox     = bvh::BBox<Scalar>;
+using Triangle = proto::Triangle<Scalar>;
+using Ray      = proto::Ray<Scalar>;
+using Vec3     = proto::Vec3<Scalar>;
+using BBox     = proto::BBox<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
 int main() {

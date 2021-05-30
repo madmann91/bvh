@@ -8,8 +8,10 @@
 #include <functional>
 #include <algorithm>
 
-#define TARGET_NAMESPACE bvh
-#include <proto/import.h>
+#include <proto/vec.h>
+#include <proto/bbox.h>
+#include <proto/ray.h>
+#include <proto/triangle.h>
 
 #include <bvh/bvh.h>
 #include <bvh/builders/binned_sah_builder.h>
@@ -27,10 +29,10 @@
 //#include <bvh/hierarchy_refitter.hpp>
 
 using Scalar   = float;
-using Vec3     = bvh::Vec3<Scalar>;
-using Triangle = bvh::Triangle<Scalar>;
-using BBox     = bvh::BBox<Scalar>;
-using Ray      = bvh::Ray<Scalar>;
+using Vec3     = proto::Vec3<Scalar>;
+using Triangle = proto::Triangle<Scalar>;
+using BBox     = proto::BBox<Scalar>;
+using Ray      = proto::Ray<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
 struct Hit {
@@ -133,9 +135,9 @@ void render(
     size_t width, size_t height,
     const Scalar* stats_weights = NULL)
 {
-    auto dir = bvh::normalize(camera.dir);
-    auto image_u = bvh::normalize(bvh::cross(dir, camera.up));
-    auto image_v = bvh::normalize(bvh::cross(image_u, dir));
+    auto dir = proto::normalize(camera.dir);
+    auto image_u = proto::normalize(proto::cross(dir, camera.up));
+    auto image_v = proto::normalize(proto::cross(image_u, dir));
     auto image_w = std::tan(camera.fov * Scalar(3.14159265 * (1.0 / 180.0) * 0.5));
     auto ratio = Scalar(height) / Scalar(width);
     image_u = image_u * image_w;
@@ -149,7 +151,7 @@ void render(
             auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
             auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
 
-            Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
+            Ray ray(camera.eye, proto::normalize(image_u * u + image_v * v + dir));
             size_t visited_nodes = 0, intr_count = 0;
             auto node_visitor = [&] (const Bvh::Node&) { if constexpr (CollectStatistics) visited_nodes++; };
             auto leaf_intersector = [&] (Ray& ray, const Bvh::Node& leaf) {
@@ -179,7 +181,7 @@ void render(
                     pixels[index + 1] = std::min(intr_count    * stats_weights[1], Scalar(1.0f));
                     pixels[index + 2] = std::min(combined      * stats_weights[2], Scalar(1.0f));
                 } else {
-                    auto normal = bvh::normalize(triangles[hit->tri_index].normal());
+                    auto normal = proto::normalize(triangles[hit->tri_index].normal());
                     pixels[index    ] = std::fabs(normal[0]);
                     pixels[index + 1] = std::fabs(normal[1]);
                     pixels[index + 2] = std::fabs(normal[2]);
