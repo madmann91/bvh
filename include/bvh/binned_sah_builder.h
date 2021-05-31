@@ -14,8 +14,7 @@
 #include <proto/utils.h>
 
 #include "bvh/bvh.h"
-#include "bvh/top_down_scheduler.h"
-#include "bvh/top_down_builder_config.h"
+#include "bvh/top_down_builder_common.h"
 
 namespace bvh {
 
@@ -210,10 +209,11 @@ private:
         std::atomic<size_t>& node_count_;
     };
 
-    friend class TopDownScheduler<BinnedSahBuilder>;
+    friend TopDownScheduler<BinnedSahBuilder>;
 
 public:
     /// Builds the BVH from primitive bounding boxes and centers provided as two pointers.
+    template <template <typename> typename TopDownScheduler>
     static Bvh build(
         TopDownScheduler<BinnedSahBuilder>& scheduler,
         const BBox& global_bbox,

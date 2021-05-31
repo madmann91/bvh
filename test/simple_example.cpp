@@ -9,6 +9,7 @@
 
 #include <bvh/bvh.h>
 #include <bvh/binned_sah_builder.h>
+#include <bvh/sequential_top_down_scheduler.h>
 #include <bvh/single_ray_traverser.h>
 
 using Scalar   = float;
@@ -42,7 +43,7 @@ int main() {
     }
 
     using Builder = bvh::BinnedSahBuilder<Bvh>;
-    bvh::TopDownScheduler<Builder> scheduler;
+    bvh::SequentialTopDownScheduler<Builder> scheduler;
     auto bvh = Builder::build(scheduler, global_bbox, bboxes.data(), centers.data(), triangles.size());
 
     // Intersect a ray with the data structure

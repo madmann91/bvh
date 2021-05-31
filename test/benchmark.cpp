@@ -358,7 +358,7 @@ int main(int argc, char** argv) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             using Builder = bvh::SweepSahBuilder<Bvh>;
             bvh::ParallelTopDownScheduler<Builder> scheduler;
-            bvh = Builder::build(std::execution::par_unseq, scheduler, global_bbox, bboxes, centers, prim_count);
+            bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } /*else if (!strcmp(builder_name, "spatial_split")) {

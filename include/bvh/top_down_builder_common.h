@@ -1,5 +1,5 @@
-#ifndef BVH_BUILDERS_TOP_DOWN_BUILDER_CONFIG_H
-#define BVH_BUILDERS_TOP_DOWN_BUILDER_CONFIG_H
+#ifndef BVH_BUILDERS_TOP_DOWN_BUILDER_COMMON_H
+#define BVH_BUILDERS_TOP_DOWN_BUILDER_COMMON_H
 
 #include <cstddef>
 
@@ -22,6 +22,15 @@ struct TopDownBuilderConfig {
     /// For instance, a cost of 2 would mean that traversing a node is twice as slow as
     /// intersecting a primitive.
     T traversal_cost = T(1.0);
+};
+
+/// Base class for all top-down schedulers. Top-down schedulers are objects that controls how
+/// a top-down construction algorithm is executed. Custom top-down schedulers can be implemented
+/// to support various parallel libraries or frameworks.
+template <typename Builder>
+struct TopDownScheduler {
+    using InnerTask = typename Builder::Task;
+    using WorkItem  = typename Builder::WorkItem;
 };
 
 } // namespace bvh

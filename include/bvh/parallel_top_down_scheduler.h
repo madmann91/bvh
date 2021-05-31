@@ -1,10 +1,13 @@
 #ifndef BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
 #define BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
 
+#include <stack>
+#include <execution>
+
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 #include <tbb/tbb.h>
 
-#include "bvh/top_down_scheduler.h"
+#include "bvh/top_down_builder_common.h"
 
 namespace bvh {
     
@@ -49,10 +52,12 @@ class ParallelTopDownScheduler final : public TopDownScheduler<Builder> {
     };
 
 public:
+    static constexpr auto&& execution_policy() { return std::execution::par_unseq; }
+
     /// Work items whose size is below this threshold execute serially.
     size_t parallel_threshold = 1024;
 
-    void run(InnerTask&& root, WorkItem&& work_item) override {
+    void run(InnerTask&& root, WorkItem&& work_item) {
         task_group_.run_and_wait(Task(*this, std::move(root), std::move(work_item)));
     }
 
