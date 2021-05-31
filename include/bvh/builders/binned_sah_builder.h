@@ -160,9 +160,9 @@ private:
                     auto axis = node.bbox().largest_axis();
                     right_begin = (item.begin + item.end + 1) / 2;
                     std::partial_sort(
-                        bvh_.prim_indices.get() + item.begin,
-                        bvh_.prim_indices.get() + right_begin,
-                        bvh_.prim_indices.get() + item.end,
+                        bvh_.prim_indices.data() + item.begin,
+                        bvh_.prim_indices.data() + right_begin,
+                        bvh_.prim_indices.data() + item.end,
                         [&] (size_t i, size_t j) { return centers_[i][axis] < centers_[j][axis]; });
 
                     // Compute left and right bounding boxes
@@ -176,11 +176,11 @@ private:
                 // If the split is useful, we partition the set of objects based on the bins they fall in.
                 auto offset_and_scale = offsets_and_scales_per_axis[split.axis];
                 right_begin = std::partition(
-                    bvh_.prim_indices.get() + item.begin,
-                    bvh_.prim_indices.get() + item.end,
+                    bvh_.prim_indices.data() + item.begin,
+                    bvh_.prim_indices.data() + item.end,
                     [&] (size_t i) {
                         return Bin::index(centers_[i][split.axis], offset_and_scale) < split.bin_index;
-                    }) - bvh_.prim_indices.get();
+                    }) - bvh_.prim_indices.data();
 
                 // Compute the left and right bounding boxes
                 auto& bins = bins_per_axis[split.axis];
@@ -225,17 +225,15 @@ public:
         Bvh bvh;
 
         // Initialize primitive indices and allocate nodes
-        bvh.prim_indices = std::make_unique<size_t[]>(prim_count);
-        bvh.nodes = std::make_unique<Node[]>(2 * prim_count - 1);
-        std::iota(bvh.prim_indices.get(), bvh.prim_indices.get() + prim_count, 0);
+        bvh.prim_indices.resize(prim_count);
+        bvh.nodes.resize(2 * prim_count - 1);
+        std::iota(bvh.prim_indices.begin(), bvh.prim_indices.end(), 0);
         bvh.nodes[0].bbox_proxy() = global_bbox;
 
         // Start the root task and wait for the result
         std::atomic<size_t> node_count(1);
         scheduler.run(Task(bvh, config, bboxes, centers, node_count), WorkItem { 0, 0, 0, prim_count });
-
-        bvh.node_count = node_count;
-        bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);
+        bvh.nodes.resize(node_count);
         return bvh;
     }
 };

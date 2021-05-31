@@ -70,20 +70,18 @@ struct Bvh {
     };
 
     /// Nodes of the BVH. The root is located at index 0.
-    std::unique_ptr<Node[]> nodes;
+    std::vector<Node> nodes;
     
     /// Indices of the primitives contained in the leaves of the BVH.
     /// Each leaf covers a range of indices in that array, equal to:
     /// `[first_index, first_index + prim_count]`.
-    std::unique_ptr<size_t[]> prim_indices;
+    std::vector<size_t> prim_indices;
 
     static bool is_left_child(size_t i)  { return i % 2 == 1; }
     static bool is_right_child(size_t i) { return !is_left_child(i); }
     static size_t left_child(size_t i)  { return is_left_child(i)  ? i : i - 1; }
     static size_t right_child(size_t i) { return is_right_child(i) ? i : i + 1; }
     static size_t sibling(size_t i) { return is_left_child(i) ? i + 1 : i - 1; }
-
-    size_t node_count = 0;
 };
 
 } // namespace bvh

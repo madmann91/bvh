@@ -456,7 +456,7 @@ int main(int argc, char** argv) {
 
     std::cout
         << "BVH depth of " << compute_bvh_depth(bvh) << ", "
-        << bvh.node_count << " node(s), "
+        << bvh.nodes.size() << " node(s), "
         << ref_count << " reference(s)" << std::endl;
 
     auto pixels = std::make_unique<Scalar[]>(3 * width * height);

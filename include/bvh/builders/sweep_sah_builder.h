@@ -183,15 +183,15 @@ public:
         Bvh bvh;
 
         // Initialize primitive indices and allocate nodes
-        bvh.nodes = std::make_unique<Node[]>(2 * prim_count - 1);
-        bvh.prim_indices   = std::make_unique<size_t[]>(prim_count);
+        bvh.nodes.resize(2 * prim_count - 1);
+        bvh.prim_indices.resize(prim_count);
         auto other_indices = std::make_unique<size_t[]>(prim_count * 2);
 
         auto marks = std::make_unique<Mark[]>(prim_count);
         auto costs = std::make_unique<Scalar[]>(prim_count);
 
         std::array<size_t*, 3> sorted_indices {
-            bvh.prim_indices.get(),
+            bvh.prim_indices.data(),
             other_indices.get(),
             other_indices.get() + prim_count
         };
@@ -210,8 +210,7 @@ public:
             Task(bvh, config, bboxes, marks.get(), costs.get(), sorted_indices, node_count),
             WorkItem { 0, 0, 0, prim_count });
 
-        bvh.node_count = node_count;
-        bvh.nodes = proto::copy(bvh.nodes, bvh.node_count);
+        bvh.nodes.resize(node_count);
         return bvh;
     }
 };
