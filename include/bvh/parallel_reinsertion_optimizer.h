@@ -79,7 +79,7 @@ private:
         parents_[in] = out;
     }
 
-    Insertion search(size_t in) {
+    Insertion search(size_t in) const {
         bool   down  = true;
         size_t pivot = parents_[in];
         size_t out   = Bvh::sibling(in);
