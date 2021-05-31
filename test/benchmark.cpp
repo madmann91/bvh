@@ -17,6 +17,7 @@
 #include <bvh/builders/binned_sah_builder.h>
 #include <bvh/builders/sweep_sah_builder.h>
 #include <bvh/builders/sequential_top_down_scheduler.h>
+#include <bvh/optimizers/sequential_reinsertion_optimizer.h>
 #include <bvh/traversers/single_ray_traverser.h>
 //#include <bvh/sweep_sah_builder.hpp>
 //#include <bvh/spatial_split_bvh_builder.hpp>
@@ -85,21 +86,22 @@ static void usage() {
     std::cout <<
         "Usage: benchmark [options] file.obj\n"
         "\nOptions:\n"
-        "  --help                  Shows this message.\n"
-        "  --builder <name>        Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --permute               Activates the primitive permutation optimization (disabled by default).\n"
-        "  --optimize-layout       Activates the node layout optimization (disabled by default).\n"
-        "  --collapse-leaves       Activates the leaf collapse optimization (disabled by default).\n"
-        "  --parallel-reinsertion  Activates the parallel reinsertion optimization (disabled by default).\n"
-        "  --pre-split <percent>   Activates pre-splitting and sets the percentage of references (disabled by default).\n"
-        "  --build-iterations <n>  Sets the number of construction iterations (equal to 1 by default).\n"
-        "  --eye <x> <y> <z>       Sets the position of the camera.\n"
-        "  --dir <x> <y> <z>       Sets the direction of the camera.\n"
-        "  --up  <x> <y> <z>       Sets the up vector of the camera.\n"
-        "  --fov <degrees>         Sets the field of view.\n"
-        "  --width <pixels>        Sets the image width.\n"
-        "  --height <pixels>       Sets the image height.\n"
-        "  -o <file.ppm>           Sets the output file name (defaults to 'render.ppm').\n\n"
+        "  --help                   Shows this message.\n"
+        "  --builder <name>         Sets the BVH builder to use (defaults to 'binned_sah').\n"
+        "  --permute                Activates the primitive permutation optimization (disabled by default).\n"
+        "  --optimize-layout        Activates the node layout optimization (disabled by default).\n"
+        "  --collapse-leaves        Activates the leaf collapse optimization (disabled by default).\n"
+        "  --parallel-reinsertion   Activates the parallel reinsertion optimization (disabled by default).\n"
+        "  --sequential-reinsertion Activates the sequential reinsertion optimization (disabled by default).\n"
+        "  --pre-split <percent>    Activates pre-splitting and sets the percentage of references (disabled by default).\n"
+        "  --build-iterations <n>   Sets the number of construction iterations (equal to 1 by default).\n"
+        "  --eye <x> <y> <z>        Sets the position of the camera.\n"
+        "  --dir <x> <y> <z>        Sets the direction of the camera.\n"
+        "  --up  <x> <y> <z>        Sets the up vector of the camera.\n"
+        "  --fov <degrees>          Sets the field of view.\n"
+        "  --width <pixels>         Sets the image width.\n"
+        "  --height <pixels>        Sets the image height.\n"
+        "  -o <file.ppm>            Sets the output file name (defaults to 'render.ppm').\n\n"
         "  --rotate <axis> <degrees>\n\n"
         "    Rotates the scene by the given amount of degrees on the\n"
         "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
@@ -237,6 +239,7 @@ int main(int argc, char** argv) {
     bool permute = false;
     bool optimize_layout = false;
     bool parallel_reinsertion = false;
+    bool sequential_reinsertion = false;
     bool collapse_leaves = false;
     size_t build_iterations = 1;
     Scalar pre_split_factor = 0;
@@ -285,6 +288,8 @@ int main(int argc, char** argv) {
                 optimize_layout = true;
             } else if (!strcmp(argv[i], "--parallel-reinsertion")) {
                 parallel_reinsertion = true;
+            } else if (!strcmp(argv[i], "--sequential-reinsertion")) {
+                sequential_reinsertion = true;
             } else if (!strcmp(argv[i], "--collapse-leaves")) {
                 collapse_leaves = true;
             } else if (!strcmp(argv[i], "--pre-split")) {
@@ -408,6 +413,8 @@ int main(int argc, char** argv) {
         std::cout << " + pre-split";
     if (parallel_reinsertion)
         std::cout << " + parallel-reinsertion";
+    if (sequential_reinsertion)
+        std::cout << " + sequential-reinsertion";
     if (optimize_layout)
         std::cout << " + optimize-layout";
     if (collapse_leaves)
@@ -438,6 +445,8 @@ int main(int argc, char** argv) {
         //    bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh);
         //    reinsertion_optimizer.optimize();
         //}
+        if (sequential_reinsertion)
+            bvh::SequentialReinsertionOptimizer<Bvh>::optimize(bvh);
         //if (optimize_layout) {
         //    bvh::NodeLayoutOptimizer layout_optimizer(bvh);
         //    layout_optimizer.optimize();
