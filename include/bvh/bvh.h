@@ -2,8 +2,12 @@
 #define BVH_BVH_H
 
 #include <climits>
-#include <memory>
 #include <cassert>
+#include <algorithm>
+#include <type_traits>
+#include <ranges>
+#include <vector>
+#include <numeric>
 
 #include <proto/bbox.h>
 #include <proto/utils.h>
@@ -82,6 +86,39 @@ struct Bvh {
     static size_t left_child(size_t i)  { return is_left_child(i)  ? i : i - 1; }
     static size_t right_child(size_t i) { return is_right_child(i) ? i : i + 1; }
     static size_t sibling(size_t i) { return is_left_child(i) ? i + 1 : i - 1; }
+
+    /// Evaluates the SAH cost of this BVH.
+    /// The `traversal_cost` parameter represents the ratio of the cost
+    /// of traversing a node over the cost of intersecting a primitive.
+    template <typename ExecutionPolicy>
+    Scalar sah_cost(ExecutionPolicy&& exec_policy, Scalar traversal_cost = Scalar(1)) const {
+        auto total = std::transform_reduce(
+            std::forward<ExecutionPolicy>(exec_policy),
+            nodes.begin(), nodes.end(), Scalar(0),
+            std::plus<Scalar> {},
+            [&] (const Node& node) {
+                return node.bbox().half_area() * (node.is_leaf() ? node.prim_count : traversal_cost);
+            });
+        return total / nodes[0].bbox().half_area();
+    }
+
+    /// Computes the parent-child indices.
+    /// The parent of the root node (at index 0) is the root node itself, by convention.
+    template <typename ExecutionPolicy>
+    std::vector<size_t> parents(ExecutionPolicy&& exec_policy) {
+        std::vector<size_t> parents(nodes.size(), 0);
+        auto range = std::views::iota(size_t{0}, nodes.size());
+        std::for_each(
+            std::forward<ExecutionPolicy>(exec_policy),
+            range.begin(), range.end(),
+            [&] (size_t i) {
+                if (!nodes[i].is_leaf()) {
+                    parents[nodes[i].first_index + 0] = i;
+                    parents[nodes[i].first_index + 1] = i;
+                }
+            });
+        return parents;
+    }
 };
 
 } // namespace bvh

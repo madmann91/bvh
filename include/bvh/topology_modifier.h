@@ -4,6 +4,10 @@
 #include <limits>
 #include <vector>
 #include <cassert>
+#include <algorithm>
+#include <execution>
+
+#include "bvh/bvh.h"
 
 namespace bvh {
 
@@ -18,86 +22,71 @@ class TopologyModifier {
     using Node = typename Bvh::Node;
 
 public:
-    TopologyModifier(Bvh& bvh)
-        : bvh_(bvh), parents_(bvh.nodes.size())
-    {
-        recompute_parents();
-    }
+    Bvh& bvh;
 
-    /// Recomputes the parent-child indices, if the topology of the BVH has been
-    /// changed through some other means that this object.
-    void recompute_parents() {
-        std::fill(parents_.begin(), parents_.end(), 0);
-        for (size_t i = 0; i < bvh_.nodes.size(); ++i) {
-            if (!bvh_.nodes[i].is_leaf()) {
-                parents_[bvh_.nodes[i].first_index + 0] = i;
-                parents_[bvh_.nodes[i].first_index + 1] = i;
-            }
-        }
-    }
+    /// Array containing the index of the parent node of every node in the BVH.
+    std::vector<size_t> parents;
+
+    /// Nodes that are free to be used during insertion are placed in this list.
+    /// Each index in this list corresponds to two nodes, starting at this index.
+    std::vector<size_t> free_list;
+
+    TopologyModifier(Bvh& bvh)
+        : bvh(bvh), parents(bvh.parents(std::execution::par_unseq))
+    {}
 
     /// Removes the node at the given index, and places the two children in the free list.
     void remove_node(size_t index) {
         assert(index != 0);
         auto sibling = Bvh::sibling(index);
-        auto parent  = parents_[index];
-        bvh_.nodes[parent] = bvh_.nodes[sibling];
-        parents_[index]   = 0;
-        parents_[sibling] = 0;
-        if (!bvh_.nodes[sibling].is_leaf()) {
-            parents_[bvh_.nodes[sibling].first_index + 0] = parent;
-            parents_[bvh_.nodes[sibling].first_index + 1] = parent;
+        auto parent  = parents[index];
+        bvh.nodes[parent] = bvh.nodes[sibling];
+        parents[index]   = 0;
+        parents[sibling] = 0;
+        if (!bvh.nodes[sibling].is_leaf()) {
+            parents[bvh.nodes[sibling].first_index + 0] = parent;
+            parents[bvh.nodes[sibling].first_index + 1] = parent;
         }
-        mark_as_free(Bvh::left_child(index));
-        refit_from(parents_[parent]);
-    }
-
-    /// Adds the two nodes at `index` and `index + 1` to the free list, so that they can
-    /// be used when inserting other nodes.
-    void mark_as_free(size_t index) {
-        free_list_.push_back(index);
+        free_list.push_back(Bvh::left_child(index));
+        refit_from(parents[parent]);
     }
 
     /// Inserts the given node in the BVH, by making it the child of the node located at `target`.
     /// This requires to have at least two nodes in the free list (this can be done either
     /// by a call to `remove_node()` or `mark_as_free()`).
     void insert_node(const Node& node, size_t target) {
-        assert(!free_list_.empty());
-        auto old_node = bvh_.nodes[target];
-        auto first_child = free_list_.back();
-        free_list_.pop_back();
-        bvh_.nodes[target].first_index = first_child;
-        bvh_.nodes[target].prim_count  = 0;
-        bvh_.nodes[first_child + 0] = node;
-        bvh_.nodes[first_child + 1] = old_node;
+        assert(!free_list.empty());
+        auto old_node = bvh.nodes[target];
+        auto first_child = free_list.back();
+        free_list.pop_back();
+        bvh.nodes[target].first_index = first_child;
+        bvh.nodes[target].prim_count  = 0;
+        bvh.nodes[first_child + 0] = node;
+        bvh.nodes[first_child + 1] = old_node;
         if (!node.is_leaf()) {
-            parents_[node.first_index + 0] = first_child + 0;
-            parents_[node.first_index + 1] = first_child + 0;
+            parents[node.first_index + 0] = first_child + 0;
+            parents[node.first_index + 1] = first_child + 0;
         }
         if (!old_node.is_leaf()) {
-            parents_[old_node.first_index + 0] = first_child + 1;
-            parents_[old_node.first_index + 1] = first_child + 1;
+            parents[old_node.first_index + 0] = first_child + 1;
+            parents[old_node.first_index + 1] = first_child + 1;
         }
-        parents_[first_child + 0] = target;
-        parents_[first_child + 1] = target;
+        parents[first_child + 0] = target;
+        parents[first_child + 1] = target;
         refit_from(target);
     }
 
 private:
     void refit_from(size_t index) {
         do {
-            auto& node = bvh_.nodes[index];
+            auto& node = bvh.nodes[index];
             assert(!node.is_leaf());
             node.bbox_proxy() =
-                bvh_.nodes[node.first_index + 0].bbox().extend(
-                bvh_.nodes[node.first_index + 1].bbox());
-            index = parents_[index];
+                bvh.nodes[node.first_index + 0].bbox().extend(
+                bvh.nodes[node.first_index + 1].bbox());
+            index = parents[index];
         } while (index != 0);
     }
-
-    Bvh& bvh_;
-    std::vector<size_t> free_list_;
-    std::vector<size_t> parents_;
 };
 
 } // namespace bvh

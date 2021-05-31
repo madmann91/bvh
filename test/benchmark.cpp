@@ -14,20 +14,19 @@
 #include <proto/triangle.h>
 
 #include <bvh/bvh.h>
-#include <bvh/builders/binned_sah_builder.h>
-#include <bvh/builders/sweep_sah_builder.h>
-#include <bvh/builders/sequential_top_down_scheduler.h>
-#include <bvh/optimizers/sequential_reinsertion_optimizer.h>
-#include <bvh/traversers/single_ray_traverser.h>
-//#include <bvh/sweep_sah_builder.hpp>
+#include <bvh/binned_sah_builder.h>
+#include <bvh/sweep_sah_builder.h>
+#include <bvh/parallel_top_down_scheduler.h>
+#include <bvh/parallel_reinsertion_optimizer.h>
+#include <bvh/parallel_hierarchy_refitter.h>
+#include <bvh/sequential_reinsertion_optimizer.h>
+#include <bvh/single_ray_traverser.h>
 //#include <bvh/spatial_split_bvh_builder.hpp>
 //#include <bvh/locally_ordered_clustering_builder.hpp>
 //#include <bvh/linear_bvh_builder.hpp>
-//#include <bvh/parallel_reinsertion_optimizer.hpp>
 //#include <bvh/node_layout_optimizer.hpp>
 //#include <bvh/leaf_collapser.hpp>
 //#include <bvh/heuristic_primitive_splitter.hpp>
-//#include <bvh/hierarchy_refitter.hpp>
 
 using Scalar   = float;
 using Vec3     = proto::Vec3<Scalar>;
@@ -351,15 +350,15 @@ int main(int argc, char** argv) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             static constexpr size_t bin_count = 16;
             using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
-            bvh::SequentialTopDownScheduler<Builder> scheduler;
+            bvh::ParallelTopDownScheduler<Builder> scheduler;
             bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } else if (!strcmp(builder_name, "sweep_sah")) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             using Builder = bvh::SweepSahBuilder<Bvh>;
-            bvh::SequentialTopDownScheduler<Builder> scheduler;
-            bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
+            bvh::ParallelTopDownScheduler<Builder> scheduler;
+            bvh = Builder::build(std::execution::par_unseq, scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } /*else if (!strcmp(builder_name, "spatial_split")) {
@@ -441,10 +440,10 @@ int main(int argc, char** argv) {
         ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), ref_count);
         //if (pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
-        //if (parallel_reinsertion) {
-        //    bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh);
-        //    reinsertion_optimizer.optimize();
-        //}
+        if (parallel_reinsertion) {
+            bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh);
+            reinsertion_optimizer.optimize();
+        }
         if (sequential_reinsertion)
             bvh::SequentialReinsertionOptimizer<Bvh>::optimize(bvh);
         //if (optimize_layout) {
@@ -460,8 +459,8 @@ int main(int argc, char** argv) {
     }, build_iterations);
 
     // This is just to make sure that refitting works
-    //bvh::HierarchyRefitter refitter(bvh);
-    //refitter.refit([] (Bvh::Node&) {});
+    bvh::ParallelHierarchyRefitter<Bvh> refitter;
+    refitter.refit(bvh);
 
     std::cout
         << "BVH depth of " << compute_bvh_depth(bvh) << ", "

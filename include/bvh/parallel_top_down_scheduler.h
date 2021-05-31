@@ -1,16 +1,16 @@
-#ifndef BVH_BUILDERS_PARALLEL_TOP_DOWN_SCHEDULER_H
-#define BVH_BUILDERS_PARALLEL_TOP_DOWN_SCHEDULER_H
+#ifndef BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
+#define BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
 
-#include <stack>
+#define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
+#include <tbb/tbb.h>
 
-#include <oneapi/tbb.h>
-
-#include "bvh/builders/top_down_scheduler.h"
+#include "bvh/top_down_scheduler.h"
 
 namespace bvh {
     
+/// TBB-based top-down construction algorithm scheduler.
 template <typename Builder>
-class ParallelTopDownScheduler : public TopDownScheduler<Builder> {
+class ParallelTopDownScheduler final : public TopDownScheduler<Builder> {
     using InnerTask = typename TopDownScheduler<Builder>::InnerTask;
     using WorkItem  = typename TopDownScheduler<Builder>::WorkItem;
 
@@ -53,13 +53,12 @@ public:
     size_t parallel_threshold = 1024;
 
     void run(InnerTask&& root, WorkItem&& work_item) override {
-        task_group_.run(Task(*this, std::move(root), std::move(work_item)));
-        task_group_.wait();
+        task_group_.run_and_wait(Task(*this, std::move(root), std::move(work_item)));
     }
 
 private:
     friend class Task;
-    oneapi::tbb::task_group task_group_;
+    tbb::task_group task_group_;
 };
 
 } // namespace bvh

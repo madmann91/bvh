@@ -14,7 +14,7 @@ namespace bvh {
 
 /// Sequential re-insertion optimizer, based on the article:
 /// "Fast, Insertion-based Optimization of Bounding Volume Hierarchies", by J. Bittner et al.
-/// Can be preferred over `bvh::ParallelReinsertionOptimizer` when parallelism is not required.
+/// Can be used over `bvh::ParallelReinsertionOptimizer` when parallelism is not required.
 template <typename Bvh>
 class SequentialReinsertionOptimizer {
     using Scalar = typename Bvh::Scalar;
@@ -24,7 +24,6 @@ class SequentialReinsertionOptimizer {
         size_t index;
         Scalar cost;
 
-        bool operator < (const Candidate& other) const { return cost < other.cost; }
         bool operator > (const Candidate& other) const { return cost > other.cost; }
     };
 

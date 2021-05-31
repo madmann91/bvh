@@ -1,5 +1,5 @@
-#ifndef BVH_TRAVERSERS_SINGLE_RAY_TRAVERSER_H
-#define BVH_TRAVERSERS_SINGLE_RAY_TRAVERSER_H
+#ifndef BVH_SINGLE_RAY_TRAVERSER_H
+#define BVH_SINGLE_RAY_TRAVERSER_H
 
 #include <optional>
 #include <cassert>

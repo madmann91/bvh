@@ -1,5 +1,5 @@
-#ifndef BVH_BUILDERS_BINNED_SAH_BUILDER_H
-#define BVH_BUILDERS_BINNED_SAH_BUILDER_H
+#ifndef BVH_BINNED_SAH_BUILDER_H
+#define BVH_BINNED_SAH_BUILDER_H
 
 #include <cstddef>
 #include <numeric>
@@ -14,8 +14,8 @@
 #include <proto/utils.h>
 
 #include "bvh/bvh.h"
-#include "bvh/builders/top_down_scheduler.h"
-#include "bvh/builders/top_down_builder_config.h"
+#include "bvh/top_down_scheduler.h"
+#include "bvh/top_down_builder_config.h"
 
 namespace bvh {
 

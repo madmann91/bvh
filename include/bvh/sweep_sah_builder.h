@@ -1,5 +1,5 @@
-#ifndef BVH_BUILDERS_SWEEP_SAH_BUILDER_H
-#define BVH_BUILDERS_SWEEP_SAH_BUILDER_H
+#ifndef BVH_SWEEP_SAH_BUILDER_H
+#define BVH_SWEEP_SAH_BUILDER_H
 
 #include <cstddef>
 #include <numeric>
@@ -14,8 +14,8 @@
 #include <proto/utils.h>
 
 #include "bvh/bvh.h"
-#include "bvh/builders/top_down_scheduler.h"
-#include "bvh/builders/top_down_builder_config.h"
+#include "bvh/top_down_scheduler.h"
+#include "bvh/top_down_builder_config.h"
 
 namespace bvh {
 
@@ -172,7 +172,9 @@ private:
 
 public:
     /// Builds the BVH from primitive bounding boxes and centers provided as two pointers.
+    template <typename ExecutionPolicy>
     static Bvh build(
+        ExecutionPolicy&& exec_policy,
         TopDownScheduler<SweepSahBuilder>& scheduler,
         const BBox& global_bbox,
         const BBox* bboxes,
@@ -199,7 +201,7 @@ public:
         for (int axis = 0; axis < 3; ++axis) {
             auto indices = sorted_indices[axis];
             std::iota(indices, indices + prim_count, 0);
-            std::sort(indices, indices + prim_count,
+            std::sort(std::forward<ExecutionPolicy>(exec_policy), indices, indices + prim_count,
                 [&] (size_t i, size_t j) { return centers[i][axis] < centers[j][axis]; });
         }
         bvh.nodes[0].bbox_proxy() = global_bbox;
