@@ -1,5 +1,6 @@
 #include <vector>
 #include <iostream>
+#include <ranges>
 #include <execution>
 
 #include <proto/vec.h>
@@ -33,18 +34,23 @@ int main() {
         Vec3(-1.0,  1.0, 1.0)
     );
 
-    std::vector<BBox> bboxes;
-    std::vector<Vec3> centers;
-    auto global_bbox = BBox::empty();
-    for (auto& triangle : triangles) {
-        bboxes.push_back(triangle.bbox());
-        centers.push_back(triangle.center());
-        global_bbox.extend(bboxes.back());
-    }
+    auto bboxes  = std::make_unique<BBox[]>(triangles.size());
+    auto centers = std::make_unique<Vec3[]>(triangles.size());
+    auto range = std::views::iota(size_t{0}, triangles.size());
+    auto global_bbox = std::transform_reduce(
+        std::execution::par_unseq,
+        range.begin(), range.end(), BBox::empty(),
+        [] (BBox left, const BBox& right) { return left.extend(right); },
+        [&] (size_t i) {
+            auto bbox  = triangles[i].bbox();
+            bboxes[i]  = bbox;
+            centers[i] = triangles[i].center();
+            return bbox;
+        });
 
     using Builder = bvh::BinnedSahBuilder<Bvh>;
     bvh::SequentialTopDownScheduler<Builder> scheduler;
-    auto bvh = Builder::build(scheduler, global_bbox, bboxes.data(), centers.data(), triangles.size());
+    auto bvh = Builder::build(scheduler, global_bbox, bboxes.get(), centers.get(), triangles.size());
 
     // Intersect a ray with the data structure
     Ray ray(

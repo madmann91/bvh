@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
+#include <ranges>
 #include <functional>
 #include <algorithm>
 
@@ -16,7 +17,11 @@
 #include <bvh/bvh.h>
 #include <bvh/binned_sah_builder.h>
 #include <bvh/sweep_sah_builder.h>
+#ifdef BVH_ENABLE_TBB
 #include <bvh/parallel_top_down_scheduler.h>
+#else
+#include <bvh/sequential_top_down_scheduler.h>
+#endif
 #include <bvh/parallel_reinsertion_optimizer.h>
 #include <bvh/parallel_hierarchy_refitter.h>
 #include <bvh/sequential_reinsertion_optimizer.h>
@@ -34,6 +39,14 @@ using Triangle = proto::Triangle<Scalar>;
 using BBox     = proto::BBox<Scalar>;
 using Ray      = proto::Ray<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
+
+#ifdef BVH_ENABLE_TBB
+template <typename Builder>
+using TopDownScheduler = bvh::ParallelTopDownScheduler<Builder>;
+#else
+template <typename Builder>
+using TopDownScheduler = bvh::SequentialTopDownScheduler<Builder>;
+#endif
 
 struct Hit {
     std::pair<Scalar, Scalar> uv;
@@ -350,14 +363,14 @@ int main(int argc, char** argv) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             static constexpr size_t bin_count = 16;
             using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
-            bvh::ParallelTopDownScheduler<Builder> scheduler;
+            TopDownScheduler<Builder> scheduler;
             bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } else if (!strcmp(builder_name, "sweep_sah")) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             using Builder = bvh::SweepSahBuilder<Bvh>;
-            bvh::ParallelTopDownScheduler<Builder> scheduler;
+            TopDownScheduler<Builder> scheduler;
             bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
@@ -404,7 +417,7 @@ int main(int argc, char** argv) {
     Bvh bvh;
 
     size_t ref_count = triangles.size();
-    std::unique_ptr<Triangle[]> shuffled_triangles;
+    std::unique_ptr<Triangle[]> permuted_triangles;
 
     // Build an acceleration data structure for this object set
     std::cout << "Building BVH (" << builder_name;
@@ -422,21 +435,23 @@ int main(int argc, char** argv) {
         std::cout << " + permute";
     std::cout << ")..." << std::endl;
     profile("BVH construction", [&] {
-        //auto [bboxes, centers] =
-        //    bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
-        //auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), triangles.size());
         //bvh::HeuristicPrimitiveSplitter<Triangle> splitter;
         //if (pre_split_factor > 0)
         //    std::tie(ref_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
         auto bboxes  = std::make_unique<BBox[]>(triangles.size());
         auto centers = std::make_unique<Vec3[]>(triangles.size());
-        auto global_bbox = BBox::empty();
-        for (size_t i = 0; i < triangles.size(); ++i) {
-            auto bbox = triangles[i].bbox();
-            bboxes[i]  = bbox;
-            centers[i] = triangles[i].center();
-            global_bbox.extend(bbox);
-        }
+        auto range = std::views::iota(size_t{0}, triangles.size());
+        auto global_bbox = std::transform_reduce(
+            std::execution::par_unseq,
+            range.begin(), range.end(), BBox::empty(),
+            [] (BBox left, const BBox& right) { return left.extend(right); },
+            [&] (size_t i) {
+                auto bbox  = triangles[i].bbox();
+                bboxes[i]  = bbox;
+                centers[i] = triangles[i].center();
+                return bbox;
+            });
+
         ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), ref_count);
         //if (pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
@@ -454,8 +469,13 @@ int main(int argc, char** argv) {
         //    bvh::LeafCollapser leaf_collapser(bvh);
         //    leaf_collapser.collapse();
         //}
-        //if (permute)
-        //    shuffled_triangles = bvh::permute_primitives(triangles.data(), bvh.primitive_indices.get(), ref_count);
+        if (permute) {
+            auto range = std::views::iota(size_t{0}, ref_count);
+            permuted_triangles = std::make_unique<Triangle[]>(ref_count);
+            std::for_each(
+                std::execution::par_unseq, range.begin(), range.end(),
+                [&] (size_t i) { permuted_triangles[i] = triangles[bvh.prim_indices[i]]; });
+        }
     }, build_iterations);
 
     // This is just to make sure that refitting works
@@ -473,9 +493,9 @@ int main(int argc, char** argv) {
     profile("Rendering", [&] {
         if (permute) {
             if (collect_stats)
-                render<true, true>(camera, bvh, shuffled_triangles.get(), pixels.get(), width, height, stats_weights);
+                render<true, true>(camera, bvh, permuted_triangles.get(), pixels.get(), width, height, stats_weights);
             else
-                render<true, false>(camera, bvh, shuffled_triangles.get(), pixels.get(), width, height);
+                render<true, false>(camera, bvh, permuted_triangles.get(), pixels.get(), width, height);
         } else {
             if (collect_stats)
                 render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, stats_weights);

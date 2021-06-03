@@ -1,6 +1,10 @@
 #ifndef BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
 #define BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
 
+#ifndef BVH_ENABLE_TBB
+#error "Please install TBB in order to use this parallel scheduler."
+#endif
+
 #include <stack>
 #include <execution>
 
