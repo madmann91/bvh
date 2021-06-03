@@ -89,7 +89,7 @@ private:
                 for (size_t i = item.end - 1; i > item.begin; --i) {
                     right_bbox.extend(bboxes_[indices[i]]);
                     auto right_cost = right_bbox.half_area() * (item.end - i);
-                    if (proto_unlikely(right_cost >= split.cost)) {
+                    if (right_cost >= split.cost) [[unlikely]] {
                         begin = i;
                         break;
                     }
@@ -103,7 +103,7 @@ private:
                 for (size_t i = begin; i < item.end; ++i) {
                     left_bbox.extend(bboxes_[indices[i]]);
                     auto left_cost = left_bbox.half_area() * (i - item.begin + 1);
-                    if (proto_unlikely(left_cost >= split.cost))
+                    if (left_cost >= split.cost) [[unlikely]]
                         break;
                     auto cost = left_cost + costs_[i + 1];
                     if (cost < split.cost)
