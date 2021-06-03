@@ -1,29 +1,33 @@
 #include <vector>
 #include <iostream>
 #include <random>
+#include <ranges>
+#include <numeric>
+#include <execution>
 #include <array>
 
-#include <bvh/bvh.hpp>
-#include <bvh/vector.hpp>
-#include <bvh/triangle.hpp>
-#include <bvh/ray.hpp>
-#include <bvh/sweep_sah_builder.hpp>
-#include <bvh/single_ray_traverser.hpp>
-#include <bvh/primitive_intersectors.hpp>
-#include <bvh/bounding_box.hpp>
-#include <bvh/hierarchy_refitter.hpp>
+#include <proto/vec.h>
+#include <proto/ray.h>
+#include <proto/bbox.h>
+#include <proto/triangle.h>
 
-using Scalar      = float;
-using Vector3     = bvh::Vector3<Scalar>;
-using BoundingBox = bvh::BoundingBox<Scalar>;
-using Triangle    = bvh::Triangle<Scalar>;
-using Ray         = bvh::Ray<Scalar>;
-using Bvh         = bvh::Bvh<Scalar>;
+#include <bvh/bvh.h>
+#include <bvh/sweep_sah_builder.h>
+#include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/single_ray_traverser.h>
+#include <bvh/parallel_hierarchy_refitter.h>
 
-static Vector3 random_vector() {
+using Scalar   = float;
+using Vec3     = proto::Vec3<Scalar>;
+using BBox     = proto::BBox<Scalar>;
+using Triangle = proto::Triangle<Scalar>;
+using Ray      = proto::Ray<Scalar>;
+using Bvh      = bvh::Bvh<Scalar>;
+
+static Vec3 random_vector() {
     std::default_random_engine gen;
     std::uniform_real_distribution<Scalar> uniform(0, 1);
-    return Vector3(uniform(gen), uniform(gen), uniform(gen));
+    return Vec3(uniform(gen), uniform(gen), uniform(gen));
 }
 
 static std::vector<Triangle> random_triangles(size_t triangle_count) {
@@ -33,24 +37,24 @@ static std::vector<Triangle> random_triangles(size_t triangle_count) {
     return triangles;
 }
 
-template <typename Primitive>
-bool check_bvh(const Bvh& bvh, const std::vector<Primitive>& primitives) {
+template <typename Prim>
+bool check_bvh(const Bvh& bvh, const std::vector<Prim>& prims) {
     return std::all_of(
-        bvh.nodes.get(), bvh.nodes.get() + bvh.node_count,
+        bvh.nodes.begin(), bvh.nodes.end(),
         [&] (const Bvh::Node& node) {
             if (node.is_leaf()) {
                 return std::all_of(
-                    bvh.primitive_indices.get() + node.first_child_or_primitive,
-                    bvh.primitive_indices.get() + node.first_child_or_primitive + node.primitive_count,
+                    bvh.prim_indices.begin() + node.first_index,
+                    bvh.prim_indices.begin() + node.first_index + node.prim_count,
                     [&] (size_t index) {
-                        return primitives[index].bounding_box().is_contained_in(node.bounding_box_proxy());
+                        return prims[index].bbox().is_contained_in(node.bbox());
                     });
             } else {
-                auto left_bbox  = bvh.nodes[node.first_child_or_primitive + 0].bounding_box_proxy().to_bounding_box();
-                auto right_bbox = bvh.nodes[node.first_child_or_primitive + 1].bounding_box_proxy().to_bounding_box();
+                auto left_bbox  = bvh.nodes[node.first_index + 0].bbox();
+                auto right_bbox = bvh.nodes[node.first_index + 1].bbox();
                 return
-                    left_bbox.is_contained_in(node.bounding_box_proxy()) &&
-                    right_bbox.is_contained_in(node.bounding_box_proxy());
+                    left_bbox.is_contained_in(node.bbox()) &&
+                    right_bbox.is_contained_in(node.bbox());
             }
         });
 }
@@ -58,33 +62,46 @@ bool check_bvh(const Bvh& bvh, const std::vector<Primitive>& primitives) {
 static bool create_and_refit_bvh(size_t primitive_count) {
     auto triangles = random_triangles(primitive_count);
 
+    auto bboxes  = std::make_unique<BBox[]>(triangles.size());
+    auto centers = std::make_unique<Vec3[]>(triangles.size());
+    auto range = std::views::iota(size_t{0}, triangles.size());
+    auto global_bbox = std::transform_reduce(
+        std::execution::par_unseq,
+        range.begin(), range.end(), BBox::empty(),
+        [] (BBox left, const BBox& right) { return left.extend(right); },
+        [&] (size_t i) {
+            auto bbox  = triangles[i].bbox();
+            bboxes[i]  = bbox;
+            centers[i] = triangles[i].center();
+            return bbox;
+        });
+
     Bvh bvh;
 
     // Create an acceleration data structure on those triangles
-    bvh::SweepSahBuilder<Bvh> builder(bvh);
-    auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(triangles.data(), triangles.size());
-    auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), triangles.size());
-    builder.build(global_bbox, bboxes.get(), centers.get(), triangles.size());
+    using Builder = bvh::SweepSahBuilder<Bvh>;
+    bvh::SequentialTopDownScheduler<Builder> scheduler;
+    Builder::build(scheduler, global_bbox, bboxes.get(), centers.get(), triangles.size());
 
-    std::cout << "Created BVH with " << bvh.node_count << " nodes" << std::endl;
+    std::cout << "Created BVH with " << bvh.nodes.size() << " nodes" << std::endl;
 
     // Randomly modify triangles
     for (auto& triangle : triangles) {
-        triangle.p0 += random_vector();
-        triangle.e1 += random_vector();
-        triangle.e2 += random_vector();
+        triangle.v0 += random_vector();
+        triangle.v1 += random_vector();
+        triangle.v2 += random_vector();
     }
 
     // Refit the BVH
-    bvh::HierarchyRefitter<Bvh> refitter(bvh);
-    refitter.refit([&] (Bvh::Node& leaf) {
+    bvh::ParallelHierarchyRefitter<Bvh> refitter;
+    refitter.refit(bvh, bvh.parents(std::execution::par_unseq), [&] (Bvh::Node& leaf) {
         assert(leaf.is_leaf());
-        auto bbox = BoundingBox::empty();
-        for (size_t i = 0; i < leaf.primitive_count; ++i) {
-            auto& triangle = triangles[bvh.primitive_indices[leaf.first_child_or_primitive + i]];
-            bbox.extend(triangle.bounding_box());
+        auto bbox = BBox::empty();
+        for (size_t i = 0; i < leaf.prim_count; ++i) {
+            auto& triangle = triangles[bvh.prim_indices[leaf.first_index + i]];
+            bbox.extend(triangle.bbox());
         }
-        leaf.bounding_box_proxy() = bbox;
+        leaf.bbox_proxy() = bbox;
     });
 
     return check_bvh(bvh, triangles);

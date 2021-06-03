@@ -6,6 +6,7 @@
 #include <fstream>
 #include <cstdint>
 #include <ranges>
+#include <numeric>
 #include <functional>
 #include <algorithm>
 

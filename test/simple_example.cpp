@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <ranges>
+#include <numeric>
 #include <execution>
 
 #include <proto/vec.h>
@@ -34,6 +35,7 @@ int main() {
         Vec3(-1.0,  1.0, 1.0)
     );
 
+    // Compute bounding boxes and centers for every triangle
     auto bboxes  = std::make_unique<BBox[]>(triangles.size());
     auto centers = std::make_unique<Vec3[]>(triangles.size());
     auto range = std::views::iota(size_t{0}, triangles.size());

@@ -1,17 +1,20 @@
-#include <bvh/bvh.hpp>
-#include <bvh/vector.hpp>
-#include <bvh/ray.hpp>
-#include <bvh/node_intersectors.hpp>
+#include <proto/vec.h>
+#include <proto/ray.h>
+#include <proto/bbox.h>
+
+#include <bvh/bvh.h>
+#include <bvh/single_ray_traverser.h>
 
 using Scalar   = float;
-using Vector3  = bvh::Vector3<Scalar>;
-using Ray      = bvh::Ray<Scalar>;
+using Ray      = proto::Ray<Scalar>;
+using Vec3     = proto::Vec3<Scalar>;
+using BBox     = proto::BBox<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
 template <typename NodeIntersector>
 bool intersect_bvh_node(const Bvh::Node& node, const Ray& ray) {
     NodeIntersector node_intersector(ray);
-    auto [tentry, texit] = node_intersector.intersect(node, ray);
+    auto [tentry, texit] = node_intersector.intersect_node(ray, node);
     return tentry <= texit;
 }
 
@@ -25,13 +28,13 @@ int main() {
     node.bounds[5] = 2.1;
 
     Ray ray(
-        Vector3(0.25, 0.25, 0.0), // origin
-        Vector3(0.0, -0.0, 1.0),  // direction
+        Vec3(0.25, 0.25, 0.0), // origin
+        Vec3(0.0, -0.0, 1.0),  // direction
         0.0,                      // minimum distance
         100.0                     // maximum distance
     );
 
     return
-        intersect_bvh_node<bvh::FastNodeIntersector<Bvh>>(node, ray) &&
-        intersect_bvh_node<bvh::RobustNodeIntersector<Bvh>>(node, ray) ? 0 : 1;
+        intersect_bvh_node<bvh::SingleRayTraverser<Bvh>::FastNodeIntersector>(node, ray) &&
+        intersect_bvh_node<bvh::SingleRayTraverser<Bvh>::RobustNodeIntersector>(node, ray) ? 0 : 1;
 }

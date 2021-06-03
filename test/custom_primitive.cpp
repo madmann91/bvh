@@ -1,80 +1,103 @@
 #include <vector>
+#include <ranges>
+#include <numeric>
+#include <execution>
 #include <iostream>
 
-#include <bvh/bvh.hpp>
-#include <bvh/vector.hpp>
-#include <bvh/ray.hpp>
-#include <bvh/sweep_sah_builder.hpp>
-#include <bvh/single_ray_traverser.hpp>
-#include <bvh/primitive_intersectors.hpp>
+#include <proto/vec.h>
+#include <proto/bbox.h>
+#include <proto/ray.h>
+#include <proto/triangle.h>
 
-using Scalar      = float;
-using Vector3     = bvh::Vector3<Scalar>;
-using BoundingBox = bvh::BoundingBox<Scalar>;
-using Ray         = bvh::Ray<Scalar>;
-using Bvh         = bvh::Bvh<Scalar>;
+#include <bvh/bvh.h>
+#include <bvh/binned_sah_builder.h>
+#include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/single_ray_traverser.h>
 
+using Scalar   = float;
+using Triangle = proto::Triangle<Scalar>;
+using Ray      = proto::Ray<Scalar>;
+using Vec3     = proto::Vec3<Scalar>;
+using BBox     = proto::BBox<Scalar>;
+using Bvh      = bvh::Bvh<Scalar>;
+
+/// This is an example of custom primitive.
+/// Since the new version of the library is more explicit,
+/// the methods and types of this primitive need not have a specific name.
 struct CustomPrimitive  {
-    struct Intersection {
-        Scalar t;
-
-        // Required member: returns the distance along the ray
-        Scalar distance() const { return t; }
-    };
-
-    // Required type: the floating-point type used
-    using ScalarType = Scalar;
-    // Required type: the intersection data type returned by the intersect() method
-    using IntersectionType = Intersection;
-
     CustomPrimitive() = default;
 
-    // Required member: returns the center of the primitive
-    Vector3 center() const {
-        return Vector3(0, 0, 0);
-    }
+    struct Intersection {
+        float some_value;
+    };
 
-    // Required member: returns a bounding box for the primitive (tighter is better)
-    BoundingBox bounding_box() const {
-        return BoundingBox(Vector3(-1, -1, -1), Vector3(1, 1, 1));
-    }
+    Vec3 center() const { return Vec3(0, 0, 0); }
+    BBox bbox() const { return BBox(Vec3(-1, -1, -1), Vec3(1, 1, 1)); }
 
-    // Required member: computes the intersection between a ray and the primitive
-    std::optional<Intersection> intersect(const Ray& ray) const {
-        return std::make_optional<Intersection>(Intersection { (ray.tmin + ray.tmax) * Scalar(0.5) });
+    bool intersect(Ray& ray) const {
+        // When an intersection is found, we update the ray's `tmax` member to reflect
+        // the distance at which the intersection has been found.
+        // In turn, this informs the traversal to ignore intersections that appear further
+        // than this distance.
+        ray.tmax = (ray.tmin + ray.tmax) * Scalar(0.5);
+        return true;
     }
 };
 
 int main() {
-    // Create an array of spheres 
+    // Create an array of primitives
     std::vector<CustomPrimitive> primitives;
     primitives.emplace_back();
     primitives.emplace_back();
 
-    Bvh bvh;
+    // Compute bounding boxes and centers for every primitive
+    auto bboxes  = std::make_unique<BBox[]>(primitives.size());
+    auto centers = std::make_unique<Vec3[]>(primitives.size());
+    auto range = std::views::iota(size_t{0}, primitives.size());
+    auto global_bbox = std::transform_reduce(
+        std::execution::par_unseq,
+        range.begin(), range.end(), BBox::empty(),
+        [] (BBox left, const BBox& right) { return left.extend(right); },
+        [&] (size_t i) {
+            auto bbox  = primitives[i].bbox();
+            bboxes[i]  = bbox;
+            centers[i] = primitives[i].center();
+            return bbox;
+        });
 
-    // Create an acceleration data structure on those triangles
-    bvh::SweepSahBuilder<Bvh> builder(bvh);
-    auto [bboxes, centers] = bvh::compute_bounding_boxes_and_centers(primitives.data(), primitives.size());
-    auto global_bbox = bvh::compute_bounding_boxes_union(bboxes.get(), primitives.size());
-    builder.build(global_bbox, bboxes.get(), centers.get(), primitives.size());
+    // Build a BVH on those primitives
+    using Builder = bvh::BinnedSahBuilder<Bvh>;
+    bvh::SequentialTopDownScheduler<Builder> scheduler;
+    auto bvh = Builder::build(scheduler, global_bbox, bboxes.get(), centers.get(), primitives.size());
 
     // Intersect a ray with the data structure
     Ray ray(
-        Vector3(0.0, 0.0, 0.0), // origin
-        Vector3(0.0, 0.0, 1.0), // direction
-        0.0,                    // minimum distance
-        100.0                   // maximum distance
+        Vec3(0.0, 0.0, 0.0), // origin
+        Vec3(0.0, 0.0, 1.0), // direction
+        0.0,                 // minimum distance
+        100.0                // maximum distance
     );
-    bvh::ClosestPrimitiveIntersector<Bvh, CustomPrimitive> intersector(bvh, primitives.data());
-    bvh::SingleRayTraverser<Bvh> traverser(bvh);
 
-    auto hit = traverser.traverse(ray, intersector);
+    struct Hit {
+        // The user is free to add whatever information is required in this structure.
+        // For now, we only really need to know which primitive was intersected.
+        size_t prim_index;
+    };
+
+    auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(ray, bvh, [&] (Ray& ray, const Bvh::Node& leaf) {
+        std::optional<Hit> hit;
+        for (size_t i = 0; i < leaf.prim_count; ++i) {
+            size_t prim_index = bvh.prim_indices[leaf.first_index + i];
+            if (primitives[prim_index].intersect(ray))
+                hit = Hit { prim_index };
+        }
+        return hit;
+    });
+
     if (hit) {
-        auto primitive_index = hit->primitive_index;
-        auto intersection = hit->intersection;
-        std::cout << "Hit primitive " << primitive_index         << "\n"
-                  << "distance: "     << intersection.distance() << std::endl;
+        std::cout
+            << "Hit primitive: " << hit->prim_index << "\n"
+            << "distance: "      << ray.tmax        << std::endl;
         return 0;
     }
     return 1;

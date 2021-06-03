@@ -43,17 +43,15 @@ function (add_benchmark_test)
 endfunction ()
 
 add_bvh_test_executable(NAME simple_example     SOURCES simple_example.cpp)
-#add_bvh_test_executable(NAME custom_intersector SOURCES custom_intersector.cpp)
-#add_bvh_test_executable(NAME custom_primitive   SOURCES custom_primitive.cpp)
-#add_bvh_test_executable(NAME node_intersectors  SOURCES node_intersectors.cpp)
-#add_bvh_test_executable(NAME refit_bvh          SOURCES refit_bvh.cpp)
+add_bvh_test_executable(NAME custom_primitive   SOURCES custom_primitive.cpp)
+add_bvh_test_executable(NAME node_intersectors  SOURCES node_intersectors.cpp)
+add_bvh_test_executable(NAME refit_bvh          SOURCES refit_bvh.cpp)
 add_bvh_test_executable(NAME benchmark          SOURCES benchmark.cpp)
 
 add_test(NAME simple_example     COMMAND simple_example)
-#add_test(NAME custom_intersector COMMAND custom_intersector)
-#add_test(NAME custom_primitive   COMMAND custom_primitive)
-#add_test(NAME node_intersectors  COMMAND node_intersectors)
-#add_test(NAME refit_bvh          COMMAND refit_bvh)
+add_test(NAME custom_primitive   COMMAND custom_primitive)
+add_test(NAME node_intersectors  COMMAND node_intersectors)
+add_test(NAME refit_bvh          COMMAND refit_bvh)
 
 set(cornell_scene_options 
     --eye 0 0.9 2.5
