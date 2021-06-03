@@ -65,17 +65,18 @@ foreach (build_options_as_string
     "--builder sweep_sah"
     "--builder binned_sah"
     "--builder binned_sah --permute"
-    "--builder spatial_split"
-    "--builder locally_ordered_clustering"
-    "--builder locally_ordered_clustering --collapse-leaves"
-    "--builder linear"
-    "--builder linear --pre-split 30"
+    #"--builder spatial_split"
+    #"--builder locally_ordered_clustering"
+    #"--builder locally_ordered_clustering --collapse-leaves"
+    #"--builder linear"
+    #"--builder linear --pre-split 30"
+    #"--builder sweep_sah --optimize-layout"
     "--builder sweep_sah --parallel-reinsertion"
-    "--builder sweep_sah --optimize-layout")
+    "--builder sweep_sah --sequential-reinsertion")
     string(MAKE_C_IDENTIFIER ${build_options_as_string} benchmark_test_name)
     string(REPLACE " " ";" build_options ${build_options_as_string})
-    #add_benchmark_test(
-    #    NAME ${benchmark_test_name}
-    #    OPTIONS ${cornell_scene_options} ${build_options}
-    #    REFERENCE ${cornell_scene_reference})
+    add_benchmark_test(
+        NAME ${benchmark_test_name}
+        OPTIONS ${cornell_scene_options} ${build_options}
+        REFERENCE ${cornell_scene_reference})
 endforeach ()

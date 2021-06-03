@@ -49,11 +49,6 @@ template <typename Builder>
 using TopDownScheduler = bvh::SequentialTopDownScheduler<Builder>;
 #endif
 
-struct Hit {
-    std::pair<Scalar, Scalar> uv;
-    size_t tri_index;
-};
-
 #include "obj.h"
 
 template <typename F>
@@ -141,7 +136,7 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool Permute, bool CollectStatistics>
+template <bool IsPermuted, bool CollectStatistics>
 void render(
     const Camera& camera,
     const Bvh& bvh,
@@ -167,36 +162,43 @@ void render(
             auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
 
             Ray ray(camera.eye, proto::normalize(image_u * u + image_v * v + dir));
+
+            struct Hit {
+                ptrdiff_t tri_index = -1;
+                operator bool () const { return tri_index >= 0; }
+            };
+
             size_t visited_nodes = 0, intr_count = 0;
             auto node_visitor = [&] (const Bvh::Node&) { if constexpr (CollectStatistics) visited_nodes++; };
             auto leaf_intersector = [&] (Ray& ray, const Bvh::Node& leaf) {
-                std::optional<Hit> hit;
+                Hit hit;
                 for (size_t i = 0; i < leaf.prim_count; ++i) {
                     size_t j = leaf.first_index + i;
-                    if constexpr (Permute) {
-                        if (auto intr = triangles[j].intersect(ray))
-                            hit = Hit { *intr, bvh.prim_indices[j] };
+                    if constexpr (IsPermuted) {
+                        if (triangles[j].intersect(ray))
+                            hit = Hit { static_cast<ptrdiff_t>(j) };
                     } else {
                         size_t prim_index = bvh.prim_indices[j];
                         if (auto intr = triangles[prim_index].intersect(ray))
-                            hit = Hit { *intr, prim_index };
+                            hit = Hit { static_cast<ptrdiff_t>(prim_index) };
                     }
                 }
                 if constexpr (CollectStatistics)
                     intr_count += leaf.prim_count;
                 return hit;
             };
+
             auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(ray, bvh, leaf_intersector, node_visitor);
             if (!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             } else {
-                if (CollectStatistics) {
+                if constexpr (CollectStatistics) {
                     auto combined = visited_nodes + intr_count;
                     pixels[index    ] = std::min(visited_nodes * stats_weights[0], Scalar(1.0f));
                     pixels[index + 1] = std::min(intr_count    * stats_weights[1], Scalar(1.0f));
                     pixels[index + 2] = std::min(combined      * stats_weights[2], Scalar(1.0f));
                 } else {
-                    auto normal = proto::normalize(triangles[hit->tri_index].normal());
+                    auto normal = proto::normalize(triangles[hit.tri_index].normal());
                     pixels[index    ] = std::fabs(normal[0]);
                     pixels[index + 1] = std::fabs(normal[1]);
                     pixels[index + 2] = std::fabs(normal[2]);

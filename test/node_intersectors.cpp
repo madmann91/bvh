@@ -30,8 +30,8 @@ int main() {
     Ray ray(
         Vec3(0.25, 0.25, 0.0), // origin
         Vec3(0.0, -0.0, 1.0),  // direction
-        0.0,                      // minimum distance
-        100.0                     // maximum distance
+        0.0,                   // minimum distance
+        100.0                  // maximum distance
     );
 
     return
