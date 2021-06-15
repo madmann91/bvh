@@ -38,7 +38,7 @@ function (add_benchmark_test)
             -Dbenchmark_REFERENCE=${benchmark_test_REFERENCE}
             -Dbenchmark_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/render_${benchmark_test_NAME}.ppm
             -Dbenchmark_DIFFERENCE_RESULT=${CMAKE_CURRENT_BINARY_DIR}/difference_${benchmark_test_NAME}.png
-            -P ${PROJECT_SOURCE_DIR}/cmake/RunBenchmarkTest.cmake
+            -P ${PROJECT_SOURCE_DIR}/cmake/run_benchmark_test.cmake
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endfunction ()
 

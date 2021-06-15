@@ -1,3 +1,0 @@
-[submodule "contrib/proto"]
-	path = contrib/proto
-	url = git@github.com:madmann91/proto
