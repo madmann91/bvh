@@ -155,7 +155,7 @@ public:
 
         NodeIntersector node_intersector(ray);
         Stack<StackSize> stack;
-        Hit<LeafIntersector> hit;
+        Hit<LeafIntersector> hit {};
         Index top = stack_value_from_node(0);
 
         node_visitor(bvh.nodes[0]);
