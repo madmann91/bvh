@@ -17,7 +17,7 @@ if (TBB_FOUND)
     target_compile_definitions(bvh INTERFACE -DBVH_ENABLE_TBB)
     set(BVH_DEPENDS_TBB "find_dependency(TBB)")
 else ()
-    message(INFO "TBB was not found. Some parallel algorithms might not be available.")
+    message(WARNING "TBB was not found. Some parallel algorithms might not be available.")
     if (CMAKE_CXX_COMPILER STREQUAL "GNU")
         message(WARNING
             "TBB is required for libstdc++'s implementation of C++ parallel algorithms."
