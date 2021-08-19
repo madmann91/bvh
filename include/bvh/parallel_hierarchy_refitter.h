@@ -5,16 +5,25 @@
 
 #include "bvh/bvh.h"
 #include "bvh/parallel_bottom_up_traverser.h"
+#include "bvh/sequential_loop_scheduler.h"
 
 namespace bvh {
 
-template <typename Bvh>
+template <typename Bvh, typename LoopScheduler>
 class ParallelHierarchyRefitter {
     using Node = typename Bvh::Node;
 
-    ParallelBottomUpTraverser<Bvh> traverser_;
+    ParallelBottomUpTraverser<Bvh, LoopScheduler> traverser_;
 
 public:
+    ParallelHierarchyRefitter(LoopScheduler& loop_scheduler)
+        : traverser_(loop_scheduler)
+    {}
+
+    LoopScheduler& loop_scheduler() const {
+        return traverser_.loop_scheduler;
+    }
+
     /// Refits every node of the BVH in parallel, using the given function to
     /// update the contents of a leaf.
     template <typename UpdateLeaf>
@@ -35,7 +44,7 @@ public:
     }
 
     void refit(Bvh& bvh) {
-        refit(bvh, bvh.parents(std::execution::par_unseq));
+        refit(bvh, bvh.parents(loop_scheduler()));
     }
 };
 

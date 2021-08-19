@@ -5,7 +5,6 @@
 #include <vector>
 #include <cassert>
 #include <algorithm>
-#include <execution>
 
 #include "bvh/bvh.h"
 
@@ -31,8 +30,8 @@ public:
     /// Each index in this list corresponds to two nodes, starting at this index.
     std::vector<size_t> free_list;
 
-    TopologyModifier(Bvh& bvh)
-        : bvh(bvh), parents(bvh.parents(std::execution::par_unseq))
+    TopologyModifier(Bvh& bvh, std::vector<size_t>&& parents)
+        : bvh(bvh), parents(std::move(parents))
     {}
 
     /// Removes the node at the given index, and places the two children in the free list.
@@ -52,8 +51,8 @@ public:
     }
 
     /// Inserts the given node in the BVH, by making it the child of the node located at `target`.
-    /// This requires to have at least two nodes in the free list (this can be done either
-    /// by a call to `remove_node()` or `mark_as_free()`).
+    /// This requires to have at least two nodes in the free list (this can be done with
+    /// a call to `remove_node()`).
     void insert_node(const Node& node, size_t target) {
         assert(!free_list.empty());
         auto old_node = bvh.nodes[target];

@@ -2,7 +2,6 @@
 #include <iostream>
 #include <ranges>
 #include <numeric>
-#include <execution>
 
 #include <proto/vec.h>
 #include <proto/bbox.h>
@@ -10,9 +9,11 @@
 #include <proto/triangle.h>
 
 #include <bvh/bvh.h>
-#include <bvh/binned_sah_builder.h>
-#include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/sweep_sah_builder.h>
 #include <bvh/single_ray_traverser.h>
+#include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/sequential_sort_algorithm.h>
+#include <bvh/sequential_reduction_scheduler.h>
 
 using Scalar   = float;
 using Triangle = proto::Triangle<Scalar>;
@@ -38,21 +39,19 @@ int main() {
     // Compute bounding boxes and centers for every triangle
     auto bboxes  = std::make_unique<BBox[]>(triangles.size());
     auto centers = std::make_unique<Vec3[]>(triangles.size());
-    auto range = std::views::iota(size_t{0}, triangles.size());
-    auto global_bbox = std::transform_reduce(
-        std::execution::par_unseq,
-        range.begin(), range.end(), BBox::empty(),
+    auto global_bbox = bvh::SequentialReductionScheduler::run(
+        size_t{0}, triangles.size(), BBox::empty(),
         [] (BBox left, const BBox& right) { return left.extend(right); },
-        [&] (size_t i) {
+        [&] (size_t i) -> BBox {
             auto bbox  = triangles[i].bbox();
-            bboxes[i]  = bbox;
             centers[i] = triangles[i].center();
-            return bbox;
+            return bboxes[i] = bbox;
         });
 
-    using Builder = bvh::BinnedSahBuilder<Bvh>;
+    using Builder = bvh::SweepSahBuilder<Bvh>;
     bvh::SequentialTopDownScheduler<Builder> scheduler;
-    auto bvh = Builder::build(scheduler, global_bbox, bboxes.get(), centers.get(), triangles.size());
+    bvh::SequentialSortAlgorithm sort_algorithm;
+    auto bvh = Builder::build(scheduler, sort_algorithm, global_bbox, bboxes.get(), centers.get(), triangles.size());
 
     // Intersect a ray with the data structure
     Ray ray(
@@ -72,7 +71,7 @@ int main() {
         for (size_t i = 0; i < leaf.prim_count; ++i) {
             size_t prim_index = bvh.prim_indices[leaf.first_index + i];
             if (auto uv = triangles[prim_index].intersect(ray))
-                hit = Hit { *uv, prim_index }; 
+                hit = Hit { *uv, prim_index };
         }
         return hit;
     });

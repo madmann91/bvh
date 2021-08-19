@@ -1,20 +1,15 @@
-#ifndef BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
-#define BVH_PARALLEL_TOP_DOWN_SCHEDULER_H
-
-#ifndef BVH_ENABLE_TBB
-#error "Please install TBB in order to use this parallel scheduler."
-#endif
+#ifndef BVH_TBB_TOP_DOWN_SCHEDULER_H
+#define BVH_TBB_TOP_DOWN_SCHEDULER_H
 
 #include <stack>
-#include <execution>
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 #include <tbb/tbb.h>
 
 #include "bvh/top_down_builder_common.h"
 
-namespace bvh {
-    
+namespace bvh::tbb {
+
 /// TBB-based top-down construction algorithm scheduler.
 template <typename Builder>
 class ParallelTopDownScheduler final : public TopDownScheduler<Builder> {
@@ -56,8 +51,6 @@ class ParallelTopDownScheduler final : public TopDownScheduler<Builder> {
     };
 
 public:
-    static constexpr auto&& execution_policy() { return std::execution::par_unseq; }
-
     /// Work items whose size is below this threshold execute serially.
     size_t parallel_threshold = 1024;
 
@@ -67,9 +60,9 @@ public:
 
 private:
     friend class Task;
-    tbb::task_group task_group_;
+    ::tbb::task_group task_group_;
 };
 
-} // namespace bvh
+} // namespace bvh::tbb
 
 #endif

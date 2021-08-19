@@ -5,12 +5,14 @@
 #include <cassert>
 #include <algorithm>
 #include <type_traits>
-#include <ranges>
 #include <vector>
 #include <numeric>
 
 #include <proto/bbox.h>
 #include <proto/utils.h>
+
+#include "bvh/sequential_reduction_scheduler.h"
+#include "bvh/sequential_loop_scheduler.h"
 
 namespace bvh {
 
@@ -75,7 +77,7 @@ struct Bvh {
 
     /// Nodes of the BVH. The root is located at index 0.
     std::vector<Node> nodes;
-    
+
     /// Indices of the primitives contained in the leaves of the BVH.
     /// Each leaf covers a range of indices in that array, equal to:
     /// `[first_index, first_index + prim_count]`.
@@ -90,33 +92,27 @@ struct Bvh {
     /// Evaluates the SAH cost of this BVH.
     /// The `traversal_cost` parameter represents the ratio of the cost
     /// of traversing a node over the cost of intersecting a primitive.
-    template <typename ExecutionPolicy>
-    Scalar sah_cost(ExecutionPolicy&& exec_policy, Scalar traversal_cost = Scalar(1)) const {
-        auto total = std::transform_reduce(
-            std::forward<ExecutionPolicy>(exec_policy),
-            nodes.begin(), nodes.end(), Scalar(0),
+    template <typename ReductionScheduler = SequentialReductionScheduler>
+    Scalar sah_cost(ReductionScheduler& reduction_scheduler, Scalar traversal_cost = Scalar(1)) const {
+        return reduction_scheduler.run(
+            size_t{0}, nodes.size(), Scalar(0),
             std::plus<Scalar> {},
-            [&] (const Node& node) {
-                return node.bbox().half_area() * (node.is_leaf() ? node.prim_count : traversal_cost);
-            });
-        return total / nodes[0].bbox().half_area();
+            [&] (size_t i) {
+                return nodes[i].bbox().half_area() * (nodes[i].is_leaf() ? nodes[i].prim_count : traversal_cost);
+            }) / nodes[0].bbox().half_area();
     }
 
     /// Computes the parent-child indices.
     /// The parent of the root node (at index 0) is the root node itself, by convention.
-    template <typename ExecutionPolicy>
-    std::vector<size_t> parents(ExecutionPolicy&& exec_policy) {
+    template <typename LoopScheduler = SequentialLoopScheduler>
+    std::vector<size_t> parents(LoopScheduler& loop_scheduler) const {
         std::vector<size_t> parents(nodes.size(), 0);
-        auto range = std::views::iota(size_t{0}, nodes.size());
-        std::for_each(
-            std::forward<ExecutionPolicy>(exec_policy),
-            range.begin(), range.end(),
-            [&] (size_t i) {
-                if (!nodes[i].is_leaf()) {
-                    parents[nodes[i].first_index + 0] = i;
-                    parents[nodes[i].first_index + 1] = i;
-                }
-            });
+        loop_scheduler.run(size_t{0}, nodes.size(), [&] (size_t i) {
+            if (!nodes[i].is_leaf()) {
+                parents[nodes[i].first_index + 0] = i;
+                parents[nodes[i].first_index + 1] = i;
+            }
+        });
         return parents;
     }
 };

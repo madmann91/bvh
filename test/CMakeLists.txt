@@ -1,3 +1,26 @@
+set(BVH_TEST_MULTITHREADING_FRAMEWORK None CACHE STRING "Multithreading framework to use for tests")
+set_property(CACHE BVH_TEST_MULTITHREADING_FRAMEWORK PROPERTY STRINGS None TBB OpenMP)
+
+add_library(test_interface INTERFACE)
+
+if (BVH_TEST_MULTITHREADING_FRAMEWORK STREQUAL "TBB")
+    find_package(TBB REQUIRED)
+    if (TBB_FOUND)
+        target_link_libraries(test_interface INTERFACE TBB::tbb)
+        target_compile_definitions(test_interface INTERFACE -DBVH_ENABLE_TBB)
+        message(STATUS "Building tests with TBB")
+    endif ()
+elseif (BVH_TEST_MULTITHREADING_FRAMEWORK STREQUAL "OpenMP")
+    find_package(OpenMP REQUIRED)
+    if (OpenMP_FOUND)
+        target_link_libraries(test_interface INTERFACE OpenMP::OpenMP_CXX)
+        target_compile_definitions(test_interface INTERFACE -DBVH_ENABLE_OMP)
+        message(STATUS "Building tests with OpenMP")
+    endif ()
+else ()
+    message(STATUS "Building tests without multithreading support")
+endif ()
+
 find_package(ImageMagick COMPONENTS compare QUIET)
 if (NOT ImageMagick_compare_FOUND)
     message(WARNING "Cannot find ImageMagick's compare tool. Images will not be compared to the reference.")
@@ -13,13 +36,13 @@ function (add_bvh_test_executable)
     cmake_parse_arguments(bvh_test_executable "" "${single_value_args}" "${multi_value_args}" "${ARGN}")
 
     add_executable(${bvh_test_executable_NAME} ${bvh_test_executable_SOURCES})
-    target_link_libraries(${bvh_test_executable_NAME} PRIVATE bvh)
+    target_link_libraries(${bvh_test_executable_NAME} PRIVATE bvh test_interface)
     set_target_properties(${bvh_test_executable_NAME} PROPERTIES CXX_STANDARD 20)
 endfunction ()
 
 # Adds a test for the benchmark tool that compares the
 # output to a reference picture. Arguments are:
-# 
+#
 #   NAME      : The test name (e.g. benchmark_sweep_sah_cornell).
 #   OPTIONS   : The options to pass to the benchmark tool.
 #   REFERENCE : The reference image file.
@@ -53,7 +76,7 @@ add_test(NAME custom_primitive   COMMAND custom_primitive)
 add_test(NAME node_intersectors  COMMAND node_intersectors)
 add_test(NAME refit_bvh          COMMAND refit_bvh)
 
-set(cornell_scene_options 
+set(cornell_scene_options
     --eye 0 0.9 2.5
     --dir 0 0.001 -1
     --up 0 1 0

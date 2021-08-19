@@ -171,9 +171,10 @@ private:
 
 public:
     /// Builds the BVH from primitive bounding boxes and centers provided as two pointers.
-    template <template <typename> typename TopDownScheduler>
+    template <template <typename> typename TopDownScheduler, typename SortAlgorithm>
     static Bvh build(
         TopDownScheduler<SweepSahBuilder>& scheduler,
+        SortAlgorithm& sort_algorithm,
         const BBox& global_bbox,
         const BBox* bboxes,
         const Vec3* centers,
@@ -196,12 +197,10 @@ public:
             other_indices.get() + prim_count
         };
 
-        using ExecutionPolicy = decltype(scheduler.execution_policy());
         for (int axis = 0; axis < 3; ++axis) {
             auto indices = sorted_indices[axis];
             std::iota(indices, indices + prim_count, 0);
-            std::sort(
-                std::forward<ExecutionPolicy>(scheduler.execution_policy()),
+            sort_algorithm.run(
                 indices, indices + prim_count,
                 [&] (size_t i, size_t j) { return centers[i][axis] < centers[j][axis]; });
         }

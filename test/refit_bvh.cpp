@@ -3,7 +3,6 @@
 #include <random>
 #include <ranges>
 #include <numeric>
-#include <execution>
 #include <array>
 
 #include <proto/vec.h>
@@ -14,6 +13,8 @@
 #include <bvh/bvh.h>
 #include <bvh/sweep_sah_builder.h>
 #include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/sequential_reduction_scheduler.h>
+#include <bvh/sequential_sort_algorithm.h>
 #include <bvh/single_ray_traverser.h>
 #include <bvh/parallel_hierarchy_refitter.h>
 
@@ -64,16 +65,13 @@ static bool create_and_refit_bvh(size_t primitive_count) {
 
     auto bboxes  = std::make_unique<BBox[]>(triangles.size());
     auto centers = std::make_unique<Vec3[]>(triangles.size());
-    auto range = std::views::iota(size_t{0}, triangles.size());
-    auto global_bbox = std::transform_reduce(
-        std::execution::par_unseq,
-        range.begin(), range.end(), BBox::empty(),
+    auto global_bbox = bvh::SequentialReductionScheduler::run(
+        size_t{0}, triangles.size(), BBox::empty(),
         [] (BBox left, const BBox& right) { return left.extend(right); },
-        [&] (size_t i) {
+        [&] (size_t i) -> BBox {
             auto bbox  = triangles[i].bbox();
-            bboxes[i]  = bbox;
             centers[i] = triangles[i].center();
-            return bbox;
+            return bboxes[i] = bbox;
         });
 
     Bvh bvh;
@@ -81,7 +79,8 @@ static bool create_and_refit_bvh(size_t primitive_count) {
     // Create an acceleration data structure on those triangles
     using Builder = bvh::SweepSahBuilder<Bvh>;
     bvh::SequentialTopDownScheduler<Builder> scheduler;
-    Builder::build(scheduler, global_bbox, bboxes.get(), centers.get(), triangles.size());
+    bvh::SequentialSortAlgorithm sort_algorithm;
+    Builder::build(scheduler, sort_algorithm, global_bbox, bboxes.get(), centers.get(), triangles.size());
 
     std::cout << "Created BVH with " << bvh.nodes.size() << " nodes" << std::endl;
 
@@ -93,8 +92,9 @@ static bool create_and_refit_bvh(size_t primitive_count) {
     }
 
     // Refit the BVH
-    bvh::ParallelHierarchyRefitter<Bvh> refitter;
-    refitter.refit(bvh, bvh.parents(std::execution::par_unseq), [&] (Bvh::Node& leaf) {
+    bvh::SequentialLoopScheduler loop_scheduler;
+    bvh::ParallelHierarchyRefitter<Bvh, bvh::SequentialLoopScheduler> refitter(loop_scheduler);
+    refitter.refit(bvh, bvh.parents(loop_scheduler), [&] (Bvh::Node& leaf) {
         assert(leaf.is_leaf());
         auto bbox = BBox::empty();
         for (size_t i = 0; i < leaf.prim_count; ++i) {

@@ -99,7 +99,7 @@ This library provides the following traversal algorithms:
     traversal can also be configured to operate in "robust" mode, in which the
     ray-node intersection does not use FMA instructions, and makes the necessary
     corrections to avoid false-misses (see _Robust BVH Ray Traversal_, by T. Ize).
-    
+
 Traversal algorithms can work in two modes: closest intersection,
 or any intersection (for shadow rays, usually around 20% faster).
 They only require an intersector to compute primitive-ray intersections.

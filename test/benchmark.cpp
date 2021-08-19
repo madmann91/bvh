@@ -5,7 +5,6 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
-#include <ranges>
 #include <numeric>
 #include <functional>
 #include <algorithm>
@@ -18,10 +17,21 @@
 #include <bvh/bvh.h>
 #include <bvh/binned_sah_builder.h>
 #include <bvh/sweep_sah_builder.h>
-#ifdef BVH_ENABLE_TBB
-#include <bvh/parallel_top_down_scheduler.h>
+#if defined(BVH_ENABLE_TBB)
+#include <bvh/tbb/parallel_top_down_scheduler.h>
+#include <bvh/tbb/parallel_loop_scheduler.h>
+#include <bvh/tbb/parallel_reduction_scheduler.h>
+#include <bvh/tbb/parallel_sort_algorithm.h>
+#elif defined(BVH_ENABLE_OMP)
+#include <bvh/omp/parallel_top_down_scheduler.h>
+#include <bvh/omp/parallel_loop_scheduler.h>
+#include <bvh/omp/parallel_reduction_scheduler.h>
+#include <bvh/sequential_sort_algorithm.h>
 #else
 #include <bvh/sequential_top_down_scheduler.h>
+#include <bvh/sequential_loop_scheduler.h>
+#include <bvh/sequential_reduction_scheduler.h>
+#include <bvh/sequential_sort_algorithm.h>
 #endif
 #include <bvh/parallel_reinsertion_optimizer.h>
 #include <bvh/parallel_hierarchy_refitter.h>
@@ -41,12 +51,24 @@ using BBox     = proto::BBox<Scalar>;
 using Ray      = proto::Ray<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
-#ifdef BVH_ENABLE_TBB
+#if defined(BVH_ENABLE_TBB)
 template <typename Builder>
-using TopDownScheduler = bvh::ParallelTopDownScheduler<Builder>;
+using TopDownScheduler   = bvh::tbb::ParallelTopDownScheduler<Builder>;
+using LoopScheduler      = bvh::tbb::ParallelLoopScheduler;
+using ReductionScheduler = bvh::tbb::ParallelReductionScheduler;
+using SortAlgorithm      = bvh::tbb::ParallelSortAlgorithm;
+#elif defined(BVH_ENABLE_OMP)
+template <typename Builder>
+using TopDownScheduler   = bvh::omp::ParallelTopDownScheduler<Builder>;
+using LoopScheduler      = bvh::omp::ParallelLoopScheduler;
+using ReductionScheduler = bvh::omp::ParallelReductionScheduler;
+using SortAlgorithm      = bvh::SequentialSortAlgorithm;
 #else
 template <typename Builder>
-using TopDownScheduler = bvh::SequentialTopDownScheduler<Builder>;
+using TopDownScheduler   = bvh::SequentialTopDownScheduler<Builder>;
+using LoopScheduler      = bvh::SequentialLoopScheduler;
+using ReductionScheduler = bvh::SequentialReductionScheduler;
+using SortAlgorithm      = bvh::SequentialSortAlgorithm;
 #endif
 
 #include "obj.h"
@@ -361,20 +383,24 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    ReductionScheduler reduction_scheduler;
+    LoopScheduler loop_scheduler;
+    SortAlgorithm sort_algorithm;
+
     std::function<size_t(Bvh&, const Triangle*, const BBox&, const BBox*, const Vec3*, size_t)> builder;
     if (!strcmp(builder_name, "binned_sah")) {
         builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             static constexpr size_t bin_count = 16;
             using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
-            TopDownScheduler<Builder> scheduler;
-            bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
+            TopDownScheduler<Builder> top_down_scheduler;
+            bvh = Builder::build(top_down_scheduler, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } else if (!strcmp(builder_name, "sweep_sah")) {
-        builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+        builder = [&] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             using Builder = bvh::SweepSahBuilder<Bvh>;
-            TopDownScheduler<Builder> scheduler;
-            bvh = Builder::build(scheduler, global_bbox, bboxes, centers, prim_count);
+            TopDownScheduler<Builder> top_down_scheduler;
+            bvh = Builder::build(top_down_scheduler, sort_algorithm, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } /*else if (!strcmp(builder_name, "spatial_split")) {
@@ -437,33 +463,34 @@ int main(int argc, char** argv) {
     if (permute)
         std::cout << " + permute";
     std::cout << ")..." << std::endl;
+
     profile("BVH construction", [&] {
         //bvh::HeuristicPrimitiveSplitter<Triangle> splitter;
         //if (pre_split_factor > 0)
         //    std::tie(ref_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
         auto bboxes  = std::make_unique<BBox[]>(triangles.size());
         auto centers = std::make_unique<Vec3[]>(triangles.size());
-        auto range = std::views::iota(size_t{0}, triangles.size());
-        auto global_bbox = std::transform_reduce(
-            std::execution::par_unseq,
-            range.begin(), range.end(), BBox::empty(),
+        auto global_bbox = reduction_scheduler.run(
+            size_t{0}, triangles.size(), BBox::empty(),
             [] (BBox left, const BBox& right) { return left.extend(right); },
-            [&] (size_t i) {
+            [&] (size_t i) -> BBox {
                 auto bbox  = triangles[i].bbox();
-                bboxes[i]  = bbox;
                 centers[i] = triangles[i].center();
-                return bbox;
+                return bboxes[i]  = bbox;
             });
 
         ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), ref_count);
         //if (pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
         if (parallel_reinsertion) {
-            bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh);
+            bvh::ParallelReinsertionOptimizer<Bvh, LoopScheduler, ReductionScheduler>
+                reinsertion_optimizer(bvh, loop_scheduler, reduction_scheduler);
             reinsertion_optimizer.optimize();
         }
-        if (sequential_reinsertion)
-            bvh::SequentialReinsertionOptimizer<Bvh>::optimize(bvh);
+        if (sequential_reinsertion) {
+            bvh::TopologyModifier<Bvh> topo_modifier(bvh, bvh.parents(loop_scheduler));
+            bvh::SequentialReinsertionOptimizer<Bvh>::optimize(topo_modifier);
+        }
         //if (optimize_layout) {
         //    bvh::NodeLayoutOptimizer layout_optimizer(bvh);
         //    layout_optimizer.optimize();
@@ -473,16 +500,14 @@ int main(int argc, char** argv) {
         //    leaf_collapser.collapse();
         //}
         if (permute) {
-            auto range = std::views::iota(size_t{0}, ref_count);
             permuted_triangles = std::make_unique<Triangle[]>(ref_count);
-            std::for_each(
-                std::execution::par_unseq, range.begin(), range.end(),
+            loop_scheduler.run(size_t{0}, ref_count,
                 [&] (size_t i) { permuted_triangles[i] = triangles[bvh.prim_indices[i]]; });
         }
     }, build_iterations);
 
     // This is just to make sure that refitting works
-    bvh::ParallelHierarchyRefitter<Bvh> refitter;
+    bvh::ParallelHierarchyRefitter<Bvh, LoopScheduler> refitter(loop_scheduler);
     refitter.refit(bvh);
 
     std::cout

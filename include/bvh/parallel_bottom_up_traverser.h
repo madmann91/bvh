@@ -10,13 +10,14 @@
 #include <cassert>
 
 #include "bvh/bvh.h"
+#include "bvh/sequential_loop_scheduler.h"
 
 namespace bvh {
 
 /// Base class for bottom-up BVH traversal algorithms. The implementation is inspired
 /// from T. Karras' bottom-up refitting algorithm, explained in the article
 /// "Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees".
-template <typename Bvh>
+template <typename Bvh, typename LoopScheduler = SequentialLoopScheduler>
 class ParallelBottomUpTraverser {
     struct Flag {
         std::atomic_int value;
@@ -34,6 +35,12 @@ class ParallelBottomUpTraverser {
     std::vector<Flag> flags_;
 
 public:
+    LoopScheduler& loop_scheduler;
+
+    ParallelBottomUpTraverser(LoopScheduler& loop_scheduler)
+        : loop_scheduler(loop_scheduler)
+    {}
+
     /// Traverses the BVH with an array of parent-child indices, and two functions that
     /// control how to process leaves and inner nodes.
     template <typename ProcessLeaf, typename ProcessInnerNode>
@@ -52,10 +59,8 @@ public:
         if (bvh.nodes.size() == 1)
             process_leaf(0);
 
-        auto range = std::views::iota(size_t{1}, bvh.nodes.size());
-        std::for_each(
-            std::execution::par_unseq,
-            range.begin(), range.end(),
+        loop_scheduler.run(
+            size_t{1}, bvh.nodes.size(),
             [&] (size_t i) {
                 // Only process leaves
                 if (!bvh.nodes[i].is_leaf())
@@ -86,7 +91,7 @@ public:
         ProcessInnerNode&& process_inner_node)
     {
         return traverse(
-            bvh, bvh.parents(std::execution::par_unseq),
+            bvh, bvh.template parents<LoopScheduler>(),
             std::move(process_leaf),
             std::move(process_inner_node));
     }

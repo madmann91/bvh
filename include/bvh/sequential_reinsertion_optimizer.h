@@ -77,16 +77,15 @@ class SequentialReinsertionOptimizer {
     }
 
 public:
-    static void optimize(Bvh& bvh, size_t iter_count = 3, double batch_ratio = 0.01) {
-        TopologyModifier topo_modifier(bvh);
-        size_t batch_size = std::max<size_t>(bvh.nodes.size() * batch_ratio, 1);
+    static void optimize(TopologyModifier<Bvh>& topo_modifier, size_t iter_count = 3, double batch_ratio = 0.01) {
+        size_t batch_size = std::max<size_t>(topo_modifier.bvh.nodes.size() * batch_ratio, 1);
         for (size_t j = 0; j < iter_count; ++j) {
-            auto candidates = find_candidates(bvh, batch_size);
+            auto candidates = find_candidates(topo_modifier.bvh, batch_size);
             for (size_t i = candidates.size(); i > 0; --i) {
                 auto& candidate = candidates[i - 1];
-                auto node = bvh.nodes[candidate.index];
+                auto node = topo_modifier.bvh.nodes[candidate.index];
                 topo_modifier.remove_node(candidate.index);
-                topo_modifier.insert_node(node, find_reinsertion(bvh, node));
+                topo_modifier.insert_node(node, find_reinsertion(topo_modifier.bvh, node));
             }
         }
     }

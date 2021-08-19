@@ -27,7 +27,7 @@ inline char* strip_spaces(char* ptr) {
 inline std::optional<int> read_index(char** ptr) {
     char* base = *ptr;
 
-    // Detect end of line (negative indices are supported) 
+    // Detect end of line (negative indices are supported)
     base = strip_spaces(base);
     if (!std::isdigit(*base) && *base != '-')
         return std::nullopt;
