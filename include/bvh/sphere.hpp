@@ -37,9 +37,10 @@ struct Sphere  {
         return BoundingBox<Scalar>(origin - Vector3<Scalar>(radius), origin + Vector3<Scalar>(radius));
     }
 
+    template <bool AssumeNormalized = false>
     std::optional<Intersection> intersect(const Ray<Scalar>& ray) const {
         auto oc = ray.origin - origin;
-        auto a = dot(ray.direction, ray.direction);
+        auto a = AssumeNormalized ? Scalar(1) : dot(ray.direction, ray.direction);
         auto b = 2 * dot(ray.direction, oc);
         auto c = dot(oc, oc) - radius * radius;
 
