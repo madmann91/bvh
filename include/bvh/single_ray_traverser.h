@@ -138,23 +138,23 @@ public:
     /// Traverses the BVH with a given ray.
     template <
         bool AnyHit,
+        size_t StackSize,
+        typename NodeIntersector,
         typename LeafIntersector,
-        typename NodeVisitor,
-        typename NodeIntersector = FastNodeIntersector,
-        size_t StackSize = default_stack_size>
+        typename NodeVisitor>
     static proto_always_inline Hit<LeafIntersector> traverse(
+        Stack<StackSize>& stack,
         Ray& ray,
         const Bvh& bvh,
-        LeafIntersector&& leaf_intersector,
-        NodeVisitor&& node_visitor)
+        const NodeIntersector& node_intersector,
+        const LeafIntersector& leaf_intersector,
+        const NodeVisitor& node_visitor)
     {
         auto leaf_mask = Index(1) << (sizeof(Index) * CHAR_BIT - 1);
         auto stack_value_from_node = [&] (Index index) {
             return bvh.nodes[index].is_leaf() ? ~index : bvh.nodes[index].first_index;
         };
 
-        NodeIntersector node_intersector(ray);
-        Stack<StackSize> stack;
         Hit<LeafIntersector> hit {};
         Index top = stack_value_from_node(0);
 
@@ -202,8 +202,10 @@ public:
         typename LeafIntersector,
         typename NodeIntersector = FastNodeIntersector,
         size_t StackSize = default_stack_size>
-    static proto_always_inline Hit<LeafIntersector> traverse(Ray& ray, const Bvh& bvh, LeafIntersector&& leaf_intersector) {
-        return traverse<AnyHit>(ray, bvh, leaf_intersector, [] (const Node&) {});
+    static proto_always_inline Hit<LeafIntersector> traverse(Ray& ray, const Bvh& bvh, const LeafIntersector& leaf_intersector) {
+        Stack<StackSize> stack;
+        NodeIntersector node_intersector(ray);
+        return traverse<AnyHit>(stack, ray, bvh, node_intersector, leaf_intersector, [] (const Node&) {});
     }
 };
 

@@ -204,7 +204,9 @@ void render(
                 return hit;
             };
 
-            auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(ray, bvh, leaf_intersector, node_visitor);
+            bvh::SingleRayTraverser<Bvh>::FastNodeIntersector node_intersector(ray);
+            bvh::SingleRayTraverser<Bvh>::Stack<bvh::SingleRayTraverser<Bvh>::default_stack_size> stack;
+            auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(stack, ray, bvh, node_intersector, leaf_intersector, node_visitor);
             if (!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             } else {
