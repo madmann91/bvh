@@ -14,24 +14,25 @@
 #include <proto/ray.h>
 #include <proto/triangle.h>
 
+#include <par/for_each.h>
+#include <par/transform_reduce.h>
+#if defined(BVH_ENABLE_TBB)
+#include <par/tbb/executors.h>
+#elif defined(BVH_ENABLE_OMP)
+#include <par/omp/executors.h>
+#else
+#include <par/sequential_executor.h>
+#endif
+
 #include <bvh/bvh.h>
 #include <bvh/binned_sah_builder.h>
 #include <bvh/sweep_sah_builder.h>
 #if defined(BVH_ENABLE_TBB)
 #include <bvh/tbb/parallel_top_down_scheduler.h>
-#include <bvh/tbb/parallel_loop_scheduler.h>
-#include <bvh/tbb/parallel_reduction_scheduler.h>
-#include <bvh/tbb/parallel_sort_algorithm.h>
 #elif defined(BVH_ENABLE_OMP)
 #include <bvh/omp/parallel_top_down_scheduler.h>
-#include <bvh/omp/parallel_loop_scheduler.h>
-#include <bvh/omp/parallel_reduction_scheduler.h>
-#include <bvh/sequential_sort_algorithm.h>
 #else
 #include <bvh/sequential_top_down_scheduler.h>
-#include <bvh/sequential_loop_scheduler.h>
-#include <bvh/sequential_reduction_scheduler.h>
-#include <bvh/sequential_sort_algorithm.h>
 #endif
 #include <bvh/parallel_reinsertion_optimizer.h>
 #include <bvh/parallel_hierarchy_refitter.h>
@@ -54,21 +55,12 @@ using Bvh      = bvh::Bvh<Scalar>;
 #if defined(BVH_ENABLE_TBB)
 template <typename Builder>
 using TopDownScheduler   = bvh::tbb::ParallelTopDownScheduler<Builder>;
-using LoopScheduler      = bvh::tbb::ParallelLoopScheduler;
-using ReductionScheduler = bvh::tbb::ParallelReductionScheduler;
-using SortAlgorithm      = bvh::tbb::ParallelSortAlgorithm;
 #elif defined(BVH_ENABLE_OMP)
 template <typename Builder>
 using TopDownScheduler   = bvh::omp::ParallelTopDownScheduler<Builder>;
-using LoopScheduler      = bvh::omp::ParallelLoopScheduler;
-using ReductionScheduler = bvh::omp::ParallelReductionScheduler;
-using SortAlgorithm      = bvh::SequentialSortAlgorithm;
 #else
 template <typename Builder>
 using TopDownScheduler   = bvh::SequentialTopDownScheduler<Builder>;
-using LoopScheduler      = bvh::SequentialLoopScheduler;
-using ReductionScheduler = bvh::SequentialReductionScheduler;
-using SortAlgorithm      = bvh::SequentialSortAlgorithm;
 #endif
 
 #include "obj.h"
@@ -158,8 +150,9 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool IsPermuted, bool CollectStatistics>
+template <bool IsPermuted, bool CollectStatistics, typename Executor>
 void render(
+    Executor& executor,
     const Camera& camera,
     const Bvh& bvh,
     const Triangle* triangles,
@@ -175,9 +168,10 @@ void render(
     image_u = image_u * image_w;
     image_v = image_v * image_w * ratio;
 
-    size_t total_intr_count = 0, total_visited_nodes = 0;
-    for (size_t i = 0; i < width; ++i) {
-        for (size_t j = 0; j < height; ++j) {
+    std::atomic<size_t> total_intr_count = 0, total_visited_nodes = 0;
+    par::for_each(
+        executor, par::range_2d(size_t{0}, width, size_t{0}, height),
+        [&] (size_t i, size_t j) {
             size_t index = 3 * (width * j + i);
 
             auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
@@ -228,8 +222,7 @@ void render(
             }
             total_intr_count    += intr_count;
             total_visited_nodes += visited_nodes;
-        }
-    }
+        });
 
     if (CollectStatistics) {
         std::cout << total_intr_count    << " total primitive intersection(s)" << std::endl;
@@ -383,9 +376,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ReductionScheduler reduction_scheduler;
-    LoopScheduler loop_scheduler;
-    SortAlgorithm sort_algorithm;
+#if defined(BVH_ENABLE_TBB)
+    par::tbb::Executor static_executor, dynamic_executor;
+#elif defined(BVH_ENABLE_OMP)
+    par::omp::StaticExecutor static_executor;
+    par::omp::DynamicExecutor dynamic_executor;
+#else
+    par::SequentialExecutor static_executor, dynamic_executor;
+#endif
 
     std::function<size_t(Bvh&, const Triangle*, const BBox&, const BBox*, const Vec3*, size_t)> builder;
     if (!strcmp(builder_name, "binned_sah")) {
@@ -400,7 +398,7 @@ int main(int argc, char** argv) {
         builder = [&] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
             using Builder = bvh::SweepSahBuilder<Bvh>;
             TopDownScheduler<Builder> top_down_scheduler;
-            bvh = Builder::build(top_down_scheduler, sort_algorithm, global_bbox, bboxes, centers, prim_count);
+            bvh = Builder::build(top_down_scheduler, static_executor, global_bbox, bboxes, centers, prim_count);
             return prim_count;
         };
     } /*else if (!strcmp(builder_name, "spatial_split")) {
@@ -470,8 +468,8 @@ int main(int argc, char** argv) {
         //    std::tie(ref_count, bboxes, centers) = splitter.split(global_bbox, triangles.data(), triangles.size(), pre_split_factor);
         auto bboxes  = std::make_unique<BBox[]>(triangles.size());
         auto centers = std::make_unique<Vec3[]>(triangles.size());
-        auto global_bbox = reduction_scheduler.run(
-            size_t{0}, triangles.size(), BBox::empty(),
+        auto global_bbox = par::transform_reduce(
+            static_executor, par::range_1d(size_t{0}, triangles.size()), BBox::empty(),
             [] (BBox left, const BBox& right) { return left.extend(right); },
             [&] (size_t i) -> BBox {
                 auto bbox  = triangles[i].bbox();
@@ -483,12 +481,11 @@ int main(int argc, char** argv) {
         //if (pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
         if (parallel_reinsertion) {
-            bvh::ParallelReinsertionOptimizer<Bvh, LoopScheduler, ReductionScheduler>
-                reinsertion_optimizer(bvh, loop_scheduler, reduction_scheduler);
-            reinsertion_optimizer.optimize();
+            bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh, bvh.parents(static_executor));
+            reinsertion_optimizer.optimize(static_executor);
         }
         if (sequential_reinsertion) {
-            bvh::TopologyModifier<Bvh> topo_modifier(bvh, bvh.parents(loop_scheduler));
+            bvh::TopologyModifier<Bvh> topo_modifier(bvh, bvh.parents(static_executor));
             bvh::SequentialReinsertionOptimizer<Bvh>::optimize(topo_modifier);
         }
         //if (optimize_layout) {
@@ -501,14 +498,14 @@ int main(int argc, char** argv) {
         //}
         if (permute) {
             permuted_triangles = std::make_unique<Triangle[]>(ref_count);
-            loop_scheduler.run(size_t{0}, ref_count,
+            par::for_each(static_executor, par::range_1d(size_t{0}, ref_count),
                 [&] (size_t i) { permuted_triangles[i] = triangles[bvh.prim_indices[i]]; });
         }
     }, build_iterations);
 
     // This is just to make sure that refitting works
-    bvh::ParallelHierarchyRefitter<Bvh, LoopScheduler> refitter(loop_scheduler);
-    refitter.refit(bvh);
+    bvh::ParallelHierarchyRefitter<Bvh> refitter;
+    refitter.refit(static_executor, bvh);
 
     std::cout
         << "BVH depth of " << compute_bvh_depth(bvh) << ", "
@@ -521,14 +518,14 @@ int main(int argc, char** argv) {
     profile("Rendering", [&] {
         if (permute) {
             if (collect_stats)
-                render<true, true>(camera, bvh, permuted_triangles.get(), pixels.get(), width, height, stats_weights);
+                render<true, true>(dynamic_executor, camera, bvh, permuted_triangles.get(), pixels.get(), width, height, stats_weights);
             else
-                render<true, false>(camera, bvh, permuted_triangles.get(), pixels.get(), width, height);
+                render<true, false>(dynamic_executor, camera, bvh, permuted_triangles.get(), pixels.get(), width, height);
         } else {
             if (collect_stats)
-                render<false, true>(camera, bvh, triangles.data(), pixels.get(), width, height, stats_weights);
+                render<false, true>(dynamic_executor, camera, bvh, triangles.data(), pixels.get(), width, height, stats_weights);
             else
-                render<false, false>(camera, bvh, triangles.data(), pixels.get(), width, height);
+                render<false, false>(dynamic_executor, camera, bvh, triangles.data(), pixels.get(), width, height);
         }
     });
 

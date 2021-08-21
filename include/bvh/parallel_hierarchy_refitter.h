@@ -5,31 +5,22 @@
 
 #include "bvh/bvh.h"
 #include "bvh/parallel_bottom_up_traverser.h"
-#include "bvh/sequential_loop_scheduler.h"
 
 namespace bvh {
 
-template <typename Bvh, typename LoopScheduler>
+template <typename Bvh>
 class ParallelHierarchyRefitter {
     using Node = typename Bvh::Node;
 
-    ParallelBottomUpTraverser<Bvh, LoopScheduler> traverser_;
+    ParallelBottomUpTraverser<Bvh> traverser_;
 
 public:
-    ParallelHierarchyRefitter(LoopScheduler& loop_scheduler)
-        : traverser_(loop_scheduler)
-    {}
-
-    LoopScheduler& loop_scheduler() const {
-        return traverser_.loop_scheduler;
-    }
-
     /// Refits every node of the BVH in parallel, using the given function to
     /// update the contents of a leaf.
-    template <typename UpdateLeaf>
-    void refit(Bvh& bvh, const std::vector<size_t>& parents, UpdateLeaf&& update_leaf) {
+    template <typename Executor, typename UpdateLeaf>
+    void refit(Executor& executor, Bvh& bvh, const std::vector<size_t>& parents, UpdateLeaf&& update_leaf) {
         traverser_.traverse(
-            bvh, parents,
+            executor, bvh, parents,
             [&] (size_t i) { update_leaf(bvh.nodes[i]); },
             [&] (size_t i) {
                 auto& node  = bvh.nodes[i];
@@ -39,12 +30,14 @@ public:
             });
     }
 
-    void refit(Bvh& bvh, const std::vector<size_t>& parents) {
-        refit(bvh, parents, [] (const Node&) {});
+    template <typename Executor>
+    void refit(Executor& executor, Bvh& bvh, const std::vector<size_t>& parents) {
+        refit(executor, bvh, parents, [] (const Node&) {});
     }
 
-    void refit(Bvh& bvh) {
-        refit(bvh, bvh.parents(loop_scheduler()));
+    template <typename Executor>
+    void refit(Executor& executor, Bvh& bvh) {
+        refit(executor, bvh, bvh.parents(executor));
     }
 };
 

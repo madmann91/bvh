@@ -12,8 +12,6 @@
 
 #include "bvh/bvh.h"
 #include "bvh/parallel_hierarchy_refitter.h"
-#include "bvh/sequential_loop_scheduler.h"
-#include "bvh/sequential_reduction_scheduler.h"
 
 namespace bvh {
 
@@ -21,10 +19,7 @@ namespace bvh {
 /// SAH cost of the tree decreases after the re-insertion. Inspired from the
 /// article "Parallel Reinsertion for Bounding Volume Hierarchy Optimization",
 /// by D. Meister and J. Bittner.
-template <
-    typename Bvh,
-    typename LoopScheduler = SequentialLoopScheduler,
-    typename ReductionScheduler = SequentialReductionScheduler>
+template <typename Bvh>
 class ParallelReinsertionOptimizer {
     using Scalar = typename Bvh::Scalar;
     using Node   = typename Bvh::Node;
@@ -35,24 +30,13 @@ class ParallelReinsertionOptimizer {
 
     Bvh& bvh_;
     std::vector<size_t> parents_;
-    ParallelHierarchyRefitter<Bvh, LoopScheduler> refitter_;
+    ParallelHierarchyRefitter<Bvh> refitter_;
 
 public:
-    ReductionScheduler& reduction_scheduler;
-
-    ParallelReinsertionOptimizer(
-        Bvh& bvh,
-        LoopScheduler& loop_scheduler,
-        ReductionScheduler& reduction_scheduler)
+    ParallelReinsertionOptimizer(Bvh& bvh, std::vector<size_t>&& parents)
         : bvh_(bvh)
-        , parents_(bvh.parents(loop_scheduler))
-        , refitter_(loop_scheduler)
-        , reduction_scheduler(reduction_scheduler)
+        , parents_(std::move(parents))
     {}
-
-    LoopScheduler& loop_scheduler() const {
-        return refitter_.loop_scheduler();
-    }
 
 private:
     ConflictList conflicts(size_t in, size_t out) const {
@@ -159,30 +143,31 @@ private:
         return Insertion { out_best, d_best };
     }
 
-    template <typename F>
-    proto_always_inline void forall_nodes_in_iter(size_t first_node, size_t u, F&& f) {
-        loop_scheduler().run(size_t{0}, (bvh_.nodes.size() - first_node) / u, [&] (size_t i) {
+    template <typename Executor, typename F>
+    proto_always_inline void forall_nodes_in_iter(Executor& executor, size_t first_node, size_t u, F&& f) {
+        par::for_each(executor, par::range_1d(size_t{0}, (bvh_.nodes.size() - first_node) / u), [&] (size_t i) {
             f(first_node + i * u);
         });
     }
 
 public:
-    void optimize(size_t u = 9, Scalar threshold = 0.1, Scalar traversal_cost = 1) {
+    template <typename Executor>
+    void optimize(Executor& executor, size_t u = 9, Scalar threshold = 0.1, Scalar traversal_cost = 1) {
         auto locks = std::make_unique<std::atomic<uint64_t>[]>(bvh_.nodes.size());
         auto outs  = std::make_unique<Insertion[]>(bvh_.nodes.size());
 
-        auto old_cost = bvh_.sah_cost(reduction_scheduler, traversal_cost);
+        auto old_cost = bvh_.sah_cost(executor, traversal_cost);
         for (size_t iter = 0; ; ++iter) {
             size_t first_node = iter % u + 1;
 
             // Clear the locks
-            loop_scheduler().run(size_t{0}, bvh_.nodes.size(), [&] (size_t i) { locks[i].store(0); });
+            par::for_each(executor, par::range_1d(size_t{0}, bvh_.nodes.size()), [&] (size_t i) { locks[i].store(0); });
 
             // Search for insertion candidates
-            forall_nodes_in_iter(first_node, u, [&] (size_t i) { outs[i] = search(i); });
+            forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) { outs[i] = search(i); });
 
             // Resolve topological conflicts with locking
-            forall_nodes_in_iter(first_node, u, [&] (size_t i) {
+            forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
                 if (outs[i].second <= 0)
                     return;
                 // Encode locks into 64 bits using the highest 32 bits for the cost and the
@@ -195,7 +180,7 @@ public:
             });
 
             // Check the locks to disable conflicting re-insertions
-            forall_nodes_in_iter(first_node, u, [&] (size_t i) {
+            forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
                 if (outs[i].second <= 0)
                     return;
                 auto c = conflicts(i, outs[i].first);
@@ -208,18 +193,18 @@ public:
             });
 
             // Perform the reinsertions
-            forall_nodes_in_iter(first_node, u, [&] (size_t i) {
+            forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
                 if (outs[i].second > 0)
                     reinsert(i, outs[i].first);
             });
 
             // Update the bounding boxes of each node in the tree
-            refitter_.refit(bvh_, parents_);
+            refitter_.refit(executor, bvh_, parents_);
 
             // Compare the old SAH cost to the new one and decrease the number
             // of nodes that are ignored during the optimization if the change
             // in cost is below the threshold.
-            auto new_cost = bvh_.sah_cost(reduction_scheduler, traversal_cost);
+            auto new_cost = bvh_.sah_cost(executor, traversal_cost);
             if (std::abs(new_cost - old_cost) <= threshold || iter >= u) {
                 if (u <= 1)
                     break;

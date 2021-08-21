@@ -7,13 +7,12 @@
 #include <proto/bbox.h>
 #include <proto/ray.h>
 #include <proto/triangle.h>
+#include <par/sequential_executor.h>
 
 #include <bvh/bvh.h>
 #include <bvh/sweep_sah_builder.h>
 #include <bvh/single_ray_traverser.h>
 #include <bvh/sequential_top_down_scheduler.h>
-#include <bvh/sequential_sort_algorithm.h>
-#include <bvh/sequential_reduction_scheduler.h>
 
 using Scalar   = float;
 using Triangle = proto::Triangle<Scalar>;
@@ -23,6 +22,8 @@ using BBox     = proto::BBox<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
 int main() {
+    par::SequentialExecutor executor;
+
     // Create an array of triangles
     std::vector<Triangle> triangles;
     triangles.emplace_back(
@@ -39,8 +40,8 @@ int main() {
     // Compute bounding boxes and centers for every triangle
     auto bboxes  = std::make_unique<BBox[]>(triangles.size());
     auto centers = std::make_unique<Vec3[]>(triangles.size());
-    auto global_bbox = bvh::SequentialReductionScheduler::run(
-        size_t{0}, triangles.size(), BBox::empty(),
+    auto global_bbox = par::transform_reduce(
+        executor, par::range_1d(size_t{0}, triangles.size()), BBox::empty(),
         [] (BBox left, const BBox& right) { return left.extend(right); },
         [&] (size_t i) -> BBox {
             auto bbox  = triangles[i].bbox();
@@ -50,8 +51,7 @@ int main() {
 
     using Builder = bvh::SweepSahBuilder<Bvh>;
     bvh::SequentialTopDownScheduler<Builder> scheduler;
-    bvh::SequentialSortAlgorithm sort_algorithm;
-    auto bvh = Builder::build(scheduler, sort_algorithm, global_bbox, bboxes.get(), centers.get(), triangles.size());
+    auto bvh = Builder::build(scheduler, executor, global_bbox, bboxes.get(), centers.get(), triangles.size());
 
     // Intersect a ray with the data structure
     Ray ray(

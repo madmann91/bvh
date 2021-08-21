@@ -7,12 +7,12 @@
 #include <proto/bbox.h>
 #include <proto/ray.h>
 #include <proto/triangle.h>
+#include <par/sequential_executor.h>
 
 #include <bvh/bvh.h>
 #include <bvh/single_ray_traverser.h>
 #include <bvh/binned_sah_builder.h>
 #include <bvh/sequential_top_down_scheduler.h>
-#include <bvh/sequential_reduction_scheduler.h>
 
 using Scalar   = float;
 using Triangle = proto::Triangle<Scalar>;
@@ -45,6 +45,8 @@ struct CustomPrimitive  {
 };
 
 int main() {
+    par::SequentialExecutor executor;
+
     // Create an array of primitives
     std::vector<CustomPrimitive> primitives;
     primitives.emplace_back();
@@ -53,8 +55,8 @@ int main() {
     // Compute bounding boxes and centers for every primitive
     auto bboxes  = std::make_unique<BBox[]>(primitives.size());
     auto centers = std::make_unique<Vec3[]>(primitives.size());
-    auto global_bbox = bvh::SequentialReductionScheduler::run(
-        size_t{0}, primitives.size(), BBox::empty(),
+    auto global_bbox = par::transform_reduce(
+        executor, par::range_1d(size_t{0}, primitives.size()), BBox::empty(),
         [] (BBox left, const BBox& right) { return left.extend(right); },
         [&] (size_t i) -> BBox {
             auto bbox  = primitives[i].bbox();

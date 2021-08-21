@@ -2,12 +2,13 @@ cmake_minimum_required(VERSION 3.9)
 project(bvh LANGUAGES CXX VERSION 2.0)
 
 find_package(proto REQUIRED)
+find_package(par REQUIRED)
 
 add_library(bvh INTERFACE)
 target_include_directories(bvh INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_link_libraries(bvh INTERFACE proto::proto)
+target_link_libraries(bvh INTERFACE proto::proto par::par)
 
 # Make sure to only build tests when building this project,
 # and not when importing it into another one.

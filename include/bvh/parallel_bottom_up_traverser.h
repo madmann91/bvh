@@ -2,22 +2,21 @@
 #define BVH_PARALLEL_BOTTOM_UP_TRAVERSER_H
 
 #include <cstddef>
-#include <ranges>
 #include <atomic>
 #include <algorithm>
-#include <ranges>
 #include <vector>
 #include <cassert>
 
+#include <par/for_each.h>
+
 #include "bvh/bvh.h"
-#include "bvh/sequential_loop_scheduler.h"
 
 namespace bvh {
 
 /// Base class for bottom-up BVH traversal algorithms. The implementation is inspired
 /// from T. Karras' bottom-up refitting algorithm, explained in the article
 /// "Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees".
-template <typename Bvh, typename LoopScheduler = SequentialLoopScheduler>
+template <typename Bvh>
 class ParallelBottomUpTraverser {
     struct Flag {
         std::atomic_int value;
@@ -35,16 +34,11 @@ class ParallelBottomUpTraverser {
     std::vector<Flag> flags_;
 
 public:
-    LoopScheduler& loop_scheduler;
-
-    ParallelBottomUpTraverser(LoopScheduler& loop_scheduler)
-        : loop_scheduler(loop_scheduler)
-    {}
-
     /// Traverses the BVH with an array of parent-child indices, and two functions that
     /// control how to process leaves and inner nodes.
-    template <typename ProcessLeaf, typename ProcessInnerNode>
+    template <typename Executor, typename ProcessLeaf, typename ProcessInnerNode>
     void traverse(
+        Executor& executor,
         const Bvh& bvh,
         const std::vector<size_t>& parents,
         ProcessLeaf&& process_leaf,
@@ -59,8 +53,8 @@ public:
         if (bvh.nodes.size() == 1)
             process_leaf(0);
 
-        loop_scheduler.run(
-            size_t{1}, bvh.nodes.size(),
+        par::for_each(
+            executor, par::range_1d(size_t{1}, bvh.nodes.size()),
             [&] (size_t i) {
                 // Only process leaves
                 if (!bvh.nodes[i].is_leaf())
@@ -84,14 +78,15 @@ public:
     }
 
     /// Same as the other version of `traverse()` but recomputes the parent indices from the BVH.
-    template <typename ProcessLeaf, typename ProcessInnerNode>
+    template <typename Executor, typename ProcessLeaf, typename ProcessInnerNode>
     void traverse(
+        Executor& executor,
         const Bvh& bvh,
         ProcessLeaf&& process_leaf,
         ProcessInnerNode&& process_inner_node)
     {
         return traverse(
-            bvh, bvh.template parents<LoopScheduler>(),
+            executor, bvh, bvh.parents(executor),
             std::move(process_leaf),
             std::move(process_inner_node));
     }

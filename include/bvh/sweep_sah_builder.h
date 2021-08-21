@@ -12,6 +12,7 @@
 #include <proto/bbox.h>
 #include <proto/vec.h>
 #include <proto/utils.h>
+#include <par/for_each.h>
 
 #include "bvh/bvh.h"
 #include "bvh/top_down_builder_common.h"
@@ -171,10 +172,10 @@ private:
 
 public:
     /// Builds the BVH from primitive bounding boxes and centers provided as two pointers.
-    template <template <typename> typename TopDownScheduler, typename SortAlgorithm>
+    template <template <typename> typename TopDownScheduler, typename Executor>
     static Bvh build(
         TopDownScheduler<SweepSahBuilder>& scheduler,
-        SortAlgorithm& sort_algorithm,
+        Executor& executor,
         const BBox& global_bbox,
         const BBox* bboxes,
         const Vec3* centers,
@@ -196,14 +197,13 @@ public:
             other_indices.get(),
             other_indices.get() + prim_count
         };
-
-        for (int axis = 0; axis < 3; ++axis) {
+        par::for_each(executor, par::range_1d(0, 3), [&] (int axis) {
             auto indices = sorted_indices[axis];
             std::iota(indices, indices + prim_count, 0);
-            sort_algorithm.run(
+            std::sort(
                 indices, indices + prim_count,
                 [&] (size_t i, size_t j) { return centers[i][axis] < centers[j][axis]; });
-        }
+        });
         bvh.nodes[0].bbox_proxy() = global_bbox;
 
         // Start the root task and wait for the result

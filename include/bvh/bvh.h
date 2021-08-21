@@ -10,9 +10,8 @@
 
 #include <proto/bbox.h>
 #include <proto/utils.h>
-
-#include "bvh/sequential_reduction_scheduler.h"
-#include "bvh/sequential_loop_scheduler.h"
+#include <par/for_each.h>
+#include <par/transform_reduce.h>
 
 namespace bvh {
 
@@ -92,10 +91,10 @@ struct Bvh {
     /// Evaluates the SAH cost of this BVH.
     /// The `traversal_cost` parameter represents the ratio of the cost
     /// of traversing a node over the cost of intersecting a primitive.
-    template <typename ReductionScheduler = SequentialReductionScheduler>
-    Scalar sah_cost(ReductionScheduler& reduction_scheduler, Scalar traversal_cost = Scalar(1)) const {
-        return reduction_scheduler.run(
-            size_t{0}, nodes.size(), Scalar(0),
+    template <typename Executor>
+    Scalar sah_cost(Executor& executor, Scalar traversal_cost = Scalar(1)) const {
+        return par::transform_reduce(
+            executor, par::range_1d(size_t{0}, nodes.size()), Scalar(0),
             std::plus<Scalar> {},
             [&] (size_t i) {
                 return nodes[i].bbox().half_area() * (nodes[i].is_leaf() ? nodes[i].prim_count : traversal_cost);
@@ -104,10 +103,10 @@ struct Bvh {
 
     /// Computes the parent-child indices.
     /// The parent of the root node (at index 0) is the root node itself, by convention.
-    template <typename LoopScheduler = SequentialLoopScheduler>
-    std::vector<size_t> parents(LoopScheduler& loop_scheduler) const {
+    template <typename Executor>
+    std::vector<size_t> parents(Executor& executor) const {
         std::vector<size_t> parents(nodes.size(), 0);
-        loop_scheduler.run(size_t{0}, nodes.size(), [&] (size_t i) {
+        par::for_each(executor, par::range_1d(size_t{0}, nodes.size()), [&] (size_t i) {
             if (!nodes[i].is_leaf()) {
                 parents[nodes[i].first_index + 0] = i;
                 parents[nodes[i].first_index + 1] = i;

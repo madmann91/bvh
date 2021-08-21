@@ -5,4 +5,5 @@
 @PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
 find_dependency(proto)
+find_dependency(par)
 include("${CMAKE_CURRENT_LIST_DIR}/bvh-targets.cmake")
