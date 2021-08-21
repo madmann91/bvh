@@ -27,6 +27,11 @@ class SingleRayTraverser {
     template <typename LeafIntersector>
     using Hit = std::invoke_result_t<LeafIntersector, Ray&, const Node&>;
 
+public:
+    /// Default stack size used in `traverse()`.
+    /// Should be enough for most uses.
+    static constexpr size_t default_stack_size = 64;
+
     template <size_t Capacity>
     struct Stack {
         Index elems[Capacity];
@@ -43,11 +48,6 @@ class SingleRayTraverser {
             return elems[--size];
         }
     };
-
-public:
-    /// Default stack size used in `traverse()`.
-    /// Should be enough for most uses.
-    static constexpr size_t default_stack_size = 64;
 
     /// CRTP-based mixin to create node intersectors.
     template <typename Derived>
