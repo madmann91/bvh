@@ -22,7 +22,6 @@ class SingleRayTraverser {
     using Index  = typename Bvh::Index;
     using Vec3   = proto::Vec3<Scalar>;
     using Ray    = proto::Ray<Scalar>;
-    using Octant = typename Ray::Octant;
 
     template <typename LeafIntersector>
     using Hit = std::invoke_result_t<LeafIntersector, Ray&, const Node&>;
@@ -52,11 +51,19 @@ public:
     /// CRTP-based mixin to create node intersectors.
     template <typename Derived>
     struct NodeIntersector {
-        Octant octant;
+        std::array<uint8_t, 6> offsets;
 
-        NodeIntersector(const Ray& ray)
-            : octant(ray.octant())
-        {}
+        NodeIntersector(const Ray& ray) {
+            auto octant = ray.octant();
+            offsets = std::array<uint8_t, 6> {
+                static_cast<uint8_t>(0 + octant[0]),
+                static_cast<uint8_t>(2 + octant[1]),
+                static_cast<uint8_t>(4 + octant[2]),
+                static_cast<uint8_t>(0 + (1 - octant[0])),
+                static_cast<uint8_t>(2 + (1 - octant[1])),
+                static_cast<uint8_t>(4 + (1 - octant[2]))
+            };
+        }
 
         proto_always_inline Scalar intersect_axis_min(int axis, Scalar p, const Ray& ray) const {
             return static_cast<const Derived*>(this)->intersect_axis_min(axis, p, ray);
@@ -68,17 +75,16 @@ public:
 
         proto_always_inline
         std::pair<Scalar, Scalar> intersect_node(const Ray& ray, const Node& node) const {
-            Vec3 entry, exit;
-            entry[0] = intersect_axis_min(0, node.bounds[0 * 2 +     octant[0]], ray);
-            entry[1] = intersect_axis_min(1, node.bounds[1 * 2 +     octant[1]], ray);
-            entry[2] = intersect_axis_min(2, node.bounds[2 * 2 +     octant[2]], ray);
-            exit [0] = intersect_axis_max(0, node.bounds[0 * 2 + 1 - octant[0]], ray);
-            exit [1] = intersect_axis_max(1, node.bounds[1 * 2 + 1 - octant[1]], ray);
-            exit [2] = intersect_axis_max(2, node.bounds[2 * 2 + 1 - octant[2]], ray);
+            auto entry_x = intersect_axis_min(0, node.bounds[offsets[0]], ray);
+            auto entry_y = intersect_axis_min(1, node.bounds[offsets[1]], ray);
+            auto entry_z = intersect_axis_min(2, node.bounds[offsets[2]], ray);
+            auto exit_x  = intersect_axis_max(0, node.bounds[offsets[3]], ray);
+            auto exit_y  = intersect_axis_max(1, node.bounds[offsets[4]], ray);
+            auto exit_z  = intersect_axis_max(2, node.bounds[offsets[5]], ray);
             // Note: This order for the min/max operations is guaranteed not to produce NaNs
             return std::make_pair(
-                proto::robust_max(entry[0], proto::robust_max(entry[1], proto::robust_max(entry[2], ray.tmin))),
-                proto::robust_min(exit [0], proto::robust_min(exit [1], proto::robust_min(exit [2], ray.tmax))));
+                proto::robust_max(entry_x, proto::robust_max(entry_y, proto::robust_max(entry_z, ray.tmin))),
+                proto::robust_min(exit_x,  proto::robust_min(exit_y,  proto::robust_min(exit_z,  ray.tmax))));
         }
 
     protected:
