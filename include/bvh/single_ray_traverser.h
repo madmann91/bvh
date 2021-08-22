@@ -166,7 +166,15 @@ public:
 
         node_visitor(bvh.nodes[0]);
         while (true) {
-            if ((top & leaf_mask) == 0) [[likely]] {
+            if (top & leaf_mask) [[unlikely]] {
+                auto& leaf = bvh.nodes[~top];
+                node_visitor(leaf);
+                if (auto leaf_hit = leaf_intersector(ray, leaf)) {
+                    hit = leaf_hit;
+                    if constexpr (AnyHit)
+                        break;
+                }
+            } else {
                 node_visitor(bvh.nodes[top + 0]);
                 node_visitor(bvh.nodes[top + 1]);
                 auto t_left  = node_intersector.intersect_node(ray, bvh.nodes[top + 0]);
@@ -187,15 +195,8 @@ public:
                     top = stack_value_from_node(top + 1);
                     continue;
                 }
-            } else {
-                auto& leaf = bvh.nodes[~top];
-                node_visitor(leaf);
-                if (auto leaf_hit = leaf_intersector(ray, leaf)) {
-                    hit = leaf_hit;
-                    if constexpr (AnyHit)
-                        break;
-                }
             }
+
             if (stack.is_empty()) [[unlikely]]
                 break;
             top = stack.pop();
