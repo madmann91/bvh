@@ -13,9 +13,11 @@ namespace bvh {
 /// For instance, morton_split(0b00110010) = 0b000000001001000000001000.
 template <typename Morton>
 Morton morton_split(Morton x) {
-    constexpr size_t log_bits = round_up_log2(sizeof(Morton) * CHAR_BIT);
-    auto mask = Morton(-1);
-    for (size_t i = log_bits, n = 1 << log_bits; i > 0; --i, n >>= 1) {
+    constexpr size_t bit_count = sizeof(Morton) * CHAR_BIT;
+    constexpr size_t log_bits = round_up_log2(bit_count);
+    auto mask = Morton(-1) >> (bit_count / 2);
+    x &= mask;
+    for (size_t i = log_bits - 1, n = 1 << i; i > 0; --i, n >>= 1) {
         mask = (mask | (mask << n)) & ~(mask << (n / 2));
         x = (x | (x << n)) & mask;
     }
