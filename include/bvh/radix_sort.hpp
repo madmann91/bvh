@@ -88,9 +88,10 @@ public:
     template <typename T, std::enable_if_t<std::is_floating_point<T>::value, int> = 0>
     static typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Unsigned make_key(T x) {
         using U = typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Unsigned;
+        using I = typename SizedIntegerType<sizeof(T) * CHAR_BIT>::Signed;
         auto mask = U(1) << (sizeof(T) * CHAR_BIT - 1);
         auto y = as<U>(x);
-        return (y & mask ? (-y) ^ mask : y) ^ mask;
+        return (y & mask ? static_cast<U>(-static_cast<I>(y)) ^ mask : y) ^ mask;
     }
 
 private:
