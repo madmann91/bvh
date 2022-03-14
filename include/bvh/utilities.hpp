@@ -34,12 +34,45 @@ inline double product_sign(double x, double y) {
     return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
 }
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1900)
+// Visual Studio does not support #pragma STDC FP_CONTRACT.
+// Non-standard pragma fp_contract is supported at least
+// since version 2015, but it can only be applied to either
+// namespace or global scope - not inside functions for
+// example (see warning C4177).
+//
+// Before VS 2022, default for fp_contract pragma was on.
+// This was changed to off in VS 2022.
+//
+// https://docs.microsoft.com/en-us/cpp/preprocessor/fp-contract?view=msvc-170
+namespace fp_contract_on {
+
+#pragma fp_contract (on)
+
+inline float fast_multiply_add(float x, float y, float z) {
+    return x * y + z;
+}
+
+inline double fast_multiply_add(double x, double y, double z) {
+    return x * y + z;
+}
+
+} // namespace fp_contract_on
+
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1900)
+
 inline float fast_multiply_add(float x, float y, float z) {
 #ifdef FP_FAST_FMAF
     return std::fmaf(x, y, z);
 #else
-    #pragma STDC FP_CONTRACT ON
-    return x * y + z;
+    #if defined(__GNUC__) || defined(__clang__)
+        #pragma STDC FP_CONTRACT ON
+        return x * y + z;
+    #elif defined(_MSC_VER) && (_MSC_VER >= 1900)
+        return fp_contract_on::fast_multiply_add(x, y, z);
+    #else
+        return x * y + z;
+    #endif
 #endif
 }
 
@@ -47,8 +80,14 @@ inline double fast_multiply_add(double x, double y, double z) {
 #ifdef FP_FAST_FMA
     return std::fma(x, y, z);
 #else
-    #pragma STDC FP_CONTRACT ON
-    return x * y + z;
+    #if defined(__GNUC__) || defined(__clang__)
+        #pragma STDC FP_CONTRACT ON
+        return x * y + z;
+    #elif defined(_MSC_VER) && (_MSC_VER >= 1900)
+        return fp_contract_on::fast_multiply_add(x, y, z);
+    #else
+        return x * y + z;
+    #endif
 #endif
 }
 
