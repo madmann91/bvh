@@ -10,13 +10,13 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #define bvh_restrict      __restrict
-#define bvh_always_inline __attribute__((always_inline))
+#define bvh_always_inline __attribute__((always_inline)) inline
 #elif defined(_MSC_VER)
 #define bvh_restrict      __restrict
 #define bvh_always_inline __forceinline
 #else
 #define bvh_restrict
-#define bvh_always_inline
+#define bvh_always_inline inline
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
