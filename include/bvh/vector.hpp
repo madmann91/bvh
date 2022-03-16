@@ -91,49 +91,49 @@ struct Vector {
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> operator + (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> operator + (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     return Vector<Scalar, N>([=] (size_t i) { return a[i] + b[i]; });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> operator - (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> operator - (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     return Vector<Scalar, N>([=] (size_t i) { return a[i] - b[i]; });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     return Vector<Scalar, N>([=] (size_t i) { return a[i] * b[i]; });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> min(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> min(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     return Vector<Scalar, N>([=] (size_t i) { return std::min(a[i], b[i]); });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> max(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> max(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     return Vector<Scalar, N>([=] (size_t i) { return std::max(a[i], b[i]); });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, Scalar s) {
+Vector<Scalar, N> operator * (const Vector<Scalar, N>& a, Scalar s) {
     return Vector<Scalar, N>([=] (size_t i) { return a[i] * s; });
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> operator * (Scalar s, const Vector<Scalar, N>& b) {
+Vector<Scalar, N> operator * (Scalar s, const Vector<Scalar, N>& b) {
     return b * s;
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Scalar dot(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
+Scalar dot(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
     Scalar sum = a[0] * b[0];
     for (size_t i = 1; i < N; ++i)
         sum += a[i] * b[i];
@@ -142,13 +142,13 @@ inline Scalar dot(const Vector<Scalar, N>& a, const Vector<Scalar, N>& b) {
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Scalar length(const Vector<Scalar, N>& v) {
+Scalar length(const Vector<Scalar, N>& v) {
     return std::sqrt(dot(v, v));
 }
 
 template <typename Scalar, size_t N>
 bvh_always_inline
-inline Vector<Scalar, N> normalize(const Vector<Scalar, N>& v) {
+Vector<Scalar, N> normalize(const Vector<Scalar, N>& v) {
     auto inv = Scalar(1) / length(v);
     return v * inv;
 }
@@ -158,7 +158,7 @@ using Vector3 = Vector<Scalar, 3>;
 
 template <typename Scalar>
 bvh_always_inline
-inline Vector3<Scalar> cross(const Vector3<Scalar>& a, const Vector3<Scalar>& b) {
+Vector3<Scalar> cross(const Vector3<Scalar>& a, const Vector3<Scalar>& b) {
     return Vector3<Scalar>([=] (size_t i) {
         size_t j = (i + 1) % 3;
         size_t k = (i + 2) % 3;
