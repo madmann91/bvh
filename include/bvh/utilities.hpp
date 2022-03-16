@@ -36,7 +36,7 @@ inline double product_sign(double x, double y) {
 
 /// Performs a multiplication followed by an addition, using a fused multiply-add
 /// instruction if available, or a regular multiplication followed by an addition, if not.
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #pragma float_control(push)
 #pragma float_control(precise, off)
 #pragma fp_contract(on)
@@ -52,7 +52,7 @@ bvh_always_inline T fast_multiply_add(T x, T y, T z) {
     return x * y + z;
 #endif
 }
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #pragma float_control(pop)
 #endif
 
