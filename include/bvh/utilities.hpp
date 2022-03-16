@@ -34,23 +34,27 @@ inline double product_sign(double x, double y) {
     return as<double>(as<uint64_t>(x) ^ (as<uint64_t>(y) & UINT64_C(0x8000000000000000)));
 }
 
-inline float fast_multiply_add(float x, float y, float z) {
+/// Performs a multiplication followed by an addition, using a fused multiply-add
+/// instruction if available, or a regular multiplication followed by an addition, if not.
+#if defined(_MSC_VER)
+#pragma float_control(push)
+#pragma float_control(precise, off)
+#pragma fp_contract(on)
+#endif
+template <typename T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
+bvh_always_inline T fast_multiply_add(T x, T y, T z) {
 #ifdef FP_FAST_FMAF
     return std::fmaf(x, y, z);
 #else
+#ifdef __clang__
     #pragma STDC FP_CONTRACT ON
+#endif
     return x * y + z;
 #endif
 }
-
-inline double fast_multiply_add(double x, double y, double z) {
-#ifdef FP_FAST_FMA
-    return std::fma(x, y, z);
-#else
-    #pragma STDC FP_CONTRACT ON
-    return x * y + z;
+#if defined(_MSC_VER)
+#pragma float_control(pop)
 #endif
-}
 
 /// Returns the mininum of two values.
 /// Guaranteed to return a non-NaN value if the right hand side is not a NaN.
