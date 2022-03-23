@@ -168,8 +168,8 @@ public:
         auto& node = bvh.nodes[item.node_index];
 
         auto make_leaf = [] (typename Bvh::Node& node, size_t begin, size_t end) {
-            node.first_child_or_primitive = begin;
-            node.primitive_count          = end - begin;
+            node.first_child_or_primitive = static_cast<Bvh::IndexType>(begin);
+            node.primitive_count          = static_cast<Bvh::IndexType>(end - begin);
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {
@@ -198,8 +198,8 @@ public:
         if (best_splits[best_axis].first >= max_split_cost) {
             if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: median split on largest axis
-                best_axis = node.bounding_box_proxy().to_bounding_box().largest_axis();
-                split_index = (item.begin + item.end) / 2;
+                best_axis = static_cast<int>(node.bounding_box_proxy().to_bounding_box().largest_axis());
+                split_index = static_cast<int>((item.begin + item.end) / 2);
             } else {
                 make_leaf(node, item.begin, item.end);
                 return std::nullopt;
@@ -241,7 +241,7 @@ public:
 
         auto& left  = bvh.nodes[first_child + 0];
         auto& right = bvh.nodes[first_child + 1];
-        node.first_child_or_primitive = first_child;
+        node.first_child_or_primitive = static_cast<Bvh::IndexType>(first_child);
         node.primitive_count          = 0;
 
         left.bounding_box_proxy()  = left_bbox;
