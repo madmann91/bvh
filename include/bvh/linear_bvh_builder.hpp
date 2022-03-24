@@ -16,6 +16,7 @@ namespace bvh {
 template <typename Bvh, typename Morton>
 class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
     using Scalar = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
 
     using ParentBuilder = MortonCodeBasedBuilder<Bvh, Morton>;
     using ParentBuilder::sort_primitives_by_morton_code;
@@ -88,7 +89,7 @@ class LinearBvhBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
                         .to_bounding_box()
                         .extend(input_nodes[i + 1].bounding_box_proxy());
                     unmerged_node.primitive_count = 0;
-                    unmerged_node.first_child_or_primitive = first_child;
+                    unmerged_node.first_child_or_primitive = static_cast<IndexType>(first_child);
                     output_nodes[first_child + 0] = input_nodes[i + 0];
                     output_nodes[first_child + 1] = input_nodes[i + 1];
                     output_levels[unmerged_index] = input_levels[i + 1];
@@ -151,13 +152,13 @@ public:
                 auto& node = nodes[begin + i];
                 node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
                 node.primitive_count          = 1;
-                node.first_child_or_primitive = i;
+                node.first_child_or_primitive = static_cast<IndexType>(i);
             }
 
             // Compute the level of the tree where the current node is joined with the next.
             #pragma omp for nowait
             for (size_t i = 0; i < primitive_count - 1; ++i)
-                input_levels[begin + i] = count_leading_zeros(morton_codes[i] ^ morton_codes[i + 1]);
+                input_levels[begin + i] = static_cast<Level>(count_leading_zeros(morton_codes[i] ^ morton_codes[i + 1]));
         }
 
         while (end - begin > 1) {

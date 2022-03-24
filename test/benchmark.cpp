@@ -34,7 +34,9 @@ using Bvh         = bvh::Bvh<Scalar>;
 template <typename F>
 void profile(const char* task, F f, size_t runs = 1) {
     using namespace std::chrono;
-    std::vector<double> timings;
+    using Timing = std::chrono::milliseconds::rep;
+
+    std::vector<Timing> timings;
 
     for (size_t i = 0; i < runs; ++i) {
         auto start_tick = high_resolution_clock::now();
@@ -142,8 +144,8 @@ void render(
         for(size_t j = 0; j < height; ++j) {
             size_t index = 3 * (width * j + i);
 
-            auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
-            auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
+            auto u = 2 * (static_cast<Scalar>(i) + Scalar(0.5)) / static_cast<Scalar>(width)  - Scalar(1);
+            auto v = 2 * (static_cast<Scalar>(j) + Scalar(0.5)) / static_cast<Scalar>(height) - Scalar(1);
 
             Ray ray(camera.eye, bvh::normalize(image_u * u + image_v * v + dir));
 
@@ -157,25 +159,24 @@ void render(
             }
             if (!hit) {
                 pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
+            } else if (CollectStatistics) {
+                auto combined = statistics.traversal_steps + statistics.intersections;
+                pixels[index    ] = std::min(static_cast<Scalar>(statistics.traversal_steps) * statistics_weights[0], Scalar(1));
+                pixels[index + 1] = std::min(static_cast<Scalar>(statistics.intersections)   * statistics_weights[1], Scalar(1));
+                pixels[index + 2] = std::min(static_cast<Scalar>(combined)                   * statistics_weights[2], Scalar(1));
             } else {
-                if (CollectStatistics) {
-                    auto combined = statistics.traversal_steps + statistics.intersections; 
-                    pixels[index    ] = std::min(statistics.traversal_steps * statistics_weights[0], Scalar(1.0f));
-                    pixels[index + 1] = std::min(statistics.intersections   * statistics_weights[1], Scalar(1.0f));
-                    pixels[index + 2] = std::min(combined                   * statistics_weights[2], Scalar(1.0f));
-                } else {
-                    auto normal = bvh::normalize(triangles[hit->primitive_index].n);
-                    pixels[index    ] = std::fabs(normal[0]);
-                    pixels[index + 1] = std::fabs(normal[1]);
-                    pixels[index + 2] = std::fabs(normal[2]);
-                }
+                auto normal = bvh::normalize(triangles[hit->primitive_index].n);
+                pixels[index    ] = std::fabs(normal[0]);
+                pixels[index + 1] = std::fabs(normal[1]);
+                pixels[index + 2] = std::fabs(normal[2]);
             }
         }
     }
 
     if (CollectStatistics) {
-        std::cout << intersections << " total primitive intersection(s)" << std::endl;
-        std::cout << traversal_steps << " total traversal step(s)" << std::endl;
+        std::cout
+            << intersections << " total primitive intersection(s)\n"
+            << traversal_steps << " total traversal step(s)" << std::endl;
     }
 }
 

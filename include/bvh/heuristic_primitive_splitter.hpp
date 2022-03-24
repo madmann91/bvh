@@ -17,6 +17,7 @@ namespace bvh {
 template <typename Primitive>
 class HeuristicPrimitiveSplitter {
     using Scalar = typename Primitive::ScalarType;
+    using IndexType = typename Bvh<Scalar>::IndexType;
 
     std::unique_ptr<size_t[]> original_indices;
     PrefixSum<size_t> prefix_sum;
@@ -56,7 +57,8 @@ public:
             #pragma omp for
             for (size_t i = 0; i < primitive_count; ++i) {
                 auto priority = compute_priority(primitives[i], primitives[i].bounding_box());
-                split_indices[i] = 1 + priority * (Scalar(primitive_count) * split_factor / total_priority);
+                split_indices[i] = 1 + static_cast<size_t>(priority *
+                    (static_cast<Scalar>(primitive_count) * split_factor / total_priority));
             }
 
             prefix_sum.sum_in_parallel(split_indices.get(), split_indices.get(), primitive_count);
@@ -123,7 +125,8 @@ public:
 
                     auto left_extent  = left_bbox.largest_extent();
                     auto right_extent = right_bbox.largest_extent();
-                    size_t left_count = count * left_extent / (right_extent + left_extent);
+                    size_t left_count = static_cast<size_t>(
+                        static_cast<Scalar>(count) * left_extent / (right_extent + left_extent));
                     left_count = std::max(size_t(1), std::min(count - 1, left_count));
 
                     stack.emplace(left_bbox, left_count);
@@ -145,7 +148,7 @@ public:
                 auto end   = begin + node.primitive_count;
                 std::transform(begin, end, begin, [&] (size_t i) { return original_indices[i]; });
                 std::sort(begin, end);
-                node.primitive_count = std::unique(begin, end) - begin;
+                node.primitive_count = static_cast<IndexType>(std::unique(begin, end) - begin);
             }
         }
     }

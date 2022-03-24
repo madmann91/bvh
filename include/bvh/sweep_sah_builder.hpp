@@ -114,6 +114,7 @@ public:
 template <typename Bvh>
 class SweepSahBuildTask : public TopDownBuildTask {
     using Scalar  = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
     using Builder = SweepSahBuilder<Bvh>;
     using Mark    = uint_fast8_t;
 
@@ -131,13 +132,13 @@ class SweepSahBuildTask : public TopDownBuildTask {
         auto bbox = BoundingBox<Scalar>::empty();
         for (size_t i = end - 1; i > begin; --i) {
             bbox.extend(bboxes[references[axis][i]]);
-            costs[axis][i] = bbox.half_area() * (end - i);
+            costs[axis][i] = bbox.half_area() * static_cast<Scalar>(end - i);
         }
         bbox = BoundingBox<Scalar>::empty();
         auto best_split = std::pair<Scalar, size_t>(std::numeric_limits<Scalar>::max(), end);
         for (size_t i = begin; i < end - 1; ++i) {
             bbox.extend(bboxes[references[axis][i]]);
-            auto cost = bbox.half_area() * (i + 1 - begin) + costs[axis][i + 1];
+            auto cost = bbox.half_area() * static_cast<Scalar>(i + 1 - begin) + costs[axis][i + 1];
             if (cost < best_split.first)
                 best_split = std::make_pair(cost, i + 1);
         }
@@ -168,8 +169,8 @@ public:
         auto& node = bvh.nodes[item.node_index];
 
         auto make_leaf = [] (typename Bvh::Node& node, size_t begin, size_t end) {
-            node.first_child_or_primitive = begin;
-            node.primitive_count          = end - begin;
+            node.first_child_or_primitive = static_cast<IndexType>(begin);
+            node.primitive_count          = static_cast<IndexType>(end - begin);
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {
@@ -185,7 +186,7 @@ public:
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis, item.begin, item.end);
 
-        int best_axis = 0;
+        unsigned best_axis = 0;
         if (best_splits[0].first > best_splits[1].first)
             best_axis = 1;
         if (best_splits[best_axis].first > best_splits[2].first)
@@ -194,7 +195,8 @@ public:
         auto split_index = best_splits[best_axis].second;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
-        auto max_split_cost = node.bounding_box_proxy().half_area() * (item.work_size() - builder.traversal_cost);
+        auto max_split_cost = node.bounding_box_proxy().half_area() *
+            (static_cast<Scalar>(item.work_size()) - builder.traversal_cost);
         if (best_splits[best_axis].first >= max_split_cost) {
             if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: median split on largest axis
@@ -206,7 +208,7 @@ public:
             }
         }
 
-        int other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
+        unsigned other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
 
         for (size_t i = item.begin;  i < split_index; ++i) marks[references[best_axis][i]] = 1;
         for (size_t i = split_index; i < item.end;    ++i) marks[references[best_axis][i]] = 0;
@@ -241,7 +243,7 @@ public:
 
         auto& left  = bvh.nodes[first_child + 0];
         auto& right = bvh.nodes[first_child + 1];
-        node.first_child_or_primitive = first_child;
+        node.first_child_or_primitive = static_cast<IndexType>(first_child);
         node.primitive_count          = 0;
 
         left.bounding_box_proxy()  = left_bbox;

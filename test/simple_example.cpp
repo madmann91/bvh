@@ -49,11 +49,11 @@ static bool build_and_intersect_bvh(const std::vector<Primitive>& primitives) {
         auto intersection = hit->intersection;
         std::cout
             << "Hit primitive " << triangle_index << "\n"
-            << "distance: "    << intersection.t << "\n";
+            << "distance: "     << intersection.t << "\n";
         if constexpr (std::is_same_v<Primitive, Triangle>) {
             std::cout
-                << "u: "           << intersection.u << "\n"
-                << "v: "           << intersection.v << "\n";
+                << "u: " << intersection.u << "\n"
+                << "v: " << intersection.v << "\n";
         }
         return true;
     }

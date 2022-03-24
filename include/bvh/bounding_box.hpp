@@ -50,9 +50,9 @@ struct BoundingBox {
         return d[0] * d[1] * d[2];
     }
 
-    bvh_always_inline size_t largest_axis() const {
+    bvh_always_inline unsigned largest_axis() const {
         auto d = diagonal();
-        size_t axis = 0;
+        unsigned axis = 0;
         if (d[0] < d[1]) axis = 1;
         if (d[axis] < d[2]) axis = 2;
         return axis;

@@ -56,11 +56,12 @@ public:
     {
         assert(primitive_count > 0);
 
-        size_t max_reference_count = primitive_count + primitive_count * split_factor;
+        size_t max_reference_count = primitive_count +
+            static_cast<size_t>(static_cast<Scalar>(primitive_count) * split_factor);
         size_t reference_count = 0;
 
         bvh.nodes = std::make_unique<typename Bvh::Node[]>(2 * max_reference_count + 1);
-        bvh.primitive_indices = std::make_unique<size_t[]>(max_reference_count); 
+        bvh.primitive_indices = std::make_unique<size_t[]>(max_reference_count);
 
         auto accumulated_bboxes = std::make_unique<BoundingBox<Scalar>[]>(max_reference_count);
         auto reference_data     = std::make_unique<Reference[]>(max_reference_count * 3);
@@ -108,8 +109,9 @@ public:
 
 template <typename Bvh, typename Primitive, size_t BinCount>
 class SpatialSplitBvhBuildTask : public TopDownBuildTask {
-    using Scalar  = typename Bvh::ScalarType;
-    using Builder = SpatialSplitBvhBuilder<Bvh, Primitive, BinCount>;
+    using Scalar    = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
+    using Builder   = SpatialSplitBvhBuilder<Bvh, Primitive, BinCount>;
 
     struct WorkItem : public TopDownBuildTask::WorkItem {
         size_t split_end;
@@ -212,7 +214,9 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
             bbox = BoundingBox<Scalar>::empty();
             for (size_t i = begin; i < end - 1; ++i) {
                 bbox.extend(references[axis][i].bbox);
-                auto cost = bbox.half_area() * (i + 1 - begin) + accumulated_bboxes[i + 1].half_area() * (end - (i + 1));
+                auto cost =
+                    static_cast<Scalar>(i + 1 - begin) * bbox.half_area() +
+                    static_cast<Scalar>(end - (i + 1)) * accumulated_bboxes[i + 1].half_area();
                 if (cost < best_split.cost)
                     best_split = ObjectSplit(cost, i + 1, axis, bbox, accumulated_bboxes[i + 1]);
             }
@@ -237,7 +241,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
 
         auto& left  = bvh.nodes[first_child + 0];
         auto& right = bvh.nodes[first_child + 1];
-        parent.first_child_or_primitive = first_child;
+        parent.first_child_or_primitive = static_cast<IndexType>(first_child);
         parent.primitive_count          = 0;
 
         left.bounding_box_proxy()  = left_bbox;
@@ -249,14 +253,14 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
         // - [right_begin...right_end[ is the range of references on the right,
         // - [right_end...item.split_end[ is the free split space
         assert(item.begin < right_begin && right_begin < right_end && right_end <= item.split_end);
-        size_t remaining_split_count = item.split_end - right_end;
-        auto left_cost  = left_bbox.half_area() * (right_begin - item.begin);
-        auto right_cost = right_bbox.half_area() * (right_end - right_begin);
+        auto remaining_split_count = item.split_end - right_end;
+        auto left_cost  = left_bbox.half_area() * static_cast<Scalar>(right_begin - item.begin);
+        auto right_cost = right_bbox.half_area() * static_cast<Scalar>(right_end - right_begin);
         auto left_split_ratio = left_cost + right_cost > 0 ? left_cost / (left_cost + right_cost) : Scalar(0.5);
-        size_t left_split_count = remaining_split_count * left_split_ratio;
+        auto left_split_count = static_cast<size_t>(static_cast<Scalar>(remaining_split_count) * left_split_ratio);
         assert(left_split_count <= remaining_split_count);
 
-        // Move references of the right child to leave some split space for the left one 
+        // Move references of the right child to leave some split space for the left one
         if (left_split_count > 0) {
             std::move_backward(references[0] + right_begin, references[0] + right_end, references[0] + right_end + left_split_count);
             std::move_backward(references[1] + right_begin, references[1] + right_end, references[1] + right_end + left_split_count);
@@ -310,7 +314,8 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
             auto last_bin  = std::min(bin_count - 1, size_t(std::max(Scalar(0), inv_size * (reference.bbox.max[axis] - min))));
             auto current_bbox = reference.bbox;
             for (size_t j = first_bin; j < last_bin; ++j) {
-                auto [left_bbox, right_bbox] = primitives[reference.primitive_index].split(axis, min + (j + 1) * bin_size);
+                auto [left_bbox, right_bbox] = primitives[reference.primitive_index].split(
+                    axis, min + static_cast<Scalar>(j + 1) * bin_size);
                 bins[j].bbox.extend(left_bbox.shrink(current_bbox));
                 current_bbox.shrink(right_bbox);
             }
@@ -333,11 +338,13 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
             right_count -= bins[i].exit;
             current_bbox.extend(bins[i].bbox);
 
-            auto cost = left_count * current_bbox.half_area() + right_count * bins[i + 1].accumulated_bbox.half_area();
+            auto cost =
+                static_cast<Scalar>(left_count)  * current_bbox.half_area() +
+                static_cast<Scalar>(right_count) * bins[i + 1].accumulated_bbox.half_area();
             if (cost < split.cost) {
                 split.cost = cost;
                 split.axis = axis;
-                split.position = min + (i + 1) * bin_size;
+                split.position = min + static_cast<Scalar>(i + 1) * bin_size;
                 found = true;
             }
         }
@@ -358,7 +365,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
                 else
                     break;
             }
-        } 
+        }
         return split;
     }
 
@@ -451,7 +458,7 @@ class SpatialSplitBvhBuildTask : public TopDownBuildTask {
                 std::swap(references_to_split[--right_begin], references_to_split[left_end]);
                 right_count++;
             }
-        } 
+        }
 
         std::copy(
             references_to_split + item.begin,
@@ -516,8 +523,8 @@ public:
             // Copy the primitives indices from the references to the BVH
             for (size_t i = 0; i < primitive_count; ++i)
                 bvh.primitive_indices[first_primitive + i] = references[0][begin + i].primitive_index;
-            node.first_child_or_primitive = first_primitive;
-            node.primitive_count          = primitive_count;
+            node.first_child_or_primitive = static_cast<IndexType>(first_primitive);
+            node.primitive_count          = static_cast<IndexType>(primitive_count);
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {
@@ -539,7 +546,8 @@ public:
         bool use_spatial_split = best_cost < best_object_split.cost;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
-        auto max_split_cost = node.bounding_box_proxy().half_area() * (item.work_size() - builder.traversal_cost);
+        auto max_split_cost = node.bounding_box_proxy().half_area() *
+            (static_cast<Scalar>(item.work_size()) - builder.traversal_cost);
         if (best_cost >= max_split_cost) {
             if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: median split on the largest axis

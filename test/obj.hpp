@@ -32,7 +32,7 @@ inline std::optional<int> read_index(char** ptr) {
     if (!std::isdigit(*base) && *base != '-')
         return std::nullopt;
 
-    int index = std::strtol(base, &base, 10);
+    int index = static_cast<int>(std::strtol(base, &base, 10));
     base = strip_spaces(base);
 
     if (*base == '/') {

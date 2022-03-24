@@ -53,7 +53,7 @@ private:
 
         // Re-insert it into the destination
         bvh.nodes[out].bounding_box_proxy().extend(bvh.nodes[in].bounding_box_proxy());
-        bvh.nodes[out].first_child_or_primitive = std::min(in, sibling_in);
+        bvh.nodes[out].first_child_or_primitive = static_cast<typename Bvh::IndexType>(std::min(in, sibling_in));
         bvh.nodes[out].primitive_count = 0;
         bvh.nodes[sibling_in] = out_node;
         bvh.nodes[parent_in] = sibling_node;
@@ -137,7 +137,7 @@ private:
     }
 
 public:
-    void optimize(size_t u = 9, Scalar threshold = 0.1) {
+    void optimize(size_t u = 9, Scalar threshold = Scalar(0.1)) {
         auto locks = std::make_unique<std::atomic<uint64_t>[]>(bvh.node_count);
         auto outs  = std::make_unique<Insertion[]>(bvh.node_count);
 

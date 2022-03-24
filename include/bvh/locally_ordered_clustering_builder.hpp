@@ -19,8 +19,9 @@ namespace bvh {
 /// by D. Meister and J. Bittner.
 template <typename Bvh, typename Morton>
 class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morton> {
-    using Scalar = typename Bvh::ScalarType;
-    using Node   = typename Bvh::Node;
+    using Scalar    = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
+    using Node      = typename Bvh::Node;
 
     using ParentBuilder = MortonCodeBasedBuilder<Bvh, Morton>;
     using ParentBuilder::sort_primitives_by_morton_code;
@@ -154,7 +155,7 @@ class LocallyOrderedClusteringBuilder : public MortonCodeBasedBuilder<Bvh, Morto
                             .to_bounding_box()
                             .extend(input[i].bounding_box_proxy());
                         unmerged_node.primitive_count = 0;
-                        unmerged_node.first_child_or_primitive = first_child;
+                        unmerged_node.first_child_or_primitive = static_cast<IndexType>(first_child);
                         output[first_child + 0] = input[i];
                         output[first_child + 1] = input[j];
                     }
@@ -209,7 +210,7 @@ public:
             auto& node = nodes[begin + i];
             node.bounding_box_proxy()     = bboxes[primitive_indices[i]];
             node.primitive_count          = 1;
-            node.first_child_or_primitive = i;
+            node.first_child_or_primitive = static_cast<IndexType>(i);
         }
 
         while (end - begin > 1) {

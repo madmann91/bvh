@@ -68,8 +68,9 @@ public:
 
 template <typename Bvh, size_t BinCount>
 class BinnedSahBuildTask : public TopDownBuildTask {
-    using Scalar  = typename Bvh::ScalarType;
-    using Builder = BinnedSahBuilder<Bvh, BinCount>;
+    using Scalar    = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
+    using Builder   = BinnedSahBuilder<Bvh, BinCount>;
 
     using TopDownBuildTask::WorkItem;
 
@@ -95,7 +96,7 @@ class BinnedSahBuildTask : public TopDownBuildTask {
         for (size_t i = bin_count - 1; i > 0; --i) {
             current_bbox.extend(bins[i].bbox);
             current_count += bins[i].primitive_count;
-            bins[i].right_cost = current_bbox.half_area() * current_count;
+            bins[i].right_cost = current_bbox.half_area() * static_cast<Scalar>(current_count);
         }
 
         // Left sweep to compute full cost and find minimum
@@ -106,7 +107,7 @@ class BinnedSahBuildTask : public TopDownBuildTask {
         for (size_t i = 0; i < bin_count - 1; ++i) {
             current_bbox.extend(bins[i].bbox);
             current_count += bins[i].primitive_count;
-            auto cost = current_bbox.half_area() * current_count + bins[i + 1].right_cost;
+            auto cost = current_bbox.half_area() * static_cast<Scalar>(current_count) + bins[i + 1].right_cost;
             if (cost < best_split.first)
                 best_split = std::make_pair(cost, i + 1);
         }
@@ -125,8 +126,8 @@ public:
         auto& node = bvh.nodes[item.node_index];
 
         auto make_leaf = [] (typename Bvh::Node& node, size_t begin, size_t end) {
-            node.first_child_or_primitive = begin;
-            node.primitive_count          = end - begin;
+            node.first_child_or_primitive = static_cast<IndexType>(begin);
+            node.primitive_count          = static_cast<IndexType>(end - begin);
         };
 
         if (item.work_size() <= 1 || item.depth >= builder.max_depth) {
@@ -167,7 +168,7 @@ public:
         for (int axis = 0; axis < 3; ++axis)
             best_splits[axis] = find_split(axis);
 
-        int best_axis = 0;
+        unsigned best_axis = 0;
         if (best_splits[0].first > best_splits[1].first)
             best_axis = 1;
         if (best_splits[best_axis].first > best_splits[2].first)
@@ -176,7 +177,8 @@ public:
         auto split_index = best_splits[best_axis].second;
 
         // Make sure the cost of splitting does not exceed the cost of not splitting
-        auto max_split_cost = node.bounding_box_proxy().half_area() * (item.work_size() - builder.traversal_cost);
+        auto max_split_cost = node.bounding_box_proxy().half_area() *
+            (static_cast<Scalar>(item.work_size()) - builder.traversal_cost);
         if (best_splits[best_axis].second == bin_count || best_splits[best_axis].first >= max_split_cost) {
             if (item.work_size() > builder.max_leaf_size) {
                 // Fallback strategy: approximate median split on largest axis
@@ -209,7 +211,7 @@ public:
 
             auto& left  = bvh.nodes[first_child + 0];
             auto& right = bvh.nodes[first_child + 1];
-            node.first_child_or_primitive = first_child;
+            node.first_child_or_primitive = static_cast<IndexType>(first_child);
             node.primitive_count          = 0;
 
             // Compute the bounding boxes of each node

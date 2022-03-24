@@ -18,6 +18,7 @@ namespace bvh {
 template <typename Bvh>
 class LeafCollapser : public SahBasedAlgorithm<Bvh>, public BottomUpAlgorithm<Bvh> {
     using Scalar = typename Bvh::ScalarType;
+    using IndexType = typename Bvh::IndexType;
 
     PrefixSum<size_t> prefix_sum;
 
@@ -68,8 +69,8 @@ public:
                         auto collapse_cost =
                             node.bounding_box_proxy().to_bounding_box().half_area() * (Scalar(total_primitive_count) - traversal_cost);
                         auto base_cost =
-                            left_child .bounding_box_proxy().to_bounding_box().half_area() * left_primitive_count +
-                            right_child.bounding_box_proxy().to_bounding_box().half_area() * right_primitive_count;
+                            left_child .bounding_box_proxy().to_bounding_box().half_area() * static_cast<Scalar>(left_primitive_count) +
+                            right_child.bounding_box_proxy().to_bounding_box().half_area() * static_cast<Scalar>(right_primitive_count);
                         if (collapse_cost <= base_cost) {
                             primitive_counts[i] = total_primitive_count;
                             primitive_counts[first_child + 0] = 0;
@@ -90,7 +91,7 @@ public:
                     // This means the root node has become a leaf.
                     // We avoid copying the data and just swap the old primitive array with the new one.
                     bvh.nodes[0].first_child_or_primitive = 0;
-                    bvh.nodes[0].primitive_count = primitive_counts[0];
+                    bvh.nodes[0].primitive_count = static_cast<IndexType>(primitive_counts[0]);
                     std::swap(bvh.primitive_indices, primitive_indices_copy);
                     std::swap(bvh.nodes, nodes_copy);
                     bvh.node_count = 0;
@@ -98,8 +99,8 @@ public:
                     nodes_copy = std::make_unique<typename Bvh::Node[]>(node_count);
                     primitive_indices_copy = std::make_unique<size_t[]>(primitive_counts[bvh.node_count - 1]);
                     nodes_copy[0] = bvh.nodes[0];
-                    nodes_copy[0].first_child_or_primitive =
-                        node_counts[nodes_copy[0].first_child_or_primitive - 1];
+                    nodes_copy[0].first_child_or_primitive = static_cast<IndexType>(
+                        node_counts[nodes_copy[0].first_child_or_primitive - 1]);
                 }
             }
 
@@ -112,8 +113,8 @@ public:
                 nodes_copy[node_index] = bvh.nodes[i];
                 size_t first_primitive = primitive_counts[i - 1];
                 if (first_primitive != primitive_counts[i]) {
-                    nodes_copy[node_index].primitive_count = primitive_counts[i] - first_primitive;
-                    nodes_copy[node_index].first_child_or_primitive = first_primitive;
+                    nodes_copy[node_index].primitive_count = static_cast<IndexType>(primitive_counts[i] - first_primitive);
+                    nodes_copy[node_index].first_child_or_primitive = static_cast<IndexType>(first_primitive);
 
                     // Top-down traversal to store the primitives contained in this subtree.
                     size_t j = i;
@@ -136,7 +137,7 @@ public:
                     assert(first_primitive == primitive_counts[i]);
                 } else {
                     auto& first_child = nodes_copy[node_index].first_child_or_primitive;
-                    first_child = node_counts[first_child - 1];
+                    first_child = static_cast<IndexType>(node_counts[first_child - 1]);
                 }
             }
         }
