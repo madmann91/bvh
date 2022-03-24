@@ -76,8 +76,8 @@ int main() {
         return 1;
 
     std::vector<Sphere> spheres;
-    spheres.emplace_back(Vector3( 1.0, -1.0, 1.0), 1.0);
-    spheres.emplace_back(Vector3( 0.0,  0.0, 2.0), 0.5);
+    spheres.emplace_back(Vector3( 1.0, -1.0, 1.0), Scalar(1.0));
+    spheres.emplace_back(Vector3( 0.0,  0.0, 2.0), Scalar(0.5));
     if (!build_and_intersect_bvh(spheres))
         return 1;
     return 0;

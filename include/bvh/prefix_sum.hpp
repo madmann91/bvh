@@ -53,7 +53,7 @@ public:
         #pragma omp barrier
 
         // Fix the sums
-        auto offset = std::accumulate(per_thread_sums.get(), per_thread_sums.get() + thread_id + 1, 0, f);
+        auto offset = std::accumulate(per_thread_sums.get(), per_thread_sums.get() + thread_id + 1, T(0), f);
 
         #pragma omp for schedule(static)
         for (size_t i = 0; i < count; ++i)

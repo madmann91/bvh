@@ -17,7 +17,7 @@ Morton morton_split(Morton x) {
     constexpr size_t log_bits = round_up_log2(bit_count);
     auto mask = Morton(-1) >> (bit_count / 2);
     x &= mask;
-    for (size_t i = log_bits - 1, n = 1 << i; i > 0; --i, n >>= 1) {
+    for (size_t i = log_bits - 1, n = size_t{1} << i; i > 0; --i, n >>= 1) {
         mask = (mask | (mask << n)) & ~(mask << (n / 2));
         x = (x | (x << n)) & mask;
     }

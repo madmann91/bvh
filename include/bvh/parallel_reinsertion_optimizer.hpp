@@ -32,6 +32,9 @@ public:
     {}
 
 private:
+    static constexpr Insertion invalid_insertion { size_t{0}, Scalar(0) };
+    static constexpr bool is_valid_insertion(const Insertion& insertion) { return insertion.second > 0; }
+
     std::array<size_t, 6> get_conflicts(size_t in, size_t out) {
         // Return an array of re-insertion conflicts for the given nodes
         auto parent_in = parents[in];
@@ -132,7 +135,7 @@ private:
         }
 
         if (in == out_best || bvh.sibling(in) == out_best || parents[in] == out_best)
-            return Insertion { 0, 0 };
+            return invalid_insertion;
         return Insertion { out_best, d_best };
     }
 
@@ -160,7 +163,7 @@ public:
                 // Resolve topological conflicts with locking
                 #pragma omp for
                 for (size_t i = first_node; i < bvh.node_count; i += u) {
-                    if (outs[i].second <= 0)
+                    if (!is_valid_insertion(outs[i]))
                         continue;
                     // Encode locks into 64 bits using the highest 32 bits for the cost and the
                     // lowest 32 bits for the index of the node requesting the re-insertion.
@@ -174,7 +177,7 @@ public:
                 // Check the locks to disable conflicting re-insertions
                 #pragma omp for
                 for (size_t i = first_node; i < bvh.node_count; i += u) {
-                    if (outs[i].second <= 0)
+                    if (!is_valid_insertion(outs[i]))
                         continue;
                     auto conflicts = get_conflicts(i, outs[i].first);
                     // Make sure that this node owns all the locks for each and every conflicting node
@@ -182,13 +185,13 @@ public:
                         return (locks[j] & UINT64_C(0xFFFFFFFF)) == i;
                     });
                     if (!is_conflict_free)
-                        outs[i] = Insertion { 0, 0 };
+                        outs[i] = invalid_insertion;
                 }
 
                 // Perform the reinsertions
                 #pragma omp for
                 for (size_t i = first_node; i < bvh.node_count; i += u) {
-                    if (outs[i].second > 0)
+                    if (is_valid_insertion(outs[i]))
                         reinsert(i, outs[i].first);
                 }
 
