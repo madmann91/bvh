@@ -18,7 +18,8 @@ namespace bvh {
 /// Note that the methods of this class cannot be called in parallel.
 template <typename Bvh>
 class TopologyModifier {
-    using Node = typename Bvh::Node;
+    using Index = typename Bvh::Index;
+    using Node  = typename Bvh::Node;
 
 public:
     Bvh& bvh;
@@ -58,7 +59,7 @@ public:
         auto old_node = bvh.nodes[target];
         auto first_child = free_list.back();
         free_list.pop_back();
-        bvh.nodes[target].first_index = first_child;
+        bvh.nodes[target].first_index = static_cast<Index>(first_child);
         bvh.nodes[target].prim_count  = 0;
         bvh.nodes[first_child + 0] = node;
         bvh.nodes[first_child + 1] = old_node;

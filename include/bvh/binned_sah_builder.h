@@ -25,6 +25,7 @@ namespace bvh {
 template <typename Bvh, size_t BinCount = 16>
 class BinnedSahBuilder {
     using Scalar = typename Bvh::Scalar;
+    using Index  = typename Bvh::Index;
     using Node   = typename Bvh::Node;
     using BBox   = proto::BBox<Scalar>;
     using Vec3   = proto::Vec3<Scalar>;
@@ -55,7 +56,7 @@ private:
         }
 
         Scalar proto_always_inline cost() const {
-            return prim_count * bbox.half_area();
+            return static_cast<Scalar>(prim_count) * bbox.half_area();
         }
 
         static proto_always_inline std::pair<Scalar, Scalar> offset_and_scale(Scalar min, Scalar max) {
@@ -99,8 +100,8 @@ private:
         std::optional<std::pair<WorkItem, WorkItem>> run(WorkItem&& item) const {
             // Make the current node a leaf
             auto& node = bvh_.nodes[item.node_index];
-            node.prim_count  = item.size();
-            node.first_index = item.begin;
+            node.prim_count  = static_cast<Index>(item.size());
+            node.first_index = static_cast<Index>(item.begin);
 
             if (item.depth >= config_.max_depth ||
                 item.size() <= config_.min_prims_per_leaf)
@@ -147,11 +148,7 @@ private:
             auto left_bbox  = BBox::empty();
             auto right_bbox = BBox::empty();
 
-            // Test the validity of the split using the SAH stopping criterion:
-            // If the SAH cost of the split is higher than the SAH cost of the current node as a leaf,
-            // then the split is not useful (in the sense of the SAH).
-            auto leaf_cost = node.bbox().half_area() * (item.size() - config_.traversal_cost);
-            if (!split || split.cost >= leaf_cost) {
+            if (!split || !config_.is_good_split(split.cost, node.bbox().half_area(), item.size())) {
                 // If the split is not useful, then we can create a leaf.
                 // However, if there are too many primitives to create a leaf,
                 // we apply the fallback strategy: A median split.
@@ -194,7 +191,7 @@ private:
             auto left_index = node_count_.fetch_add(2);
             bvh_.nodes[left_index + 0].bbox_proxy() = left_bbox;
             bvh_.nodes[left_index + 1].bbox_proxy() = right_bbox;
-            node.first_index = left_index;
+            node.first_index = static_cast<Index>(left_index);
             node.prim_count = 0;
             return std::make_optional(std::pair {
                 WorkItem { left_index,     item.depth + 1, item.begin,  right_begin },

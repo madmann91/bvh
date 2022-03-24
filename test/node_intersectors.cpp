@@ -20,12 +20,12 @@ bool intersect_bvh_node(const Bvh::Node& node, const Ray& ray) {
 
 int main() {
     Bvh::Node node;
-    node.bounds[0] =  -1;
-    node.bounds[1] =   1;
-    node.bounds[2] =  -1;
-    node.bounds[3] =   1;
-    node.bounds[4] = 2.1;
-    node.bounds[5] = 2.1;
+    node.bounds[0] = Scalar( -1);
+    node.bounds[1] = Scalar(  1);
+    node.bounds[2] = Scalar( -1);
+    node.bounds[3] = Scalar(  1);
+    node.bounds[4] = Scalar(2.1);
+    node.bounds[5] = Scalar(2.1);
 
     Ray ray(
         Vec3(0.25, 0.25, 0.0), // origin

@@ -22,6 +22,7 @@ namespace bvh {
 template <typename Bvh>
 class ParallelReinsertionOptimizer {
     using Scalar = typename Bvh::Scalar;
+    using Index  = typename Bvh::Index;
     using Node   = typename Bvh::Node;
     using BBox   = proto::BBox<Scalar>;
 
@@ -39,6 +40,9 @@ public:
     {}
 
 private:
+    static constexpr auto invalid_insertion = Insertion { size_t{0}, Scalar(0) };
+    static constexpr bool is_valid_insertion(const Insertion& insertion) { return insertion.second > 0; }
+
     ConflictList conflicts(size_t in, size_t out) const {
         // Return an array of re-insertion conflicts for the given nodes
         auto parent_in = parents_[in];
@@ -60,7 +64,7 @@ private:
 
         // Re-insert it into the destination
         bvh_.nodes[out].bbox_proxy().extend(bvh_.nodes[in].bbox());
-        bvh_.nodes[out].first_index = std::min(in, sibling_in);
+        bvh_.nodes[out].first_index = static_cast<Index>(std::min(in, sibling_in));
         bvh_.nodes[out].prim_count = 0;
         bvh_.nodes[sibling_in] = out_node;
         bvh_.nodes[parent_in] = sibling_node;
@@ -139,7 +143,7 @@ private:
         }
 
         if (in == out_best || Bvh::sibling(in) == out_best || parents_[in] == out_best)
-            return Insertion { 0, 0 };
+            return invalid_insertion;
         return Insertion { out_best, d_best };
     }
 
@@ -152,7 +156,7 @@ private:
 
 public:
     template <typename Executor>
-    void optimize(Executor& executor, size_t u = 9, Scalar threshold = 0.1, Scalar traversal_cost = 1) {
+    void optimize(Executor& executor, size_t u = 9, Scalar threshold = Scalar(0.1), Scalar traversal_cost = Scalar(1)) {
         auto locks = std::make_unique<std::atomic<uint64_t>[]>(bvh_.nodes.size());
         auto outs  = std::make_unique<Insertion[]>(bvh_.nodes.size());
 
@@ -168,7 +172,7 @@ public:
 
             // Resolve topological conflicts with locking
             forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
-                if (outs[i].second <= 0)
+                if (!is_valid_insertion(outs[i]))
                     return;
                 // Encode locks into 64 bits using the highest 32 bits for the cost and the
                 // lowest 32 bits for the index of the node requesting the re-insertion.
@@ -181,7 +185,7 @@ public:
 
             // Check the locks to disable conflicting re-insertions
             forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
-                if (outs[i].second <= 0)
+                if (!is_valid_insertion(outs[i]))
                     return;
                 auto c = conflicts(i, outs[i].first);
                 // Make sure that this node owns all the locks for each and every conflicting node
@@ -189,12 +193,12 @@ public:
                     return (locks[j] & UINT64_C(0xFFFFFFFF)) == i;
                 });
                 if (!is_conflict_free)
-                    outs[i] = Insertion { 0, 0 };
+                    outs[i] = invalid_insertion;
             });
 
             // Perform the reinsertions
             forall_nodes_in_iter(executor, first_node, u, [&] (size_t i) {
-                if (outs[i].second > 0)
+                if (is_valid_insertion(outs[i]))
                     reinsert(i, outs[i].first);
             });
 

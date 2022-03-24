@@ -28,12 +28,21 @@ struct Bvh {
     using Scalar = T;
     using Index  = std::make_unsigned_t<proto::SizedIntegerType<sizeof(T) * CHAR_BIT>>;
 
+    /// Default traversal cost used when none is supplied.
+    /// This corresponds to a BVH holding primitives that have a ray intersection routine that is
+    /// as expensive as a ray-box intersection routine.
+    static constexpr auto default_traversal_cost = Scalar(1);
+
     struct Node {
         T bounds[6];
         Index prim_count;
         Index first_index;
 
         bool is_leaf() const { return prim_count != 0; }
+
+        Scalar sah_cost(Scalar traversal_cost = default_traversal_cost) const {
+            return bbox().half_area() * (is_leaf() ? static_cast<Scalar>(prim_count) : traversal_cost);
+        }
 
         /// Accessor to simplify the manipulation of the bounding box of a node.
         /// This type is convertible to a `BBox`.
@@ -92,13 +101,11 @@ struct Bvh {
     /// The `traversal_cost` parameter represents the ratio of the cost
     /// of traversing a node over the cost of intersecting a primitive.
     template <typename Executor>
-    Scalar sah_cost(Executor& executor, Scalar traversal_cost = Scalar(1)) const {
+    Scalar sah_cost(Executor& executor, Scalar traversal_cost = default_traversal_cost) const {
         return par::transform_reduce(
             executor, par::range_1d(size_t{0}, nodes.size()), Scalar(0),
             std::plus<Scalar> {},
-            [&] (size_t i) {
-                return nodes[i].bbox().half_area() * (nodes[i].is_leaf() ? nodes[i].prim_count : traversal_cost);
-            }) / nodes[0].bbox().half_area();
+            [&] (size_t i) { return nodes[i].sah_cost(traversal_cost); }) / nodes[0].bbox().half_area();
     }
 
     /// Computes the parent-child indices.

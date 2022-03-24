@@ -22,6 +22,13 @@ struct TopDownBuilderConfig {
     /// For instance, a cost of 2 would mean that traversing a node is twice as slow as
     /// intersecting a primitive.
     T traversal_cost = T(1.0);
+
+    /// Returns true if splitting the current node is better than not splitting it.
+    bool is_good_split(T split_cost, T half_area, size_t item_count) const {
+        // If the SAH cost of the split is higher than the SAH cost of the current node as a leaf,
+        // then the split is not useful (in the sense of the SAH).
+        return split_cost < half_area * (static_cast<T>(item_count) - traversal_cost);
+    }
 };
 
 /// Base class for all top-down schedulers. Top-down schedulers are objects that controls how

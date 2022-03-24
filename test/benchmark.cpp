@@ -52,6 +52,11 @@ using BBox     = proto::BBox<Scalar>;
 using Ray      = proto::Ray<Scalar>;
 using Bvh      = bvh::Bvh<Scalar>;
 
+using Builder = std::function<
+    size_t (Bvh&, const Triangle*, const BBox&, const BBox*, const Vec3*, size_t)>;
+
+#include "obj.h"
+
 #if defined(BVH_ENABLE_TBB)
 template <typename Builder>
 using TopDownScheduler   = bvh::tbb::ParallelTopDownScheduler<Builder>;
@@ -63,86 +68,6 @@ template <typename Builder>
 using TopDownScheduler   = bvh::SequentialTopDownScheduler<Builder>;
 #endif
 
-#include "obj.h"
-
-template <typename F>
-void profile(const char* task, F f, size_t runs = 1) {
-    using namespace std::chrono;
-    std::vector<double> timings;
-
-    for (size_t i = 0; i < runs; ++i) {
-        auto start_tick = high_resolution_clock::now();
-        f();
-        auto end_tick = high_resolution_clock::now();
-        timings.push_back(duration_cast<milliseconds>(end_tick - start_tick).count());
-    }
-
-    std::sort(timings.begin(), timings.end());
-    if (timings.size() == 1)
-        std::cout << task << " took " << timings.front() << "ms" << std::endl;
-    else {
-        std::cout
-            << task << " took "
-            << timings.front() << "/"
-            << timings[timings.size() / 2] << "/"
-            << timings.back() << "ms (min/med/max of " << runs << " runs)" << std::endl;
-    }
-}
-
-static size_t compute_bvh_depth(const Bvh& bvh, size_t node_index = 0) {
-    auto& node = bvh.nodes[node_index];
-    if (node.prim_count == 0) {
-        return 1 + std::max(
-            compute_bvh_depth(bvh, node.first_index + 0),
-            compute_bvh_depth(bvh, node.first_index + 1));
-    } else
-        return 0;
-}
-
-static int not_enough_arguments(const char* option) {
-    std::cerr << "Not enough arguments for '" << option << "'" << std::endl;
-    return 1;
-}
-
-static void usage() {
-    std::cout <<
-        "Usage: benchmark [options] file.obj\n"
-        "\nOptions:\n"
-        "  --help                   Shows this message.\n"
-        "  --builder <name>         Sets the BVH builder to use (defaults to 'binned_sah').\n"
-        "  --permute                Activates the primitive permutation optimization (disabled by default).\n"
-        "  --optimize-layout        Activates the node layout optimization (disabled by default).\n"
-        "  --collapse-leaves        Activates the leaf collapse optimization (disabled by default).\n"
-        "  --parallel-reinsertion   Activates the parallel reinsertion optimization (disabled by default).\n"
-        "  --sequential-reinsertion Activates the sequential reinsertion optimization (disabled by default).\n"
-        "  --pre-split <percent>    Activates pre-splitting and sets the percentage of references (disabled by default).\n"
-        "  --build-iterations <n>   Sets the number of construction iterations (equal to 1 by default).\n"
-        "  --eye <x> <y> <z>        Sets the position of the camera.\n"
-        "  --dir <x> <y> <z>        Sets the direction of the camera.\n"
-        "  --up  <x> <y> <z>        Sets the up vector of the camera.\n"
-        "  --fov <degrees>          Sets the field of view.\n"
-        "  --width <pixels>         Sets the image width.\n"
-        "  --height <pixels>        Sets the image height.\n"
-        "  -o <file.ppm>            Sets the output file name (defaults to 'render.ppm').\n\n"
-        "  --rotate <axis> <degrees>\n\n"
-        "    Rotates the scene by the given amount of degrees on the\n"
-        "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
-        "    intended to test the impact of pre-splitting.\n\n"
-        "  --collect-statistics <t> <i> <c>\n\n"
-        "    Collects traversal statistics per pixel.\n"
-        "    The arguments represent the weight of traversal steps (t),\n"
-        "    primitive intersections (i), and the sum of the two (s).\n"
-        "    These statistics are then converted to bytes and stored in\n"
-        "    the red, green, and blue channels of the image, respectively.\n\n"
-        "Builders:\n"
-        "  binned_sah,\n"
-        "  sweep_sah,\n"
-        "  spatial_split,\n"
-        "  locally_ordered_clustering,\n"
-        "  linear\n"
-        << std::endl;
-}
-
 struct Camera {
     Vec3 eye;
     Vec3 dir;
@@ -150,124 +75,18 @@ struct Camera {
     Scalar  fov;
 };
 
-template <bool IsPermuted, bool CollectStatistics, typename Executor>
-void render(
-    Executor& executor,
-    const Camera& camera,
-    const Bvh& bvh,
-    const Triangle* triangles,
-    Scalar* pixels,
-    size_t width, size_t height,
-    const Scalar* stats_weights = NULL)
-{
-    auto dir = proto::normalize(camera.dir);
-    auto image_u = proto::normalize(proto::cross(dir, camera.up));
-    auto image_v = proto::normalize(proto::cross(image_u, dir));
-    auto image_w = std::tan(camera.fov * Scalar(3.14159265 * (1.0 / 180.0) * 0.5));
-    auto ratio = Scalar(height) / Scalar(width);
-    image_u = image_u * image_w;
-    image_v = image_v * image_w * ratio;
-
-    std::atomic<size_t> total_intr_count = 0, total_visited_nodes = 0;
-    par::for_each(
-        executor, par::range_2d(size_t{0}, width, size_t{0}, height),
-        [&] (size_t i, size_t j) {
-            size_t index = 3 * (width * j + i);
-
-            auto u = 2 * (i + Scalar(0.5)) / Scalar(width)  - Scalar(1);
-            auto v = 2 * (j + Scalar(0.5)) / Scalar(height) - Scalar(1);
-
-            Ray ray(camera.eye, proto::normalize(image_u * u + image_v * v + dir));
-
-            struct Hit {
-                ptrdiff_t tri_index = -1;
-                operator bool () const { return tri_index >= 0; }
-            };
-
-            size_t visited_nodes = 0, intr_count = 0;
-            auto node_visitor = [&] (const Bvh::Node&) { if constexpr (CollectStatistics) visited_nodes++; };
-            auto leaf_intersector = [&] (Ray& ray, const Bvh::Node& leaf) {
-                Hit hit;
-                for (size_t i = 0; i < leaf.prim_count; ++i) {
-                    size_t j = leaf.first_index + i;
-                    if constexpr (IsPermuted) {
-                        if (triangles[j].intersect(ray))
-                            hit = Hit { static_cast<ptrdiff_t>(j) };
-                    } else {
-                        size_t prim_index = bvh.prim_indices[j];
-                        if (auto intr = triangles[prim_index].intersect(ray))
-                            hit = Hit { static_cast<ptrdiff_t>(prim_index) };
-                    }
-                }
-                if constexpr (CollectStatistics)
-                    intr_count += leaf.prim_count;
-                return hit;
-            };
-
-            bvh::SingleRayTraverser<Bvh>::FastNodeIntersector node_intersector(ray);
-            bvh::SingleRayTraverser<Bvh>::Stack<bvh::SingleRayTraverser<Bvh>::default_stack_size> stack;
-            auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(stack, ray, bvh, node_intersector, leaf_intersector, node_visitor);
-            if (!hit) {
-                pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
-            } else {
-                if constexpr (CollectStatistics) {
-                    auto combined = visited_nodes + intr_count;
-                    pixels[index    ] = std::min(visited_nodes * stats_weights[0], Scalar(1.0f));
-                    pixels[index + 1] = std::min(intr_count    * stats_weights[1], Scalar(1.0f));
-                    pixels[index + 2] = std::min(combined      * stats_weights[2], Scalar(1.0f));
-                } else {
-                    auto normal = proto::normalize(triangles[hit.tri_index].normal());
-                    pixels[index    ] = std::fabs(normal[0]);
-                    pixels[index + 1] = std::fabs(normal[1]);
-                    pixels[index + 2] = std::fabs(normal[2]);
-                }
-            }
-            total_intr_count    += intr_count;
-            total_visited_nodes += visited_nodes;
-        });
-
-    if (CollectStatistics) {
-        std::cout << total_intr_count    << " total primitive intersection(s)" << std::endl;
-        std::cout << total_visited_nodes << " total nodes visited(s)" << std::endl;
-    }
-}
-
-template <size_t Axis>
-static void rotate_triangles(Scalar degrees, Triangle* triangles, size_t triangle_count) {
-    static constexpr Scalar pi = Scalar(3.14159265359);
-    auto cos = std::cos(degrees * pi / Scalar(180));
-    auto sin = std::sin(degrees * pi / Scalar(180));
-    auto rotate = [&] (const Vec3& p) {
-        if constexpr (Axis == 0)
-            return Vec3(p[0], p[1] * cos - p[2] * sin, p[1] * sin + p[2] * cos);
-        else if constexpr (Axis == 1)
-            return Vec3(p[0] * cos + p[2] * sin, p[1], -p[0] * sin + p[2] * cos);
-        else
-            return Vec3(p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos, p[2]);
-    };
-    for (size_t i = 0; i < triangle_count; ++i) {
-        auto v0 = rotate(triangles[i].v0);
-        auto v1 = rotate(triangles[i].v1);
-        auto v2 = rotate(triangles[i].v2);
-        triangles[i] = Triangle(v0, v1, v2);
-    }
-}
-
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        usage();
-        return 1;
-    }
-
+struct Options {
     const char* output_file  = "render.ppm";
     const char* input_file   = NULL;
     const char* builder_name = "binned_sah";
+
     Camera camera = {
         Vec3(0, 0, -10),
         Vec3(0, 0, 1),
         Vec3(0, 1, 0),
         60
     };
+
     bool permute = false;
     bool optimize_layout = false;
     bool parallel_reinsertion = false;
@@ -281,11 +100,70 @@ int main(int argc, char** argv) {
     Scalar stats_weights[3];
     size_t width  = 1080;
     size_t height = 720;
-    for (int i = 1; i < argc; ++i) {
-        if (argv[i][0] == '-') {
+
+    static bool not_enough_arguments(const char* option) {
+        std::cerr << "Not enough arguments for '" << option << "'" << std::endl;
+        return false;
+    }
+
+    static void usage() {
+        std::cout <<
+            "Usage: benchmark [options] file.obj\n"
+            "\nOptions:\n"
+            "  --help                   Shows this message.\n"
+            "  --builder <name>         Sets the BVH builder to use (defaults to 'binned_sah').\n"
+            "  --permute                Activates the primitive permutation optimization (disabled by default).\n"
+            "  --optimize-layout        Activates the node layout optimization (disabled by default).\n"
+            "  --collapse-leaves        Activates the leaf collapse optimization (disabled by default).\n"
+            "  --parallel-reinsertion   Activates the parallel reinsertion optimization (disabled by default).\n"
+            "  --sequential-reinsertion Activates the sequential reinsertion optimization (disabled by default).\n"
+            "  --pre-split <percent>    Activates pre-splitting and sets the percentage of references (disabled by default).\n"
+            "  --build-iterations <n>   Sets the number of construction iterations (equal to 1 by default).\n"
+            "  --eye <x> <y> <z>        Sets the position of the camera.\n"
+            "  --dir <x> <y> <z>        Sets the direction of the camera.\n"
+            "  --up  <x> <y> <z>        Sets the up vector of the camera.\n"
+            "  --fov <degrees>          Sets the field of view.\n"
+            "  --width <pixels>         Sets the image width.\n"
+            "  --height <pixels>        Sets the image height.\n"
+            "  -o <file.ppm>            Sets the output file name (defaults to 'render.ppm').\n\n"
+            "  --rotate <axis> <degrees>\n\n"
+            "    Rotates the scene by the given amount of degrees on the\n"
+            "    given axis (valid axes are 'x', 'y', or 'z'). This is mainly\n"
+            "    intended to test the impact of pre-splitting.\n\n"
+            "  --collect-statistics <t> <i> <c>\n\n"
+            "    Collects traversal statistics per pixel.\n"
+            "    The arguments represent the weight of traversal steps (t),\n"
+            "    primitive intersections (i), and the sum of the two (s).\n"
+            "    These statistics are then converted to bytes and stored in\n"
+            "    the red, green, and blue channels of the image, respectively.\n\n"
+            "Builders:\n"
+            "  binned_sah,\n"
+            "  sweep_sah,\n"
+            "  spatial_split,\n"
+            "  locally_ordered_clustering,\n"
+            "  linear\n"
+            << std::endl;
+    }
+
+    bool parse(int argc, char** argv) {
+        if (argc < 2) {
+            usage();
+            return false;
+        }
+
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i][0] != '-') {
+                if (input_file) {
+                    std::cerr << "Scene file specified twice" << std::endl;
+                    return false;
+                }
+                input_file = argv[i];
+                continue;
+            }
+
             if (!strcmp(argv[i], "--help")) {
                 usage();
-                return 1;
+                return false;
             } else if (!strcmp(argv[i], "--eye") ||
                 !strcmp(argv[i], "--dir") ||
                 !strcmp(argv[i], "--up")) {
@@ -330,7 +208,7 @@ int main(int argc, char** argv) {
                 pre_split_factor = strtof(argv[++i], NULL) / Scalar(100.0);
                 if (pre_split_factor < 0) {
                     std::cerr << "Invalid pre-split factor." << std::endl;
-                    return 1;
+                    return false;
                 }
             } else if (!strcmp(argv[i], "--build-iterations")) {
                 if (i + 1 >= argc)
@@ -338,7 +216,7 @@ int main(int argc, char** argv) {
                 build_iterations = strtoull(argv[++i], NULL, 10);
                 if (build_iterations == 0) {
                     std::cerr << "Invalid number of construction iterations." << std::endl;
-                    return 1;
+                    return false;
                 }
             } else if (!strcmp(argv[i], "--rotate")) {
                 if (i + 2 >= argc)
@@ -347,7 +225,7 @@ int main(int argc, char** argv) {
                 rotation_degrees = strtof(argv[++i], NULL);
                 if (rotation_axis > 2) {
                     std::cerr << "Invalid rotation axis" << std::endl;
-                    return 1;
+                    return false;
                 }
             } else if (!strcmp(argv[i], "--collect-statistics")) {
                 if (i + 2 >= argc)
@@ -362,21 +240,223 @@ int main(int argc, char** argv) {
                 output_file = argv[++i];
             } else {
                 std::cerr << "Unknown option: '" << argv[i] << "'" << std::endl;
-                return 1;
+                return false;
             }
-        } else {
-            if (input_file) {
-                std::cerr << "Scene file specified twice" << std::endl;
-                return 1;
+        }
+
+        if (!input_file) {
+            std::cerr << "Missing a command line argument for the scene file" << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+};
+
+template <typename F>
+void profile(const char* task, F f, size_t runs = 1) {
+    using Duration = std::chrono::milliseconds;
+    using Timing   = Duration::rep;
+
+    std::vector<Timing> timings;
+
+    for (size_t i = 0; i < runs; ++i) {
+        auto start_tick = std::chrono::high_resolution_clock::now();
+        f();
+        auto end_tick = std::chrono::high_resolution_clock::now();
+        timings.push_back(std::chrono::duration_cast<Duration>(end_tick - start_tick).count());
+    }
+
+    std::sort(timings.begin(), timings.end());
+    if (timings.size() == 1)
+        std::cout << task << " took " << timings.front() << "ms" << std::endl;
+    else {
+        std::cout
+            << task << " took "
+            << timings.front() << "/"
+            << timings[timings.size() / 2] << "/"
+            << timings.back() << "ms (min/med/max of " << runs << " runs)" << std::endl;
+    }
+}
+
+static size_t compute_bvh_depth(const Bvh& bvh, size_t node_index = 0) {
+    auto& node = bvh.nodes[node_index];
+    if (node.prim_count == 0) {
+        return 1 + std::max(
+            compute_bvh_depth(bvh, node.first_index + 0),
+            compute_bvh_depth(bvh, node.first_index + 1));
+    } else
+        return 0;
+}
+
+template <bool IsPermuted, bool CollectStatistics, typename Executor>
+void render(
+    Executor& executor,
+    const Bvh& bvh,
+    const Triangle* triangles,
+    Scalar* pixels,
+    const Options& options)
+{
+    auto dir = proto::normalize(options.camera.dir);
+    auto image_u = proto::normalize(proto::cross(dir, options.camera.up));
+    auto image_v = proto::normalize(proto::cross(image_u, dir));
+    auto image_w = std::tan(options.camera.fov * Scalar(3.14159265 * (1.0 / 180.0) * 0.5));
+    auto ratio = Scalar(options.height) / Scalar(options.width);
+    image_u = image_u * image_w;
+    image_v = image_v * image_w * ratio;
+
+    std::atomic<size_t> total_intr_count = 0, total_visited_nodes = 0;
+    par::for_each(
+        executor, par::range_2d(size_t{0}, options.width, size_t{0}, options.height),
+        [&] (size_t i, size_t j) {
+            size_t index = 3 * (options.width * j + i);
+
+            auto u = 2 * (static_cast<Scalar>(i) + Scalar(0.5)) / static_cast<Scalar>(options.width)  - Scalar(1);
+            auto v = 2 * (static_cast<Scalar>(j) + Scalar(0.5)) / static_cast<Scalar>(options.height) - Scalar(1);
+
+            Ray ray(options.camera.eye, proto::normalize(image_u * u + image_v * v + dir));
+
+            struct Hit {
+                ptrdiff_t tri_index = -1;
+                operator bool () const { return tri_index >= 0; }
+            };
+
+            size_t visited_nodes = 0, intr_count = 0;
+            auto node_visitor = [&] (const Bvh::Node&) { if constexpr (CollectStatistics) visited_nodes++; };
+            auto leaf_intersector = [&] (Ray& ray, const Bvh::Node& leaf) {
+                Hit hit;
+                for (size_t i = 0; i < leaf.prim_count; ++i) {
+                    size_t j = leaf.first_index + i;
+                    if constexpr (IsPermuted) {
+                        if (triangles[j].intersect(ray))
+                            hit = Hit { static_cast<ptrdiff_t>(j) };
+                    } else {
+                        size_t prim_index = bvh.prim_indices[j];
+                        if (auto intr = triangles[prim_index].intersect(ray))
+                            hit = Hit { static_cast<ptrdiff_t>(prim_index) };
+                    }
+                }
+                if constexpr (CollectStatistics)
+                    intr_count += leaf.prim_count;
+                return hit;
+            };
+
+            bvh::SingleRayTraverser<Bvh>::FastNodeIntersector node_intersector(ray);
+            bvh::SingleRayTraverser<Bvh>::Stack<bvh::SingleRayTraverser<Bvh>::default_stack_size> stack;
+            auto hit = bvh::SingleRayTraverser<Bvh>::traverse<false>(stack, ray, bvh, node_intersector, leaf_intersector, node_visitor);
+            if (!hit) {
+                pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
+            } else if constexpr (CollectStatistics) {
+                auto combined = visited_nodes + intr_count;
+                pixels[index    ] = std::min(static_cast<Scalar>(visited_nodes) * options.stats_weights[0], Scalar(1.0f));
+                pixels[index + 1] = std::min(static_cast<Scalar>(intr_count)    * options.stats_weights[1], Scalar(1.0f));
+                pixels[index + 2] = std::min(static_cast<Scalar>(combined)      * options.stats_weights[2], Scalar(1.0f));
+            } else {
+                auto normal = proto::normalize(triangles[hit.tri_index].normal());
+                pixels[index    ] = std::fabs(normal[0]);
+                pixels[index + 1] = std::fabs(normal[1]);
+                pixels[index + 2] = std::fabs(normal[2]);
             }
-            input_file = argv[i];
+            total_intr_count    += intr_count;
+            total_visited_nodes += visited_nodes;
+        });
+
+    if (CollectStatistics) {
+        std::cout
+            << total_intr_count    << " total primitive intersection(s)\n"
+            << total_visited_nodes << " total nodes visited(s)" << std::endl;
+    }
+}
+
+template <size_t Axis>
+static void rotate_triangles(Scalar degrees, Triangle* triangles, size_t triangle_count) {
+    static constexpr Scalar pi = Scalar(3.14159265359);
+    auto cos = std::cos(degrees * pi / Scalar(180));
+    auto sin = std::sin(degrees * pi / Scalar(180));
+    auto rotate = [&] (const Vec3& p) {
+        if constexpr (Axis == 0)
+            return Vec3(p[0], p[1] * cos - p[2] * sin, p[1] * sin + p[2] * cos);
+        else if constexpr (Axis == 1)
+            return Vec3(p[0] * cos + p[2] * sin, p[1], -p[0] * sin + p[2] * cos);
+        else
+            return Vec3(p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos, p[2]);
+    };
+    for (size_t i = 0; i < triangle_count; ++i) {
+        auto v0 = rotate(triangles[i].v0);
+        auto v1 = rotate(triangles[i].v1);
+        auto v2 = rotate(triangles[i].v2);
+        triangles[i] = Triangle(v0, v1, v2);
+    }
+}
+
+template <typename Executor>
+static Builder get_builder_by_name(Executor& executor, const char* name) {
+    if (!strcmp(name, "binned_sah")) {
+        return [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+            static constexpr size_t bin_count = 16;
+            using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
+            TopDownScheduler<Builder> top_down_scheduler;
+            bvh = Builder::build(top_down_scheduler, global_bbox, bboxes, centers, prim_count);
+            return prim_count;
+        };
+    } else if (!strcmp(name, "sweep_sah")) {
+        return [&] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+            using Builder = bvh::SweepSahBuilder<Bvh>;
+            TopDownScheduler<Builder> top_down_scheduler;
+            bvh = Builder::build(top_down_scheduler, executor, global_bbox, bboxes, centers, prim_count);
+            return prim_count;
+        };
+    } /*else if (!strcmp(name, "spatial_split")) {
+        return [] (Bvh& bvh, const Triangle* triangles, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+            static constexpr size_t bin_count = 64;
+            bvh::SpatialSplitBvhBuilder<Bvh, Triangle, bin_count> builder(bvh);
+            return builder.build(global_bbox, triangles, bboxes, centers, prim_count);
+        };
+    } else if (!strcmp(name, "locally_ordered_clustering")) {
+        return [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+            using Morton = uint32_t;
+            bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
+            builder.build(global_bbox, bboxes, centers, prim_count);
+            return prim_count;
+        };
+    } else if (!strcmp(name, "linear")) {
+        return [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
+            using Morton = uint32_t;
+            bvh::LinearBvhBuilder<Bvh, Morton> builder(bvh);
+            builder.build(global_bbox, bboxes, centers, prim_count);
+            return prim_count;
+        };
+    } */else {
+        return {};
+    }
+}
+
+static bool save_ppm(const Scalar* pixels, size_t width, size_t height, const char* output_file) {
+    std::ofstream out(output_file, std::ofstream::binary);
+    if (!out)
+        return false;
+
+    out << "P6 " << width << " " << height << " " << 255 << "\n";
+    for(size_t j = height; j > 0; --j) {
+        for(size_t i = 0; i < width; ++i) {
+            size_t index = 3* (width * (j - 1) + i);
+            uint8_t pixel[3] = {
+                static_cast<uint8_t>(std::max(std::min(pixels[index    ] * 255, Scalar(255)), Scalar(0))),
+                static_cast<uint8_t>(std::max(std::min(pixels[index + 1] * 255, Scalar(255)), Scalar(0))),
+                static_cast<uint8_t>(std::max(std::min(pixels[index + 2] * 255, Scalar(255)), Scalar(0)))
+            };
+            out.write(reinterpret_cast<char*>(pixel), sizeof(uint8_t) * 3);
         }
     }
 
-    if (!input_file) {
-        std::cerr << "Missing a command line argument for the scene file" << std::endl;
+    return true;
+}
+
+int main(int argc, char** argv) {
+    Options options;
+
+    if (!options.parse(argc, argv))
         return 1;
-    }
 
 #if defined(BVH_ENABLE_TBB)
     par::tbb::Executor static_executor, dynamic_executor;
@@ -387,61 +467,26 @@ int main(int argc, char** argv) {
     par::SequentialExecutor static_executor, dynamic_executor;
 #endif
 
-    std::function<size_t(Bvh&, const Triangle*, const BBox&, const BBox*, const Vec3*, size_t)> builder;
-    if (!strcmp(builder_name, "binned_sah")) {
-        builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            static constexpr size_t bin_count = 16;
-            using Builder = bvh::BinnedSahBuilder<Bvh, bin_count>;
-            TopDownScheduler<Builder> top_down_scheduler;
-            bvh = Builder::build(top_down_scheduler, global_bbox, bboxes, centers, prim_count);
-            return prim_count;
-        };
-    } else if (!strcmp(builder_name, "sweep_sah")) {
-        builder = [&] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            using Builder = bvh::SweepSahBuilder<Bvh>;
-            TopDownScheduler<Builder> top_down_scheduler;
-            bvh = Builder::build(top_down_scheduler, static_executor, global_bbox, bboxes, centers, prim_count);
-            return prim_count;
-        };
-    } /*else if (!strcmp(builder_name, "spatial_split")) {
-        builder = [] (Bvh& bvh, const Triangle* triangles, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            static constexpr size_t bin_count = 64;
-            bvh::SpatialSplitBvhBuilder<Bvh, Triangle, bin_count> builder(bvh);
-            return builder.build(global_bbox, triangles, bboxes, centers, prim_count);
-        };
-    } else if (!strcmp(builder_name, "locally_ordered_clustering")) {
-        builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            using Morton = uint32_t;
-            bvh::LocallyOrderedClusteringBuilder<Bvh, Morton> builder(bvh);
-            builder.build(global_bbox, bboxes, centers, prim_count);
-            return prim_count;
-        };
-    } else if (!strcmp(builder_name, "linear")) {
-        builder = [] (Bvh& bvh, const Triangle*, const BBox& global_bbox, const BBox* bboxes, const Vec3* centers, size_t prim_count) {
-            using Morton = uint32_t;
-            bvh::LinearBvhBuilder<Bvh, Morton> builder(bvh);
-            builder.build(global_bbox, bboxes, centers, prim_count);
-            return prim_count;
-        };
-    } */else {
+    auto builder = get_builder_by_name(static_executor, options.builder_name);
+    if (!builder) {
         std::cerr << "Unknown BVH builder name" << std::endl;
         return 1;
     }
 
     // Load mesh from file
-    auto triangles = obj::load_from_file(input_file);
+    auto triangles = obj::load_from_file(options.input_file);
     if (triangles.size() == 0) {
         std::cerr << "The given scene is empty or cannot be loaded" << std::endl;
         return 1;
     }
 
     // Rotate triangles if requested
-    if (rotation_axis == 0)
-        rotate_triangles<0>(rotation_degrees, triangles.data(), triangles.size());
-    else if (rotation_axis == 1)
-        rotate_triangles<1>(rotation_degrees, triangles.data(), triangles.size());
-    else if (rotation_axis == 2)
-        rotate_triangles<2>(rotation_degrees, triangles.data(), triangles.size());
+    if (options.rotation_axis == 0)
+        rotate_triangles<0>(options.rotation_degrees, triangles.data(), triangles.size());
+    else if (options.rotation_axis == 1)
+        rotate_triangles<1>(options.rotation_degrees, triangles.data(), triangles.size());
+    else if (options.rotation_axis == 2)
+        rotate_triangles<2>(options.rotation_degrees, triangles.data(), triangles.size());
 
     Bvh bvh;
 
@@ -449,18 +494,18 @@ int main(int argc, char** argv) {
     std::unique_ptr<Triangle[]> permuted_triangles;
 
     // Build an acceleration data structure for this object set
-    std::cout << "Building BVH (" << builder_name;
-    if (pre_split_factor)
+    std::cout << "Building BVH (" << options.builder_name;
+    if (options.pre_split_factor)
         std::cout << " + pre-split";
-    if (parallel_reinsertion)
+    if (options.parallel_reinsertion)
         std::cout << " + parallel-reinsertion";
-    if (sequential_reinsertion)
+    if (options.sequential_reinsertion)
         std::cout << " + sequential-reinsertion";
-    if (optimize_layout)
+    if (options.optimize_layout)
         std::cout << " + optimize-layout";
-    if (collapse_leaves)
+    if (options.collapse_leaves)
         std::cout << " + collapse-leaves";
-    if (permute)
+    if (options.permute)
         std::cout << " + permute";
     std::cout << ")..." << std::endl;
 
@@ -480,30 +525,30 @@ int main(int argc, char** argv) {
             });
 
         ref_count = builder(bvh, triangles.data(), global_bbox, bboxes.get(), centers.get(), ref_count);
-        //if (pre_split_factor > 0)
+        //if (options.pre_split_factor > 0)
         //    splitter.repair_bvh_leaves(bvh);
-        if (parallel_reinsertion) {
+        if (options.parallel_reinsertion) {
             bvh::ParallelReinsertionOptimizer<Bvh> reinsertion_optimizer(bvh, bvh.parents(static_executor));
             reinsertion_optimizer.optimize(static_executor);
         }
-        if (sequential_reinsertion) {
+        if (options.sequential_reinsertion) {
             bvh::TopologyModifier<Bvh> topo_modifier(bvh, bvh.parents(static_executor));
             bvh::SequentialReinsertionOptimizer<Bvh>::optimize(topo_modifier);
         }
-        //if (optimize_layout) {
+        //if (options.optimize_layout) {
         //    bvh::NodeLayoutOptimizer layout_optimizer(bvh);
         //    layout_optimizer.optimize();
         //}
-        //if (collapse_leaves) {
+        //if (options.collapse_leaves) {
         //    bvh::LeafCollapser leaf_collapser(bvh);
         //    leaf_collapser.collapse();
         //}
-        if (permute) {
+        if (options.permute) {
             permuted_triangles = std::make_unique<Triangle[]>(ref_count);
             par::for_each(static_executor, par::range_1d(size_t{0}, ref_count),
                 [&] (size_t i) { permuted_triangles[i] = triangles[bvh.prim_indices[i]]; });
         }
-    }, build_iterations);
+    }, options.build_iterations);
 
     // This is just to make sure that refitting works
     bvh::ParallelHierarchyRefitter<Bvh> refitter;
@@ -514,34 +559,26 @@ int main(int argc, char** argv) {
         << bvh.nodes.size() << " node(s), "
         << ref_count << " reference(s)" << std::endl;
 
-    auto pixels = std::make_unique<Scalar[]>(3 * width * height);
+    auto pixels = std::make_unique<Scalar[]>(3 * options.width * options.height);
 
-    std::cout << "Rendering image (" << width << "x" << height << ")..." << std::endl;
+    std::cout << "Rendering image (" << options.width << "x" << options.height << ")..." << std::endl;
     profile("Rendering", [&] {
-        if (permute) {
-            if (collect_stats)
-                render<true, true>(dynamic_executor, camera, bvh, permuted_triangles.get(), pixels.get(), width, height, stats_weights);
+        if (options.permute) {
+            if (options.collect_stats)
+                render<true, true>(dynamic_executor, bvh, permuted_triangles.get(), pixels.get(), options);
             else
-                render<true, false>(dynamic_executor, camera, bvh, permuted_triangles.get(), pixels.get(), width, height);
+                render<true, false>(dynamic_executor, bvh, permuted_triangles.get(), pixels.get(), options);
         } else {
-            if (collect_stats)
-                render<false, true>(dynamic_executor, camera, bvh, triangles.data(), pixels.get(), width, height, stats_weights);
+            if (options.collect_stats)
+                render<false, true>(dynamic_executor, bvh, triangles.data(), pixels.get(), options);
             else
-                render<false, false>(dynamic_executor, camera, bvh, triangles.data(), pixels.get(), width, height);
+                render<false, false>(dynamic_executor, bvh, triangles.data(), pixels.get(), options);
         }
     });
 
-    std::ofstream out(output_file, std::ofstream::binary);
-    out << "P6 " << width << " " << height << " " << 255 << "\n";
-    for(size_t j = height; j > 0; --j) {
-        for(size_t i = 0; i < width; ++i) {
-            size_t index = 3* (width * (j - 1) + i);
-            uint8_t pixel[3] = {
-                static_cast<uint8_t>(std::max(std::min(pixels[index    ] * 255, Scalar(255)), Scalar(0))),
-                static_cast<uint8_t>(std::max(std::min(pixels[index + 1] * 255, Scalar(255)), Scalar(0))),
-                static_cast<uint8_t>(std::max(std::min(pixels[index + 2] * 255, Scalar(255)), Scalar(0)))
-            };
-            out.write(reinterpret_cast<char*>(pixel), sizeof(uint8_t) * 3);
-        }
+    if (!save_ppm(pixels.get(), options.width, options.height, options.output_file)) {
+        std::cerr << "Cannot save PPM image to '" << options.output_file << "'" << std::endl;
+        return 1;
     }
+    return 0;
 }

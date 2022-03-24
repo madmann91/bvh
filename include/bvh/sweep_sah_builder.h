@@ -25,6 +25,7 @@ namespace bvh {
 template <typename Bvh>
 class SweepSahBuilder {
     using Scalar = typename Bvh::Scalar;
+    using Index  = typename Bvh::Index;
     using Node   = typename Bvh::Node;
     using BBox   = proto::BBox<Scalar>;
     using Vec3   = proto::Vec3<Scalar>;
@@ -73,8 +74,8 @@ private:
         std::optional<std::pair<WorkItem, WorkItem>> run(WorkItem&& item) const {
             // Make the current node a leaf
             auto& node = bvh_.nodes[item.node_index];
-            node.prim_count  = item.size();
-            node.first_index = item.begin;
+            node.prim_count  = static_cast<Index>(item.size());
+            node.first_index = static_cast<Index>(item.begin);
 
             if (item.depth >= config_.max_depth ||
                 item.size() <= config_.min_prims_per_leaf)
@@ -89,7 +90,7 @@ private:
                 size_t begin = item.begin;
                 for (size_t i = item.end - 1; i > item.begin; --i) {
                     right_bbox.extend(bboxes_[indices[i]]);
-                    auto right_cost = right_bbox.half_area() * (item.end - i);
+                    auto right_cost = right_bbox.half_area() * static_cast<Scalar>(item.end - i);
                     if (right_cost >= split.cost) [[unlikely]] {
                         begin = i;
                         break;
@@ -103,7 +104,7 @@ private:
                     left_bbox.extend(bboxes_[indices[i]]);
                 for (size_t i = begin; i < item.end; ++i) {
                     left_bbox.extend(bboxes_[indices[i]]);
-                    auto left_cost = left_bbox.half_area() * (i - item.begin + 1);
+                    auto left_cost = left_bbox.half_area() * static_cast<Scalar>(i - item.begin + 1);
                     if (left_cost >= split.cost) [[unlikely]]
                         break;
                     auto cost = left_cost + costs_[i + 1];
@@ -112,9 +113,7 @@ private:
                 }
             }
 
-            // See the discussion on the termination criterion in `binned_bvh_builder.h`
-            auto leaf_cost = node.bbox().half_area() * (item.size() - config_.traversal_cost);
-            if (!split || split.cost >= leaf_cost) {
+            if (!split || !config_.is_good_split(split.cost, node.bbox().half_area(), item.size())) {
                 if (item.size() > config_.max_prims_per_leaf) {
                     // This effectively creates a median split along the largest axis
                     split.axis = node.bbox().largest_axis();
@@ -151,7 +150,7 @@ private:
             auto left_index = node_count_.fetch_add(2);
             bvh_.nodes[left_index + 0].bbox_proxy() = left_bbox;
             bvh_.nodes[left_index + 1].bbox_proxy() = right_bbox;
-            node.first_index = left_index;
+            node.first_index = static_cast<Index>(left_index);
             node.prim_count = 0;
             return std::make_optional(std::pair {
                 WorkItem { left_index,     item.depth + 1, item.begin,       split.prim_index },
