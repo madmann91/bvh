@@ -14,7 +14,11 @@ namespace bvh {
 /// Triangle primitive, defined by three points, and using the Moeller-Trumbore test.
 /// By default, the normal is left-handed, which minimizes the number of operations in
 /// the intersection routine.
-template <typename Scalar, bool LeftHandedNormal = true>
+/// When encountering precision problems, a small tolerance can be added to the intersector,
+/// such that rays that hit the edges can still report an intersection.
+template <typename Scalar,
+    bool LeftHandedNormal = true,
+    bool NonZeroTolerance = false>
 struct Triangle {
     struct Intersection {
         Scalar t, u, v;
@@ -105,10 +109,17 @@ struct Triangle {
 
         // These comparisons are designed to return false
         // when one of t, u, or v is a NaN
-        if (u >= 0 && v >= 0 && w >= 0) {
+        static constexpr auto tolerance =
+            NonZeroTolerance ? -std::numeric_limits<Scalar>::epsilon() : Scalar(0);
+        if (u >= tolerance && v >= tolerance && w >= tolerance) {
             auto t = negate_when_right_handed(dot(n, c)) * inv_det;
-            if (t >= ray.tmin && t <= ray.tmax)
+            if (t >= ray.tmin && t <= ray.tmax) {
+                if constexpr (NonZeroTolerance) {
+                    u = robust_max(u, Scalar(0));
+                    v = robust_max(v, Scalar(0));
+                }
                 return std::make_optional(Intersection{ t, u, v });
+            }
         }
 
         return std::nullopt;
