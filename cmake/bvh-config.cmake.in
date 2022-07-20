@@ -1,9 +1,0 @@
-# This file provides the imported target bvh::bvh, which can be used in a
-# call to `target_link_libraries` to pull the BVH library and all
-# its dependencies into another target.
-
-@PACKAGE_INIT@
-include(CMakeFindDependencyMacro)
-find_dependency(proto)
-find_dependency(par)
-include("${CMAKE_CURRENT_LIST_DIR}/bvh-targets.cmake")

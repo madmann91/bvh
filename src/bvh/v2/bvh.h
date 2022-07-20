@@ -1,0 +1,124 @@
+#ifndef BVH_V2_BVH_H
+#define BVH_V2_BVH_H
+
+#include "bvh/v2/node.h"
+
+#include <cstddef>
+#include <iterator>
+#include <vector>
+#include <stack>
+#include <utility>
+
+namespace bvh::v2 {
+
+template <typename Node>
+struct Bvh {
+    using Index = typename Node::Index;
+    using Scalar = typename Node::Scalar;
+
+    std::vector<Node> nodes;
+    std::vector<size_t> prim_ids;
+
+    Bvh() = default;
+    Bvh(Bvh&&) = default;
+
+    Bvh& operator = (Bvh&&) = default;
+
+    /// Returns the root node of this BVH.
+    const Node& get_root() const { return nodes[0]; }
+
+    /// Extracts the BVH rooted at the given node index.
+    inline Bvh extract_bvh(size_t root_id) const;
+
+    /// Intersects the BVH with a single ray, using the given function to intersect the contents
+    /// of a leaf. The algorithm starts at the node index `top` and uses the given stack object.
+    /// When `IsAnyHit` is true, the function stops at the first intersection (useful for shadow
+    /// rays), otherwise it finds the closest intersection. When `IsRobust` is true, a slower but
+    /// numerically robust ray-box test is used, otherwise a fast, but less precise test is used.
+    template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn>
+    inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack& stack, LeafFn&& leaf_fn) const;
+};
+
+template <typename Node>
+auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
+    assert(root_id != 0);
+
+    Bvh bvh;
+    bvh.nodes.emplace_back();
+
+    std::stack<std::pair<size_t, size_t>> stack;
+    stack.emplace(root_id, 0);
+    while (!stack.empty()) {
+        auto [src_id, dst_id] = stack.top();
+        stack.pop();
+        auto& src_node = nodes[src_id];
+        auto& dst_node = bvh.nodes[dst_id];
+        dst_node = src_node;
+        if (src_node.is_leaf()) {
+            dst_node.index.first_id = bvh.prim_ids.size();
+            std::copy_n(
+                prim_ids.begin() + src_node.index.first_id,
+                src_node.index.prim_count,
+                std::back_inserter(bvh.prim_ids));
+        } else {
+            size_t first_id = dst_node.index.first_id = bvh.nodes.size();
+            bvh.nodes.emplace_back();
+            bvh.nodes.emplace_back();
+            stack.emplace(src_node.index.first_id + 0, first_id + 0);
+            stack.emplace(src_node.index.first_id + 1, first_id + 1);
+        }
+    }
+    return bvh;
+}
+
+template <typename Node>
+template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn>
+void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack& stack, LeafFn&& leaf_fn) const {
+    auto inv_dir = ray.get_inv_dir();
+    auto inv_org = -inv_dir * ray.org;
+    auto inv_dir_pad = Ray<Scalar, Node::dimension>::pad_inv_dir(inv_dir);
+    auto octant = ray.get_octant();
+
+    auto intersect_node = [&] (const Node& node) {
+        return IsRobust
+            ? node.intersect_robust(ray, inv_dir, inv_dir_pad, octant)
+            : node.intersect_fast(ray, inv_dir, inv_org, octant);
+    };
+
+    stack.push(start);
+restart:
+    while (!stack.is_empty()) {
+        auto top = stack.pop();
+        while (top.prim_count == 0) {
+            auto& left  = nodes[top.first_id];
+            auto& right = nodes[top.first_id + 1];
+
+            auto intr_left  = intersect_node(left);
+            auto intr_right = intersect_node(right);
+
+            bool hit_left  = intr_left.first <= intr_left.second;
+            bool hit_right = intr_right.first <= intr_right.second;
+
+            if (hit_left) {
+                auto near = left.index;
+                if (hit_right) {
+                    auto far = right.index;
+                    if (!IsAnyHit && intr_left.first > intr_right.first)
+                        std::swap(near, far);
+                    stack.push(far);
+                }
+                top = near;
+            } else if (hit_right)
+                top = right.index;
+            else
+                goto restart;
+        }
+
+        if (leaf_fn(top.first_id, top.first_id + top.prim_count) && IsAnyHit)
+            return;
+    }
+}
+
+} // namespace bvh::v2
+
+#endif

@@ -1,11 +1,10 @@
-#ifndef OBJ_HPP
-#define OBJ_HPP
+#include "load_obj.h"
 
-#include <vector>
-#include <string>
-#include <optional>
 #include <fstream>
-#include <cctype>
+#include <cassert>
+#include <cstdlib>
+
+using namespace bvh::v2;
 
 namespace obj {
 
@@ -27,12 +26,12 @@ inline char* strip_spaces(char* ptr) {
 inline std::optional<int> read_index(char** ptr) {
     char* base = *ptr;
 
-    // Detect end of line (negative indices are supported)
+    // Detect end of line (negative indices are supported) 
     base = strip_spaces(base);
     if (!std::isdigit(*base) && *base != '-')
         return std::nullopt;
 
-    int index = static_cast<int>(std::strtol(base, &base, 10));
+    int index = std::strtol(base, &base, 10);
     base = strip_spaces(base);
 
     if (*base == '/') {
@@ -54,12 +53,13 @@ inline std::optional<int> read_index(char** ptr) {
     return std::make_optional(index);
 }
 
-inline std::vector<Triangle> load_from_stream(std::istream& is) {
+template <typename T>
+inline std::vector<Tri<T, 3>> load_from_stream(std::istream& is) {
     static constexpr size_t max_line = 1024;
     char line[max_line];
 
-    std::vector<Vec3> vertices;
-    std::vector<Triangle> triangles;
+    std::vector<Vec<T, 3>> vertices;
+    std::vector<Tri<T, 3>> triangles;
 
     while (is.getline(line, max_line)) {
         char* ptr = strip_spaces(line);
@@ -72,7 +72,7 @@ inline std::vector<Triangle> load_from_stream(std::istream& is) {
             auto z = std::strtof(ptr, &ptr);
             vertices.emplace_back(x, y, z);
         } else if (*ptr == 'f' && std::isspace(ptr[1])) {
-            Vec3 points[2];
+            Vec<T, 3> points[2];
             ptr += 2;
             for (size_t i = 0; ; ++i) {
                 if (auto index = read_index(&ptr)) {
@@ -95,13 +95,20 @@ inline std::vector<Triangle> load_from_stream(std::istream& is) {
     return triangles;
 }
 
-inline std::vector<Triangle> load_from_file(const std::string& file) {
+template <typename T>
+inline std::vector<Tri<T, 3>> load_from_file(const std::string& file) {
     std::ifstream is(file);
     if (is)
-        return load_from_stream(is);
-    return std::vector<Triangle>();
+        return load_from_stream<T>(is);
+    return std::vector<Tri<T, 3>>();
 }
 
 } // namespace obj
 
-#endif
+template <typename T>
+std::vector<Tri<T, 3>> load_obj(const std::string& file) {
+    return obj::load_from_file<T>(file);
+}
+
+template std::vector<Tri<float, 3>> load_obj(const std::string&);
+template std::vector<Tri<double, 3>> load_obj(const std::string&);
