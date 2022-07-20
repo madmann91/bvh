@@ -18,4 +18,4 @@ under the MIT license.
 
 ## Usage
 
-![simple example](https://github.com/madmann91/bvh/blob/master/v2/test/main.cpp)
+![simple example](https://github.com/madmann91/bvh/blob/v2/test/main.cpp)
