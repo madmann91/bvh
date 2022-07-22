@@ -19,18 +19,18 @@ struct Vec {
     BVH_ALWAYS_INLINE explicit Vec(T x) { std::fill(values, values + N, x); }
 
     template <typename Compare>
-    BVH_ALWAYS_INLINE unsigned get_best_axis(Compare&& compare) const {
-        unsigned axis = 0;
+    BVH_ALWAYS_INLINE size_t get_best_axis(Compare&& compare) const {
+        size_t axis = 0;
         static_for<1, N>([&] (size_t i) { 
-            if (compare(values[axis], values[i]))
+            if (compare(values[i], values[axis]))
                 axis = i;
         });
         return axis;
     }
 
     // Note: These functions are designed to be robust to NaNs
-    BVH_ALWAYS_INLINE unsigned get_largest_axis() const { return get_best_axis(std::less<T>()); }
-    BVH_ALWAYS_INLINE unsigned get_smallest_axis() const { return get_best_axis(std::greater<T>()); }
+    BVH_ALWAYS_INLINE size_t get_largest_axis() const { return get_best_axis(std::greater<T>()); }
+    BVH_ALWAYS_INLINE size_t get_smallest_axis() const { return get_best_axis(std::less<T>()); }
 
     BVH_ALWAYS_INLINE T& operator [] (size_t i) { return values[i]; }
     BVH_ALWAYS_INLINE T operator [] (size_t i) const { return values[i]; }
@@ -80,7 +80,7 @@ BVH_ALWAYS_INLINE Vec<T, N> operator * (T a, const Vec<T, N>& b) {
 
 template <typename T, size_t N>
 BVH_ALWAYS_INLINE Vec<T, N> operator / (T a, const Vec<T, N>& b) {
-    return Vec<T, N>::generate([&] (size_t i) { return a[i] / b[i]; });
+    return Vec<T, N>::generate([&] (size_t i) { return a / b[i]; });
 }
 
 template <typename T, size_t N>

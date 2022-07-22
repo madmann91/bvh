@@ -15,7 +15,7 @@ void ThreadPool::wait() {
     done_.wait(lock, [this] { return busy_count_ == 0 && tasks_.empty(); });
 }
 
-void ThreadPool::worker(ThreadPool* pool, [[maybe_unused]] size_t thread_id) {
+void ThreadPool::worker(ThreadPool* pool, size_t thread_id) {
     while (true) {
         Task task;
         {
@@ -27,7 +27,7 @@ void ThreadPool::worker(ThreadPool* pool, [[maybe_unused]] size_t thread_id) {
             pool->tasks_.pop();
             pool->busy_count_++;
         }
-        task();
+        task(thread_id);
         {
             std::unique_lock<std::mutex> lock(pool->mutex_);
             pool->busy_count_--;

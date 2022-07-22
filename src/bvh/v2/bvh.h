@@ -35,8 +35,8 @@ struct Bvh {
     /// When `IsAnyHit` is true, the function stops at the first intersection (useful for shadow
     /// rays), otherwise it finds the closest intersection. When `IsRobust` is true, a slower but
     /// numerically robust ray-box test is used, otherwise a fast, but less precise test is used.
-    template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn>
-    inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack& stack, LeafFn&& leaf_fn) const;
+    template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
+    inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack&, LeafFn&&, InnerFn&& = {}) const;
 };
 
 template <typename Node>
@@ -72,8 +72,8 @@ auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
 }
 
 template <typename Node>
-template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn>
-void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack& stack, LeafFn&& leaf_fn) const {
+template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn>
+void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const {
     auto inv_dir = ray.get_inv_dir();
     auto inv_org = -inv_dir * ray.org;
     auto inv_dir_pad = Ray<Scalar, Node::dimension>::pad_inv_dir(inv_dir);
@@ -92,6 +92,8 @@ restart:
         while (top.prim_count == 0) {
             auto& left  = nodes[top.first_id];
             auto& right = nodes[top.first_id + 1];
+
+            inner_fn(left, right);
 
             auto intr_left  = intersect_node(left);
             auto intr_right = intersect_node(right);

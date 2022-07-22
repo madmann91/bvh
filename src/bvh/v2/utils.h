@@ -22,6 +22,12 @@ template <> struct UnsignedInt<64> { using Type = uint64_t; };
 template <size_t Bits>
 using UnsignedIntType = typename UnsignedInt<Bits>::Type;
 
+/// Helper callable object that just ignores its arguments and returns nothing.
+struct IgnoreArgs {
+    template <typename... Args>
+    void operator () (Args&&...) const {}
+};
+
 /// Generates a bitmask with the given number of bits.
 template <typename T, std::enable_if_t<std::is_unsigned_v<T>, bool> = true>
 BVH_ALWAYS_INLINE constexpr T make_bitmask(size_t bits) {

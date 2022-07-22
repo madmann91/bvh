@@ -12,7 +12,7 @@ namespace bvh::v2 {
 
 class ThreadPool {
 public:
-    using Task = std::function<void()>;
+    using Task = std::function<void(size_t)>;
 
     ThreadPool(size_t thread_count = 0) { start(thread_count); }
     ~ThreadPool() {
@@ -31,7 +31,7 @@ public:
     inline void parallel_for(size_t begin, size_t end, const Loop&);
 
     template <typename T, typename Reduce, typename Join>
-    inline T parallel_reduce(size_t begin, size_t end, T&& init, const Reduce&, const Join&);
+    inline T parallel_reduce(size_t begin, size_t end, const T& init, const Reduce&, const Join&);
 
 private:
     static void worker(ThreadPool*, size_t);
@@ -54,7 +54,7 @@ void ThreadPool::parallel_for(size_t begin, size_t end, const Loop& loop) {
     auto chunk_size = std::max(size_t{1}, (end - begin) / get_thread_count());
     for (size_t i = begin; i < end; i += chunk_size) {
         size_t next = std::min(end, i + chunk_size);
-        push([=] { loop(i, next); });
+        push([=] (size_t) { loop(i, next); });
     }
     wait();
 }
@@ -63,22 +63,23 @@ template <typename T, typename Reduce, typename Join>
 T ThreadPool::parallel_reduce(
     size_t begin,
     size_t end,
-    T&& init,
+    const T& init,
     const Reduce& reduce,
     const Join& join)
 {
     auto chunk_size = std::max(size_t{1}, (end - begin) / get_thread_count());
-    T result(std::forward<T>(init));
+    std::vector<T> per_thread_result(get_thread_count(), init);
     for (size_t i = begin; i < end; i += chunk_size) {
         size_t next = std::min(end, i + chunk_size);
-        push([=, &result, this] {
-            auto local = reduce(i, next);
-            std::unique_lock<std::mutex> lock(mutex_);
-            join(result, std::move(local));
+        push([&, i, next] (size_t thread_id) {
+            auto& result = per_thread_result[thread_id];
+            reduce(result, i, next);
         });
     }
     wait();
-    return result;
+    for (size_t i = 1; i < get_thread_count(); ++i)
+        join(per_thread_result[0], std::move(per_thread_result[i]));
+    return per_thread_result[0];
 }
 
 } // namespace bvh::v2

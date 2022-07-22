@@ -59,7 +59,9 @@ auto compute_bboxes_and_centers(bvh::v2::ThreadPool& thread_pool, const Primitiv
 #include <bvh/bounding_box.hpp>
 #include <bvh/binned_sah_builder.hpp>
 #include <bvh/sweep_sah_builder.hpp>
+#include <bvh/locally_ordered_clustering_builder.hpp>
 #include <bvh/parallel_reinsertion_optimizer.hpp>
+#include <bvh/leaf_collapser.hpp>
 #include <bvh/single_ray_traverser.hpp>
 #include <bvh/primitive_intersectors.hpp>
 #endif
@@ -154,8 +156,11 @@ int main(int argc, char** argv) {
 
     bvhlib::Bvh bvh;
     auto build_time = profile<std::chrono::system_clock>([&] {
-        bvh::SweepSahBuilder<bvhlib::Bvh> builder(bvh);
+        //bvh::SweepSahBuilder<bvhlib::Bvh> builder(bvh);
+        bvh::LocallyOrderedClusteringBuilder<bvhlib::Bvh, uint32_t> builder(bvh);
         builder.build(global_bbox, bboxes.data(), centers.data(), tris.size());
+        bvh::LeafCollapser<bvhlib::Bvh> collapser(bvh);
+        collapser.collapse();
     });
     node_count = bvh.node_count;
     //bvh::ParallelReinsertionOptimizer<bvhlib::Bvh> optimizer(bvh);
@@ -175,9 +180,10 @@ int main(int argc, char** argv) {
     std::tie(bboxes, centers) = compute_bboxes_and_centers<Scalar, 3>(thread_pool, tris);
 
     Bvh bvh;
-    bvh::v2::MiniTreeBuilder<Node> builder;
     auto build_time = profile<std::chrono::system_clock>([&] {
-        bvh = builder.build(thread_pool, bboxes.data(), centers.data(), tris.size());
+        bvh = bvh::v2::MiniTreeBuilder<Node>::build(thread_pool, bboxes.data(), centers.data(), tris.size());
+        //bvh = bvh::v2::SweepSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
+        //bvh = bvh::v2::BinnedSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
     });
     node_count = bvh.nodes.size();
 
@@ -194,6 +200,8 @@ int main(int argc, char** argv) {
 
     std::vector<uint8_t> image(width * height * 3);
     size_t intersections = 0;
+    size_t visited_leaves = 0;
+    size_t visited_nodes = 0;
     auto intersection_time = profile([&] {
         for (size_t y = 0; y < height; ++y) {
             for (size_t x = 0; x < width; ++x) {
@@ -213,11 +221,15 @@ int main(int argc, char** argv) {
                 bvh::v2::SmallStack<Bvh::Index, stack_size> stack;
                 bvh.intersect<false, use_robust_traversal>(ray, bvh.get_root().index, stack,
                     [&] (size_t begin, size_t end) {
+                        //visited_leaves++;
                         for (size_t i = begin; i < end; ++i) {
                             if (permuted_tris[i].intersect(ray))
                                 prim_id = i;
                         }
                         return prim_id != invalid_id;
+                    },
+                    [&] (auto&&, auto&&) {
+                        //visited_nodes++;
                     });
                 if (prim_id != invalid_id)
                     intersections++;
@@ -229,7 +241,9 @@ int main(int argc, char** argv) {
             }
         }
     });
-    std::cout << intersections << " intersection(s) found in " << to_ms(intersection_time)  << "ms" << std::endl;
+    std::cout
+        << intersections << " intersection(s) found in " << to_ms(intersection_time)  << "ms\n"
+        << "Traversal visited " << visited_nodes << " nodes and " << visited_leaves << " leaves" << std::endl;
 
     std::ofstream out(output_file, std::ofstream::binary);
     out << "P6 " << width << " " << height << " " << 255 << "\n";
