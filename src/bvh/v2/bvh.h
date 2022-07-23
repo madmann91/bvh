@@ -116,8 +116,10 @@ restart:
                 goto restart;
         }
 
-        if (leaf_fn(top.first_id, top.first_id + top.prim_count) && IsAnyHit)
-            return;
+        [[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
+        if constexpr (IsAnyHit) {
+            if (was_hit) return;
+        }
     }
 }
 
