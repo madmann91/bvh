@@ -7,7 +7,7 @@
 #include "bvh/v2/sah_heuristic.h"
 
 #include <stack>
-#include <tuple>
+#include <span>
 #include <algorithm>
 #include <optional>
 #include <numeric>
@@ -48,18 +48,20 @@ protected:
         BVH_ALWAYS_INLINE size_t size() const { return end - begin; }
     };
 
-    const BBox* bboxes_;
-    const Vec* centers_;
+    std::span<const BBox> bboxes_;
+    std::span<const Vec> centers_;
     const Config& config_;
 
-    TopDownSahBuilder(
-        const BBox* bboxes,
-        const Vec* centers,
+    BVH_ALWAYS_INLINE TopDownSahBuilder(
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config)
         : bboxes_(bboxes)
         , centers_(centers)
         , config_(config)
-    {}
+    {
+        assert(bboxes.size() == centers.size());
+    }
 
     virtual std::vector<size_t>& get_prim_ids() = 0;
     virtual std::optional<size_t> try_split(const BBox& bbox, size_t begin, size_t end) = 0;
@@ -68,7 +70,9 @@ protected:
         return const_cast<TopDownSahBuilder*>(this)->get_prim_ids();
     }
 
-    Bvh<Node> build(size_t prim_count) {
+    Bvh<Node> build() {
+        const auto prim_count = bboxes_.size();
+
         Bvh<Node> bvh;
         bvh.nodes.reserve((2 * prim_count) / config_.min_leaf_size);
         bvh.nodes.emplace_back();

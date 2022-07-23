@@ -3,6 +3,7 @@
 
 #include "bvh/v2/sweep_sah_builder.h"
 #include "bvh/v2/binned_sah_builder.h"
+#include "bvh/v2/thread_pool.h"
 
 #include <stack>
 #include <tuple>
@@ -42,15 +43,14 @@ public:
 
     /// Starts building a BVH with the given primitive data. The build algorithm is multi-threaded,
     /// and runs on the given thread pool.
-    static Bvh<Node> build(
+    BVH_ALWAYS_INLINE static Bvh<Node> build(
         ThreadPool& thread_pool,
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config = {})
     {
         MiniTreeBuilder builder(thread_pool, bboxes, centers, config);
-        auto mini_trees = builder.build_mini_trees(prim_count);
+        auto mini_trees = builder.build_mini_trees();
         if (config.enable_pruning)
             mini_trees = builder.prune_mini_trees(std::move(mini_trees));
         return builder.build_top_bvh(mini_trees);
@@ -131,11 +131,7 @@ private:
                 centers[i] = builder->centers_[prim_ids[i]];
             }
 
-            bvh = BinnedSahBuilder<Node>::build(
-                bboxes.data(),
-                centers.data(),
-                prim_ids.size(),
-                builder->config_);
+            bvh = BinnedSahBuilder<Node>::build(bboxes, centers, builder->config_);
 
             // Permute primitive indices so that they index the proper set of primitives
             for (size_t i = 0; i < bvh.prim_ids.size(); ++i)
@@ -144,24 +140,26 @@ private:
     };
 
     ThreadPool& thread_pool_;
-    const BBox* bboxes_;
-    const Vec* centers_;
+    std::span<const BBox> bboxes_;
+    std::span<const Vec> centers_;
     const Config& config_;
 
-    MiniTreeBuilder(
+    BVH_ALWAYS_INLINE MiniTreeBuilder(
         ThreadPool& thread_pool,
-        const BBox* bboxes,
-        const Vec* centers,
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config)
         : thread_pool_(thread_pool)
         , bboxes_(bboxes)
         , centers_(centers)
         , config_(config)
-    {}
+    {
+        assert(bboxes.size() == centers.size());
+    }
 
-    std::vector<Bvh<Node>> build_mini_trees(size_t prim_count) {
+    std::vector<Bvh<Node>> build_mini_trees() {
         // Compute the bounding box of all centers
-        auto center_bbox = thread_pool_.parallel_reduce(0, prim_count, BBox::make_empty(),
+        auto center_bbox = thread_pool_.parallel_reduce(0, bboxes_.size(), BBox::make_empty(),
             [this] (BBox& bbox, size_t begin, size_t end) {
                 for (size_t i = begin; i < end; ++i)
                     bbox.extend(centers_[i]);
@@ -175,7 +173,7 @@ private:
         auto grid_offset = -center_bbox.min * grid_scale;
 
         // Place primitives in bins
-        auto bins = thread_pool_.parallel_reduce(0, prim_count, LocalBins {}, 
+        auto bins = thread_pool_.parallel_reduce(0, bboxes_.size(), LocalBins {},
             [&] (LocalBins& local_bins, size_t begin, size_t end) {
                 local_bins.bins.resize(bin_count);
                 for (size_t i = begin; i < end; ++i) {
@@ -259,7 +257,7 @@ private:
 
         typename SweepSahBuilder<Node>::Config config = config_;
         config.max_leaf_size = 1; // Needs to have only one mini-tree in each leaf
-        auto bvh = SweepSahBuilder<Node>::build(bboxes.data(), centers.data(), mini_trees.size(), config);
+        auto bvh = SweepSahBuilder<Node>::build(bboxes, centers, config);
 
         // Compute the offsets to apply to primitive and node indices
         std::vector<size_t> node_offsets(mini_trees.size());
@@ -290,7 +288,7 @@ private:
 
         bvh.nodes.resize(node_count);
         bvh.prim_ids.resize(prim_count);
-        thread_pool_.parallel_for(0, mini_trees.size(), 
+        thread_pool_.parallel_for(0, mini_trees.size(),
             [&] (size_t begin, size_t end) {
                 for (size_t i = begin; i < end; ++i) {
                     auto& mini_tree = mini_trees[i];

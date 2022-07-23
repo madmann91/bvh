@@ -29,36 +29,34 @@ public:
     };
     
     /// Build a BVH in parallel using the given thread pool.
-    static Bvh<Node> build(
+    BVH_ALWAYS_INLINE static Bvh<Node> build(
         ThreadPool& thread_pool,
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config = {})
     {
-        if (prim_count < config.parallel_threshold)
-            return build(bboxes, centers, prim_count, config);
+        if (bboxes.size() < config.parallel_threshold)
+            return build(bboxes, centers, config);
         return MiniTreeBuilder<Node>::build(
-            thread_pool, bboxes, centers, prim_count, make_mini_tree_config(config));
+            thread_pool, bboxes, centers, make_mini_tree_config(config));
     }
 
     /// Build a BVH in a single-thread.
-    static Bvh<Node> build(
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+    BVH_ALWAYS_INLINE static Bvh<Node> build(
+        std::span<const BBox>  bboxes,
+        std::span<const Vec> centers,
         const Config& config = {})
     {
         if (config.quality == Quality::High)
-            return SweepSahBuilder<Node>::build(bboxes, centers, prim_count, config);
+            return SweepSahBuilder<Node>::build(bboxes, centers, config);
         else
-            return BinnedSahBuilder<Node>::build(bboxes, centers, prim_count, config);
+            return BinnedSahBuilder<Node>::build(bboxes, centers, config);
     }
 
 private:
-    static auto make_mini_tree_config(const Config& config) {
+    BVH_ALWAYS_INLINE static auto make_mini_tree_config(const Config& config) {
         typename MiniTreeBuilder<Node>::Config mini_tree_config;
-        static_cast<TopDownSahBuilder<Node>::Config&>(mini_tree_config) = config;
+        static_cast<typename TopDownSahBuilder<Node>::Config&>(mini_tree_config) = config;
         mini_tree_config.enable_pruning = config.quality == Quality::Low ? false : true;
         mini_tree_config.pruning_area_ratio =
             config.quality == Quality::High ? static_cast<Scalar>(0.01) : static_cast<Scalar>(0.1);

@@ -28,10 +28,15 @@ public:
     std::mutex& get_mutex() { return mutex_; }
 
     template <typename Loop>
-    inline void parallel_for(size_t begin, size_t end, const Loop&);
+    inline void parallel_for(
+        size_t begin, size_t end, const Loop&,
+        size_t parallel_threshold = 0);
 
     template <typename T, typename Reduce, typename Join>
-    inline T parallel_reduce(size_t begin, size_t end, const T& init, const Reduce&, const Join&);
+    inline T parallel_reduce(
+        size_t begin, size_t end,
+        const T& init, const Reduce&, const Join&,
+        size_t parallel_threshold = 0);
 
 private:
     static void worker(ThreadPool*, size_t);
@@ -50,7 +55,13 @@ private:
 };
 
 template <typename Loop>
-void ThreadPool::parallel_for(size_t begin, size_t end, const Loop& loop) {
+void ThreadPool::parallel_for(
+    size_t begin, size_t end,
+    const Loop& loop, size_t parallel_threshold)
+{
+    if (end - begin < parallel_threshold)
+        return loop(begin, end);
+
     auto chunk_size = std::max(size_t{1}, (end - begin) / get_thread_count());
     for (size_t i = begin; i < end; i += chunk_size) {
         size_t next = std::min(end, i + chunk_size);
@@ -61,12 +72,16 @@ void ThreadPool::parallel_for(size_t begin, size_t end, const Loop& loop) {
 
 template <typename T, typename Reduce, typename Join>
 T ThreadPool::parallel_reduce(
-    size_t begin,
-    size_t end,
-    const T& init,
-    const Reduce& reduce,
-    const Join& join)
+    size_t begin, size_t end,
+    const T& init, const Reduce& reduce, const Join& join,
+    size_t parallel_threshold)
 {
+    if (end - begin < parallel_threshold) {
+        T result(init);
+        reduce(result, begin, end);
+        return result;
+    }
+
     auto chunk_size = std::max(size_t{1}, (end - begin) / get_thread_count());
     std::vector<T> per_thread_result(get_thread_count(), init);
     for (size_t i = begin; i < end; i += chunk_size) {

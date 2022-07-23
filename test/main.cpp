@@ -13,7 +13,6 @@ static constexpr bool   use_robust_traversal = false;
 #include <bvh/v2/vec.h>
 #include <bvh/v2/ray.h>
 #include <bvh/v2/node.h>
-#include <bvh/v2/thread_pool.h>
 #include <bvh/v2/default_builder.h>
 #include <bvh/v2/stack.h>
 #include <bvh/v2/tri.h>
@@ -174,23 +173,29 @@ int main(int argc, char** argv) {
 #else
     bvh::v2::ThreadPool thread_pool;
 
-    std::vector<Vec3> centers;
-    std::vector<BBox> bboxes;
-    std::tie(bboxes, centers) = compute_bboxes_and_centers<Scalar, 3>(thread_pool, tris);
+    std::vector<BBox> bboxes(tris.size());
+    std::vector<Vec3> centers(tris.size());
+    thread_pool.parallel_for(0, tris.size(), [&] (size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i) {
+            bboxes[i]  = tris[i].get_bbox();
+            centers[i] = tris[i].get_center();
+        }
+    });
 
     Bvh bvh;
-    typename bvh::v2::DefaultBuilder<Node>::Config config;
-    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
     auto build_time = profile<std::chrono::system_clock>([&] {
-        bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes.data(), centers.data(), tris.size(), config);
-        //bvh = bvh::v2::SweepSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
-        //bvh = bvh::v2::BinnedSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
+        typename bvh::v2::DefaultBuilder<Node>::Config config;
+        config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
+        bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes, centers);
     });
-    node_count = bvh.nodes.size();
 
-    std::vector<PrecomputedTri> permuted_tris(bvh.prim_ids.size());
-    for (size_t i = 0; i < bvh.prim_ids.size(); ++i)
-        permuted_tris[i] = tris[bvh.prim_ids[i]];
+    std::vector<PrecomputedTri> permuted_tris(tris.size());
+    thread_pool.parallel_for(0, tris.size(), [&] (size_t begin, size_t end) {
+        for (size_t i = begin; i < end; ++i)
+            permuted_tris[i] = tris[bvh.prim_ids[i]];
+    });
+
+    node_count = bvh.nodes.size();
 #endif
 
     std::cout << "Built BVH with " << node_count << " node(s) built in " << to_ms(build_time) << "ms" << std::endl;

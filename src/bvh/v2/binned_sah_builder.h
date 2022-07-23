@@ -29,14 +29,13 @@ class BinnedSahBuilder : public TopDownSahBuilder<Node> {
 public:
     using typename TopDownSahBuilder<Node>::Config;
 
-    static Bvh<Node> build(
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+    BVH_ALWAYS_INLINE static Bvh<Node> build(
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config = {})
     {
-        BinnedSahBuilder builder(bboxes, centers, prim_count, config);
-        return builder.build(prim_count);
+        BinnedSahBuilder builder(bboxes, centers, config);
+        return builder.build();
     }
 
 protected:
@@ -69,13 +68,12 @@ protected:
 
     std::vector<size_t> prim_ids_;
 
-    BinnedSahBuilder(
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+    BVH_ALWAYS_INLINE BinnedSahBuilder(
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config)
         : TopDownSahBuilder<Node>(bboxes, centers, config)
-        , prim_ids_(prim_count)
+        , prim_ids_(bboxes.size())
     {
         std::iota(prim_ids_.begin(), prim_ids_.end(), 0);
     }

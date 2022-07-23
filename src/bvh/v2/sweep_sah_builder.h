@@ -27,14 +27,13 @@ class SweepSahBuilder : public TopDownSahBuilder<Node> {
 public:
     using typename TopDownSahBuilder<Node>::Config;
 
-    static Bvh<Node> build(
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+    BVH_ALWAYS_INLINE static Bvh<Node> build(
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config = {})
     {
-        SweepSahBuilder builder(bboxes, centers, prim_count, config);
-        return builder.build(prim_count);
+        SweepSahBuilder builder(bboxes, centers, config);
+        return builder.build();
     }
 
 protected:
@@ -48,17 +47,16 @@ protected:
     std::vector<Scalar> accum_;
     std::vector<size_t> prim_ids_[Node::dimension];
 
-    SweepSahBuilder(
-        const BBox* bboxes,
-        const Vec* centers,
-        size_t prim_count,
+    BVH_ALWAYS_INLINE SweepSahBuilder(
+        std::span<const BBox> bboxes,
+        std::span<const Vec> centers,
         const Config& config)
         : TopDownSahBuilder<Node>(bboxes, centers, config)
     {
-        marks_.resize(prim_count);
-        accum_.resize(prim_count);
+        marks_.resize(bboxes.size());
+        accum_.resize(bboxes.size());
         for (size_t axis = 0; axis < Node::dimension; ++axis) {
-            prim_ids_[axis].resize(prim_count);
+            prim_ids_[axis].resize(bboxes.size());
             std::iota(prim_ids_[axis].begin(), prim_ids_[axis].end(), 0);
             std::sort(prim_ids_[axis].begin(), prim_ids_[axis].end(), [&] (size_t i, size_t j) {
                 return centers[i][axis] < centers[j][axis];
