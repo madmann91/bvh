@@ -77,14 +77,13 @@ private:
     struct LocalBins {
         std::vector<Bin> bins;
 
-        BVH_ALWAYS_INLINE size_t get_size() const { return bins.size(); }
         BVH_ALWAYS_INLINE Bin& operator [] (size_t i) { return bins[i]; }
         BVH_ALWAYS_INLINE const Bin& operator [] (size_t i) const { return bins[i]; }
 
         BVH_ALWAYS_INLINE void merge_small_bins(size_t threshold) {
-            for (size_t i = 0; i < get_size();) {
+            for (size_t i = 0; i < bins.size();) {
                 size_t j = i + 1;
-                for (; j < get_size() && bins[j].ids.size() + bins[i].ids.size() <= threshold; ++j)
+                for (; j < bins.size() && bins[j].ids.size() + bins[i].ids.size() <= threshold; ++j)
                     bins[i].merge(std::move(bins[j]));
                 i = j;
             }
@@ -97,7 +96,7 @@ private:
 
         BVH_ALWAYS_INLINE void merge(LocalBins&& other) {
             bins.resize(std::max(bins.size(), other.bins.size()));
-            for (size_t i = 0; i < bins.size(); ++i)
+            for (size_t i = 0, n = std::min(bins.size(), other.bins.size()); i < n; ++i)
                 bins[i].merge(std::move(other[i]));
         }
     };
@@ -173,7 +172,7 @@ private:
         auto grid_offset = -center_bbox.min * grid_scale;
 
         // Place primitives in bins
-        auto bins = thread_pool_.parallel_reduce(0, bboxes_.size(), LocalBins {},
+        auto final_bins = thread_pool_.parallel_reduce(0, bboxes_.size(), LocalBins {},
             [&] (LocalBins& local_bins, size_t begin, size_t end) {
                 local_bins.bins.resize(bin_count);
                 for (size_t i = begin; i < end; ++i) {
@@ -190,13 +189,13 @@ private:
         // pruning, since it will then produce larger mini-trees. For this reason, it is only enabled
         // when mini-tree pruning is enabled.
         if (config_.enable_pruning)
-            bins.merge_small_bins(config_.parallel_threshold);
-        bins.remove_empty_bins();
+            final_bins.merge_small_bins(config_.parallel_threshold);
+        final_bins.remove_empty_bins();
 
         // Iterate over bins to collect groups of primitives and build BVHs over them in parallel
-        std::vector<Bvh<Node>> mini_trees(bins.get_size());
-        for (size_t i = 0; i < bins.get_size(); ++i) {
-            auto task = new BuildTask(this, mini_trees[i], std::move(bins[i].ids));
+        std::vector<Bvh<Node>> mini_trees(final_bins.bins.size());
+        for (size_t i = 0; i < final_bins.bins.size(); ++i) {
+            auto task = new BuildTask(this, mini_trees[i], std::move(final_bins[i].ids));
             thread_pool_.push([task] (size_t) { task->run(); delete task; });
         }
         thread_pool_.wait();
