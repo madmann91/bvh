@@ -6,9 +6,9 @@ under the MIT license.
 ## Features
 
 - A high-quality, single-threaded sweeping SAH builder,
-- A fast, medium-quality, single-threaded binned SAH builder inspired from
+- A fast, medium-quality, single-threaded binned SAH builder inspired by
   "On Fast Construction of SAH-based Bounding Volume Hierarchies", by I. Wald,
-- A fast, high-quality, multithreaded mini-tree BVH builder inspired from
+- A fast, high-quality, multithreaded mini-tree BVH builder inspired by
   "Rapid Bounding Volume Hierarchy Generation using Mini Trees", by P. Ganestam et al.
 - A fast and robust traversal algorithm using "Robust BVH Ray Traversal", by T. Ize.
 - A fast ray-triangle intersection algorithm based on

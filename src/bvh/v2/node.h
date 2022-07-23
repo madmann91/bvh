@@ -69,6 +69,7 @@ struct Node {
         return Vec<T, Dim>::generate([&] (size_t i) { return bounds[2 * i + 1 - octant[i]]; });
     }
 
+    /// Robust ray-node intersection routine. See "Robust BVH Ray Traversal", by T. Ize.
     BVH_ALWAYS_INLINE std::pair<T, T> intersect_robust(
         const Ray<T, Dim>& ray,
         const Vec<T, Dim>& inv_dir,

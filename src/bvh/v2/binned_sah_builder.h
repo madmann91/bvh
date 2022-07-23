@@ -13,7 +13,8 @@
 namespace bvh::v2 {
 
 /// Single-threaded top-down builder that partitions primitives based on a binned approximation of
-/// the Surface Area Heuristic (SAH).
+/// the Surface Area Heuristic (SAH). This builder is inspired by
+/// "On Fast Construction of SAH-based Bounding Volume Hierarchies", by I. Wald.
 template <typename Node, size_t BinCount = 8>
 class BinnedSahBuilder : public TopDownSahBuilder<Node> {
     using typename TopDownSahBuilder<Node>::Scalar;
