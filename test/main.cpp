@@ -14,8 +14,7 @@ static constexpr bool   use_robust_traversal = false;
 #include <bvh/v2/ray.h>
 #include <bvh/v2/node.h>
 #include <bvh/v2/thread_pool.h>
-#include <bvh/v2/sweep_sah_builder.h>
-#include <bvh/v2/mini_tree_builder.h>
+#include <bvh/v2/default_builder.h>
 #include <bvh/v2/stack.h>
 #include <bvh/v2/tri.h>
 #include <bvh/v2/sphere.h>
@@ -180,8 +179,10 @@ int main(int argc, char** argv) {
     std::tie(bboxes, centers) = compute_bboxes_and_centers<Scalar, 3>(thread_pool, tris);
 
     Bvh bvh;
+    typename bvh::v2::DefaultBuilder<Node>::Config config;
+    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
     auto build_time = profile<std::chrono::system_clock>([&] {
-        bvh = bvh::v2::MiniTreeBuilder<Node>::build(thread_pool, bboxes.data(), centers.data(), tris.size());
+        bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes.data(), centers.data(), tris.size(), config);
         //bvh = bvh::v2::SweepSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
         //bvh = bvh::v2::BinnedSahBuilder<Node>::build(bboxes.data(), centers.data(), tris.size());
     });
@@ -221,7 +222,7 @@ int main(int argc, char** argv) {
                 bvh::v2::SmallStack<Bvh::Index, stack_size> stack;
                 bvh.intersect<false, use_robust_traversal>(ray, bvh.get_root().index, stack,
                     [&] (size_t begin, size_t end) {
-                        //visited_leaves++;
+                        visited_leaves++;
                         for (size_t i = begin; i < end; ++i) {
                             if (permuted_tris[i].intersect(ray))
                                 prim_id = i;
@@ -229,7 +230,7 @@ int main(int argc, char** argv) {
                         return prim_id != invalid_id;
                     },
                     [&] (auto&&, auto&&) {
-                        //visited_nodes++;
+                        visited_nodes++;
                     });
                 if (prim_id != invalid_id)
                     intersections++;

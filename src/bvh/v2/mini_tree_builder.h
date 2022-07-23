@@ -63,6 +63,7 @@ private:
         std::vector<size_t> ids;
 
         BVH_ALWAYS_INLINE void add(size_t id) { ids.push_back(id); }
+
         BVH_ALWAYS_INLINE void merge(Bin&& other) {
             if (ids.empty())
                 ids = std::move(other.ids);
@@ -77,21 +78,22 @@ private:
         std::vector<Bin> bins;
 
         BVH_ALWAYS_INLINE size_t get_size() const { return bins.size(); }
-        BVH_ALWAYS_INLINE void resize(size_t size) { bins.resize(size); }
+        BVH_ALWAYS_INLINE Bin& operator [] (size_t i) { return bins[i]; }
+        BVH_ALWAYS_INLINE const Bin& operator [] (size_t i) const { return bins[i]; }
 
-        BVH_ALWAYS_INLINE void prune_small_bins(size_t threshold) {
+        BVH_ALWAYS_INLINE void merge_small_bins(size_t threshold) {
             for (size_t i = 0; i < get_size();) {
                 size_t j = i + 1;
                 for (; j < get_size() && bins[j].ids.size() + bins[i].ids.size() <= threshold; ++j)
                     bins[i].merge(std::move(bins[j]));
                 i = j;
             }
+        }
+
+        BVH_ALWAYS_INLINE void remove_empty_bins() {
             bins.resize(std::remove_if(bins.begin(), bins.end(),
                 [] (const Bin& bin) { return bin.ids.empty(); }) - bins.begin());
         }
-
-        BVH_ALWAYS_INLINE Bin& operator [] (size_t i) { return bins[i]; }
-        BVH_ALWAYS_INLINE const Bin& operator [] (size_t i) const { return bins[i]; }
 
         BVH_ALWAYS_INLINE void merge(LocalBins&& other) {
             bins.resize(std::max(bins.size(), other.bins.size()));
@@ -175,7 +177,7 @@ private:
         // Place primitives in bins
         auto bins = thread_pool_.parallel_reduce(0, prim_count, LocalBins {}, 
             [&] (LocalBins& local_bins, size_t begin, size_t end) {
-                local_bins.resize(bin_count);
+                local_bins.bins.resize(bin_count);
                 for (size_t i = begin; i < end; ++i) {
                     auto p = robust_max(fast_mul_add(centers_[i], grid_scale, grid_offset), Vec(0));
                     auto x = std::min(grid_dim - 1, static_cast<size_t>(p[0]));
@@ -186,7 +188,12 @@ private:
             },
             [&] (LocalBins& result, LocalBins&& other) { result.merge(std::move(other)); });
 
-        bins.prune_small_bins(config_.parallel_threshold);
+        // Note: Merging small bins will deteriorate the quality of the top BVH if there is no
+        // pruning, since it will then produce larger mini-trees. For this reason, it is only enabled
+        // when mini-tree pruning is enabled.
+        if (config_.enable_pruning)
+            bins.merge_small_bins(config_.parallel_threshold);
+        bins.remove_empty_bins();
 
         // Iterate over bins to collect groups of primitives and build BVHs over them in parallel
         std::vector<Bvh<Node>> mini_trees(bins.get_size());
