@@ -32,24 +32,6 @@ template struct bvh::v2::Sphere<Scalar, 3>;
 
 using PrecomputedTri = bvh::v2::PrecomputedTri<Scalar>;
 
-template <typename T, size_t N, typename Primitives>
-auto compute_bboxes_and_centers(bvh::v2::ThreadPool& thread_pool, const Primitives& primitives) {
-    std::vector<bvh::v2::Vec<T, N>> centers(primitives.size());
-    std::vector<bvh::v2::BBox<T, N>> bboxes(primitives.size());
-    static constexpr size_t parallel_threshold = 1024;
-    auto run = [&] (size_t begin, size_t end) {
-        for (size_t i = begin; i < end; ++i) {
-            centers[i] = primitives[i].get_center();
-            bboxes[i] = primitives[i].get_bbox();
-        }
-    };
-    if (primitives.size() < parallel_threshold)
-        run(0, primitives.size());
-    else
-        thread_pool.parallel_for(0, primitives.size(), run);
-    return std::make_pair(bboxes, centers);
-}
-
 #if USE_BVHLIB
 #include <bvh/bvh.hpp>
 #include <bvh/triangle.hpp>
