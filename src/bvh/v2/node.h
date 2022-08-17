@@ -35,6 +35,19 @@ struct Node {
     Node() = default;
 
     BVH_ALWAYS_INLINE bool is_leaf() const { return index.prim_count != 0; }
+    static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }
+
+    static BVH_ALWAYS_INLINE size_t get_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id + 1 : node_id - 1;
+    }
+
+    static BVH_ALWAYS_INLINE size_t get_left_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id : node_id - 1;
+    }
+
+    static BVH_ALWAYS_INLINE size_t get_right_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id + 1 : node_id;
+    }
 
     BVH_ALWAYS_INLINE void make_leaf(size_t first_prim, size_t prim_count) {
         assert(prim_count != 0);

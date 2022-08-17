@@ -4,6 +4,7 @@
 #include "bvh/v2/mini_tree_builder.h"
 #include "bvh/v2/sweep_sah_builder.h"
 #include "bvh/v2/binned_sah_builder.h"
+#include "bvh/v2/reinsertion_optimizer.h"
 #include "bvh/v2/thread_pool.h"
 
 namespace bvh::v2 {
@@ -37,8 +38,11 @@ public:
     {
         if (bboxes.size() < config.parallel_threshold)
             return build(bboxes, centers, config);
-        return MiniTreeBuilder<Node>::build(
+        auto bvh = MiniTreeBuilder<Node>::build(
             thread_pool, bboxes, centers, make_mini_tree_config(config));
+        if (config.quality == Quality::High)
+            ReinsertionOptimizer<Node>::optimize(bvh);//thread_pool, bvh);
+        return bvh;
     }
 
     /// Build a BVH in a single-thread.
@@ -47,10 +51,14 @@ public:
         std::span<const Vec> centers,
         const Config& config = {})
     {
-        if (config.quality == Quality::High)
-            return SweepSahBuilder<Node>::build(bboxes, centers, config);
-        else
+        if (config.quality == Quality::Low)
             return BinnedSahBuilder<Node>::build(bboxes, centers, config);
+        else {
+            auto bvh = SweepSahBuilder<Node>::build(bboxes, centers, config);
+            if (config.quality == Quality::High)
+                ReinsertionOptimizer<Node>::optimize(bvh);
+            return bvh;
+        }
     }
 
 private:

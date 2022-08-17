@@ -4,6 +4,7 @@
 #include "bvh/v2/sweep_sah_builder.h"
 #include "bvh/v2/binned_sah_builder.h"
 #include "bvh/v2/thread_pool.h"
+#include "bvh/v2/executor.h"
 
 #include <stack>
 #include <tuple>
@@ -138,7 +139,7 @@ private:
         }
     };
 
-    ThreadPool& thread_pool_;
+    ParallelExecutor executor_;
     std::span<const BBox> bboxes_;
     std::span<const Vec> centers_;
     const Config& config_;
@@ -148,7 +149,7 @@ private:
         std::span<const BBox> bboxes,
         std::span<const Vec> centers,
         const Config& config)
-        : thread_pool_(thread_pool)
+        : executor_(thread_pool)
         , bboxes_(bboxes)
         , centers_(centers)
         , config_(config)
@@ -158,7 +159,7 @@ private:
 
     std::vector<Bvh<Node>> build_mini_trees() {
         // Compute the bounding box of all centers
-        auto center_bbox = thread_pool_.parallel_reduce(0, bboxes_.size(), BBox::make_empty(),
+        auto center_bbox = executor_.reduce(0, bboxes_.size(), BBox::make_empty(),
             [this] (BBox& bbox, size_t begin, size_t end) {
                 for (size_t i = begin; i < end; ++i)
                     bbox.extend(centers_[i]);
@@ -172,7 +173,7 @@ private:
         auto grid_offset = -center_bbox.min * grid_scale;
 
         // Place primitives in bins
-        auto final_bins = thread_pool_.parallel_reduce(0, bboxes_.size(), LocalBins {},
+        auto final_bins = executor_.reduce(0, bboxes_.size(), LocalBins {},
             [&] (LocalBins& local_bins, size_t begin, size_t end) {
                 local_bins.bins.resize(bin_count);
                 for (size_t i = begin; i < end; ++i) {
@@ -196,9 +197,9 @@ private:
         std::vector<Bvh<Node>> mini_trees(final_bins.bins.size());
         for (size_t i = 0; i < final_bins.bins.size(); ++i) {
             auto task = new BuildTask(this, mini_trees[i], std::move(final_bins[i].ids));
-            thread_pool_.push([task] (size_t) { task->run(); delete task; });
+            executor_.thread_pool.push([task] (size_t) { task->run(); delete task; });
         }
-        thread_pool_.wait();
+        executor_.thread_pool.wait();
 
         return mini_trees;
     }
@@ -232,7 +233,7 @@ private:
 
         // Extract the BVHs rooted at the previously computed indices
         std::vector<Bvh<Node>> pruned_trees(pruned_roots.size());
-        thread_pool_.parallel_for(0, pruned_roots.size(),
+        executor_.for_each(0, pruned_roots.size(),
             [&] (size_t begin, size_t end) {
                 for (size_t i = begin; i < end; ++i) {
                     if (pruned_roots[i].second == 0)
@@ -287,7 +288,7 @@ private:
 
         bvh.nodes.resize(node_count);
         bvh.prim_ids.resize(prim_count);
-        thread_pool_.parallel_for(0, mini_trees.size(),
+        executor_.for_each(0, mini_trees.size(),
             [&] (size_t begin, size_t end) {
                 for (size_t i = begin; i < end; ++i) {
                     auto& mini_tree = mini_trees[i];

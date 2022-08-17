@@ -139,12 +139,12 @@ int main(int argc, char** argv) {
         //bvh::SweepSahBuilder<bvhlib::Bvh> builder(bvh);
         bvh::LocallyOrderedClusteringBuilder<bvhlib::Bvh, uint32_t> builder(bvh);
         builder.build(global_bbox, bboxes.data(), centers.data(), tris.size());
+        bvh::ParallelReinsertionOptimizer<bvhlib::Bvh> optimizer(bvh);
+        optimizer.optimize();
         bvh::LeafCollapser<bvhlib::Bvh> collapser(bvh);
         collapser.collapse();
     });
     node_count = bvh.node_count;
-    //bvh::ParallelReinsertionOptimizer<bvhlib::Bvh> optimizer(bvh);
-    //optimizer.optimize();
 
     std::vector<bvhlib::Triangle> permuted_tris(tris.size());
     for (size_t i = 0; i < tris.size(); ++i)
@@ -154,10 +154,11 @@ int main(int argc, char** argv) {
     bvhlib::Traverser<use_robust_traversal>::Type traverser(bvh);
 #else
     bvh::v2::ThreadPool thread_pool;
+    bvh::v2::ParallelExecutor executor(thread_pool);
 
     std::vector<BBox> bboxes(tris.size());
     std::vector<Vec3> centers(tris.size());
-    thread_pool.parallel_for(0, tris.size(), [&] (size_t begin, size_t end) {
+    executor.for_each(0, tris.size(), [&] (size_t begin, size_t end) {
         for (size_t i = begin; i < end; ++i) {
             bboxes[i]  = tris[i].get_bbox();
             centers[i] = tris[i].get_center();
@@ -172,7 +173,7 @@ int main(int argc, char** argv) {
     });
 
     std::vector<PrecomputedTri> permuted_tris(tris.size());
-    thread_pool.parallel_for(0, tris.size(), [&] (size_t begin, size_t end) {
+    executor.for_each(0, tris.size(), [&] (size_t begin, size_t end) {
         for (size_t i = begin; i < end; ++i)
             permuted_tris[i] = tris[bvh.prim_ids[i]];
     });
@@ -198,12 +199,14 @@ int main(int argc, char** argv) {
                 static constexpr uint32_t invalid_id = -1;
                 uint32_t prim_id = invalid_id;
 #if USE_BVHLIB
+                bvhlib::Traverser<use_robust_traversal>::Type::Statistics statistics;
                 bvhlib::Ray ray(bvhlib::convert(eye), bvhlib::convert(dir + u * right + v * up));
-                auto hit = traverser.traverse(ray, primitive_intersector);
+                auto hit = traverser.traverse(ray, primitive_intersector, statistics);
                 if (hit) {
                     prim_id = hit->primitive_index;
                     intersections++;
                 }
+                visited_nodes += statistics.traversal_steps;
 #else
                 Ray ray(eye, dir + u * right + v * up);
                 bvh::v2::SmallStack<Bvh::Index, stack_size> stack;

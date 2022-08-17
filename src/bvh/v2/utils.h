@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <atomic>
 
 namespace bvh::v2 {
 
@@ -103,6 +104,15 @@ BVH_ALWAYS_INLINE T split_bits(T x) {
 template <typename T, std::enable_if_t<std::is_unsigned_v<T>, bool> = true>
 BVH_ALWAYS_INLINE T morton_encode(T x, T y, T z) {
     return split_bits(x) | (split_bits(y) << 1) | (split_bits(z) << 2);
+}
+
+/// Computes the maximum between an atomic variable and a value, and returns the value previously
+/// held by the atomic variable.
+template <typename T>
+BVH_ALWAYS_INLINE T atomic_max(std::atomic<T>& atomic, const T& value) {
+    auto prev_value = atomic;
+    while (prev_value < value && !atomic.compare_exchange_weak(prev_value, value));
+    return prev_value;
 }
 
 } // namespace bvh::v2
