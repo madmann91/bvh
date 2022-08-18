@@ -24,6 +24,9 @@ struct Bvh {
 
     Bvh& operator = (Bvh&&) = default;
 
+    bool operator == (const Bvh& other) const = default;
+    bool operator != (const Bvh& other) const = default;
+
     /// Returns the root node of this BVH.
     const Node& get_root() const { return nodes[0]; }
 
@@ -37,6 +40,9 @@ struct Bvh {
     /// numerically robust ray-box test is used, otherwise a fast, but less precise test is used.
     template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
     inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack&, LeafFn&&, InnerFn&& = {}) const;
+
+    inline void serialize(OutputStream&) const;
+    static inline Bvh deserialize(InputStream&);
 };
 
 template <typename Node>
@@ -121,6 +127,28 @@ restart:
             if (was_hit) return;
         }
     }
+}
+
+template <typename Node>
+void Bvh<Node>::serialize(OutputStream& stream) const {
+    stream.write(nodes.size());
+    stream.write(prim_ids.size());
+    for (auto&& node : nodes)
+        node.serialize(stream);
+    for (auto&& prim_id : prim_ids)
+        stream.write(prim_id);
+}
+
+template <typename Node>
+Bvh<Node> Bvh<Node>::deserialize(InputStream& stream) {
+    Bvh bvh;
+    bvh.nodes.resize(stream.read<size_t>());
+    bvh.prim_ids.resize(stream.read<size_t>());
+    for (auto& node : bvh.nodes)
+        node = Node::deserialize(stream);
+    for (auto& prim_id : bvh.prim_ids)
+        prim_id = stream.read<size_t>();
+    return bvh;
 }
 
 } // namespace bvh::v2

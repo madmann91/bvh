@@ -5,8 +5,10 @@
 #include "bvh/v2/vec.h"
 #include "bvh/v2/bbox.h"
 #include "bvh/v2/ray.h"
+#include "bvh/v2/stream.h"
 
 #include <cassert>
+#include <array>
 #include <limits>
 
 namespace bvh::v2 {
@@ -23,16 +25,25 @@ struct Node {
     static constexpr size_t index_bits = IndexBits;
     static constexpr size_t max_prim_count = make_bitmask<size_t>(prim_count_bits);
 
-    T bounds[Dim * 2];
+    std::array<T, Dim * 2> bounds;
     struct Index {
         using Type = UnsignedIntType<IndexBits>;
         Type first_id   : std::numeric_limits<Type>::digits - prim_count_bits;
         Type prim_count : prim_count_bits;
+
+        BVH_ALWAYS_INLINE bool operator == (const Index& other) const {
+            return first_id == other.first_id && prim_count == other.prim_count;
+        }
+
+        bool operator != (const Index&) const = default;
     } index;
 
     static_assert(sizeof(Index) == sizeof(typename Index::Type));
 
     Node() = default;
+
+    bool operator == (const Node&) const = default;
+    bool operator != (const Node&) const = default;
 
     BVH_ALWAYS_INLINE bool is_leaf() const { return index.prim_count != 0; }
     static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }
@@ -103,6 +114,22 @@ struct Node {
         auto tmin = fast_mul_add(get_min_bounds(octant), inv_dir, inv_org);
         auto tmax = fast_mul_add(get_max_bounds(octant), inv_dir, inv_org);
         return make_intersection_result(ray, tmin, tmax);
+    }
+
+    BVH_ALWAYS_INLINE void serialize(OutputStream& stream) const {
+        for (auto&& bound : bounds)
+            stream.write(bound);
+        stream.write(static_cast<size_t>(index.first_id));
+        stream.write(static_cast<size_t>(index.prim_count));
+    }
+
+    static inline Node deserialize(InputStream& stream) {
+        Node node;
+        for (auto& bound : node.bounds)
+            bound = stream.read<T>();
+        node.index.first_id = stream.read<size_t>();
+        node.index.prim_count = stream.read<size_t>();
+        return node;
     }
 
 private:
