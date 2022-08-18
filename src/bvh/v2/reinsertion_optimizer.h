@@ -35,8 +35,8 @@ public:
 
 private:
     struct Candidate {
-        size_t node_id;
-        Scalar cost;
+        size_t node_id = 0;
+        Scalar cost = -std::numeric_limits<Scalar>::max();
 
         BVH_ALWAYS_INLINE bool operator > (const Candidate& other) const {
             return cost > other.cost;
@@ -84,37 +84,17 @@ private:
         return parents;
     }
 
-    template <typename Derived>
-    std::vector<Candidate> find_candidates(
-        Executor<Derived>& executor,
-        std::span<const Node> nodes,
-        size_t target_count)
-    {
-        return executor.reduce(1, nodes.size(),
-            std::vector<Candidate>{},
-            [&] (std::vector<Candidate>& candidates, size_t begin, size_t end) {
-                for (size_t i = begin; i < end; ++i) {
-                    auto cost = nodes[i].get_bbox().get_half_area();
-                    if (candidates.size() < target_count) {
-                        candidates.push_back(Candidate { i, cost });
-                    } else if (candidates.front().cost < cost) {
-                        std::pop_heap(candidates.begin(), candidates.end(), std::greater<>{});
-                        candidates.back() = Candidate { i, cost };
-                    } else
-                        continue;
-                    std::push_heap(candidates.begin(), candidates.end(), std::greater<>{});
-                }
-                std::sort_heap(candidates.begin(), candidates.end(), std::greater<>{});
-            },
-            [&] (std::vector<Candidate>& candidates, std::vector<Candidate>&& other) {
-                std::vector<Candidate> result(candidates.size() + other.size());
-                std::merge(
-                    candidates.begin(), candidates.end(),
-                    other.begin(), other.end(),
-                    result.begin(), std::greater<>{});
-                result.resize(std::min(target_count, result.size()));
-                candidates = std::move(result);
-            });
+    BVH_ALWAYS_INLINE std::vector<Candidate> find_candidates(size_t target_count) {
+        std::vector<Candidate> candidates(bvh_.nodes.size() - 1);
+        for (size_t i = 0; i < candidates.size(); ++i)
+            candidates[i] = Candidate { i + 1, bvh_.nodes[i + 1].get_bbox().get_half_area() };
+        std::partial_sort(
+            candidates.begin(),
+            candidates.begin() + target_count,
+            candidates.end(),
+            std::greater<>{});
+        candidates.resize(target_count);
+        return candidates;
     }
 
     Reinsertion find_reinsertion(size_t node_id) {
@@ -177,7 +157,7 @@ private:
                 }
 
                 if (!dst_node.is_leaf()) {
-                    auto child_area = top.first + dst_node.get_bbox().get_half_area() - merged_area;
+                    auto child_area = reinsert_area + dst_node.get_bbox().get_half_area();
                     stack.emplace_back(child_area, dst_node.index.first_id + 0);
                     stack.emplace_back(child_area, dst_node.index.first_id + 1);
                 }
@@ -217,10 +197,11 @@ private:
             parents_[sibling_node.index.first_id + 0] = parent_id;
             parents_[sibling_node.index.first_id + 1] = parent_id;
         }
+
         parents_[sibling_id] = to;
         parents_[from] = to;
         refit_from(to);
-        refit_from(from);
+        refit_from(parent_id);
     }
 
     BVH_ALWAYS_INLINE void refit_from(size_t index) {
@@ -251,8 +232,8 @@ private:
         std::vector<Reinsertion> reinsertions;
         std::vector<bool> touched(bvh_.nodes.size());
 
-        for (size_t i = 0; i < config.max_iter_count; ++i) {
-            auto candidates = find_candidates(executor, bvh_.nodes, batch_size);
+        for (size_t iter = 0; iter < config.max_iter_count; ++iter) {
+            auto candidates = find_candidates(batch_size);
 
             std::fill(touched.begin(), touched.end(), false);
             reinsertions.resize(candidates.size());
@@ -262,12 +243,12 @@ private:
                         reinsertions[i] = find_reinsertion(candidates[i].node_id);
                 });
 
-            std::sort(reinsertions.begin(), reinsertions.end(), std::greater<void>{});
+            std::sort(reinsertions.begin(), reinsertions.end(), std::greater<>{});
             for (auto& reinsertion : reinsertions) {
-                if (reinsertion.area_diff < 0)
+                if (reinsertion.area_diff <= 0)
                     break;
                 auto conflicts = get_conflicts(reinsertion.from, reinsertion.to);
-                if (std::any_of(conflicts.begin(), conflicts.end(), [&] (size_t j) { return touched[j]; }))
+                if (std::any_of(conflicts.begin(), conflicts.end(), [&] (size_t i) { return touched[i]; }))
                     continue;
                 for (auto conflict : conflicts)
                     touched[conflict] = true;

@@ -41,7 +41,7 @@ public:
         auto bvh = MiniTreeBuilder<Node>::build(
             thread_pool, bboxes, centers, make_mini_tree_config(config));
         if (config.quality == Quality::High)
-            ReinsertionOptimizer<Node>::optimize(bvh);//thread_pool, bvh);
+            ReinsertionOptimizer<Node>::optimize(thread_pool, bvh);
         return bvh;
     }
 
