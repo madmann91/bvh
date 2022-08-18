@@ -9,14 +9,17 @@ under the MIT license.
 - A fast, medium-quality, single-threaded binned SAH builder inspired by
   "On Fast Construction of SAH-based Bounding Volume Hierarchies", by I. Wald,
 - A fast, high-quality, multithreaded mini-tree BVH builder inspired by
-  "Rapid Bounding Volume Hierarchy Generation using Mini Trees", by P. Ganestam et al.
+  "Rapid Bounding Volume Hierarchy Generation using Mini Trees", by P. Ganestam et al.,
+- A reinsertion optimizer based on "Parallel Reinsertion for Bounding Volume Hierarchy
+  Optimization", by D. Meister and J. Bittner,
 - A fast and robust traversal algorithm using "Robust BVH Ray Traversal", by T. Ize.
 - A fast ray-triangle intersection algorithm based on
   "Fast, Minimum Storage Ray/Triangle Intersection", by T. Möller and B. Trumbore,
-- Can be parametrized on the dimension (e.g. 2D, 3D, 4D BVHs are supported) & scalar type
+- A serialization/deserialization interface,
+- A variable amount of dimensions (e.g. 2D, 3D, 4D BVHs are supported) and different scalar types
   (e.g. `float` or `double`),
-- Only depends on the standard library (parallelization uses a custom thread pool based on
-  `std::thread`).
+- Few dependencies: Only depends on the standard library (parallelization uses a custom thread pool
+  based on `std::thread`).
 
 ## Usage
 
