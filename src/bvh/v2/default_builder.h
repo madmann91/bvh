@@ -28,7 +28,7 @@ public:
         /// Threshold, in number of primitives, under which the builder operates in a single-thread.
         size_t parallel_threshold = 1024;
     };
-    
+
     /// Build a BVH in parallel using the given thread pool.
     BVH_ALWAYS_INLINE static Bvh<Node> build(
         ThreadPool& thread_pool,

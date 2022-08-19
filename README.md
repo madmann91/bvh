@@ -5,22 +5,25 @@ under the MIT license.
 
 ## Features
 
-- A high-quality, single-threaded sweeping SAH builder,
-- A fast, medium-quality, single-threaded binned SAH builder inspired by
+- High-quality, single-threaded sweeping SAH builder,
+- Fast, medium-quality, single-threaded binned SAH builder inspired by
   "On Fast Construction of SAH-based Bounding Volume Hierarchies", by I. Wald,
-- A fast, high-quality, multithreaded mini-tree BVH builder inspired by
+- Fast, high-quality, multithreaded mini-tree BVH builder inspired by
   "Rapid Bounding Volume Hierarchy Generation using Mini Trees", by P. Ganestam et al.,
-- A reinsertion optimizer based on "Parallel Reinsertion for Bounding Volume Hierarchy
+- Reinsertion optimizer based on "Parallel Reinsertion for Bounding Volume Hierarchy
   Optimization", by D. Meister and J. Bittner,
-- A fast and robust traversal algorithm using "Robust BVH Ray Traversal", by T. Ize.
-- A fast ray-triangle intersection algorithm based on
+- Fast and robust traversal algorithm using "Robust BVH Ray Traversal", by T. Ize.
+- Fast ray-triangle intersection algorithm based on
   "Fast, Minimum Storage Ray/Triangle Intersection", by T. Möller and B. Trumbore,
-- A serialization/deserialization interface,
-- A variable amount of dimensions (e.g. 2D, 3D, 4D BVHs are supported) and different scalar types
+- Serialization/deserialization interface,
+- Variable amount of dimensions (e.g. 2D, 3D, 4D BVHs are supported) and different scalar types
   (e.g. `float` or `double`),
-- Few dependencies: Only depends on the standard library (parallelization uses a custom thread pool
-  based on `std::thread`).
+- Only depends on the standard library (parallelization uses a custom thread pool based on
+  `std::thread`).
 
 ## Usage
 
-![simple example](https://github.com/madmann91/bvh/blob/v2/test/main.cpp)
+The library contains two examples that are kept up-to-date with the API:
+
+- A [basic example](test/simple_example.cpp) that traces one ray on a scene made of a couple of triangles,
+- A [benchmarking utility](test/benchmark.cpp) that showcases what the library can do.

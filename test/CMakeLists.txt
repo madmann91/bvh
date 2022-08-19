@@ -1,15 +1,11 @@
-find_package(OpenMP)
-add_compile_options(-Wall -Wextra -pedantic -march=native)
-
-add_executable(bvh_test main.cpp load_obj.cpp)
-
-target_link_libraries(bvh_test PUBLIC bvh)
-set_target_properties(bvh_test PROPERTIES CXX_STANDARD 20)
-if (TRUE)
-    target_compile_options(bvh_test PUBLIC -DUSE_BVHLIB=0)
-else()
-    # TODO: Remove this
-    target_include_directories(bvh_test PUBLIC ../../bvh_old/include)
-    target_link_libraries(bvh_test PUBLIC OpenMP::OpenMP_CXX)
-    target_compile_options(bvh_test PUBLIC -DUSE_BVHLIB=1)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wall -Wextra -pedantic -march=native)
 endif()
+
+add_executable(simple_example simple_example.cpp)
+target_link_libraries(simple_example PUBLIC bvh)
+set_target_properties(simple_example PROPERTIES CXX_STANDARD 20)
+
+add_executable(benchmark benchmark.cpp load_obj.cpp)
+target_link_libraries(benchmark PUBLIC bvh)
+set_target_properties(benchmark PROPERTIES CXX_STANDARD 20)
