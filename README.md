@@ -15,6 +15,7 @@ under the MIT license.
 - Fast and robust traversal algorithm using "Robust BVH Ray Traversal", by T. Ize.
 - Fast ray-triangle intersection algorithm based on
   "Fast, Minimum Storage Ray/Triangle Intersection", by T. Möller and B. Trumbore,
+- Fast ray-sphere intersection routine,
 - Serialization/deserialization interface,
 - Variable amount of dimensions (e.g. 2D, 3D, 4D BVHs are supported) and different scalar types
   (e.g. `float` or `double`),
