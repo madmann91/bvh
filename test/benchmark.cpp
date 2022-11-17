@@ -58,11 +58,16 @@ static void usage() {
 }
 
 template <typename Clock = std::chrono::high_resolution_clock, typename F>
-auto profile(F&& f) -> typename Clock::duration {
-    auto start = Clock::now();
-    f();
-    auto end = Clock::now();
-    return end - start;
+auto profile(F&& f, size_t iter_count = 1) -> typename Clock::duration {
+    std::vector<typename Clock::duration> durations;
+    for (size_t i = 0; i < iter_count; ++i) {
+        auto start = Clock::now();
+        f();
+        auto end = Clock::now();
+        durations.push_back(end - start);
+    }
+    std::sort(durations.begin(), durations.end());
+    return durations[durations.size() / 2];
 }
 
 template <typename Duration>
@@ -194,8 +199,7 @@ struct Accel {
     std::vector<PrecomputedTri> tris;
 };
 
-static Accel build_accel(const std::vector<Tri>& tris, const Options& options) {
-    bvh::v2::ThreadPool thread_pool;
+static Accel build_accel(bvh::v2::ThreadPool& thread_pool, const std::vector<Tri>& tris, const Options& options) {
     bvh::v2::ParallelExecutor executor(thread_pool);
 
     std::vector<BBox> bboxes(tris.size());
@@ -400,7 +404,8 @@ int main(int argc, char** argv) {
     std::cout << "Loaded file with " << tris.size() << " triangle(s)" << std::endl;
 
     Accel accel;
-    auto build_time = profile([&] { accel = build_accel(tris, options); });
+    bvh::v2::ThreadPool thread_pool;
+    auto build_time = profile([&] { accel = build_accel(thread_pool, tris, options); }, options.build_iters);
     std::cout
         << "Built BVH with " << accel.bvh.nodes.size() << " node(s) in "
         << to_ms(build_time) << "ms" << std::endl;
