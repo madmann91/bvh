@@ -1,4 +1,4 @@
-# BVH Construction and Traversal Library
+# BVH Construction and Traversal Library ![Build Status](https://github.com/madmann91/bvh/workflows/build-and-test/badge.svg)
 
 > Note: This is the 2nd version of this library. Check the `v1` branch for the older, first version
 > of this library.
