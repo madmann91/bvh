@@ -49,7 +49,7 @@ int main() {
 
     typename bvh::v2::DefaultBuilder<Node>::Config config;
     config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
-    auto bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes, centers);
+    auto bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes, centers, config);
 
     // Permuting the primitive data allows to remove indirections during traversal, which makes it faster.
     static constexpr bool should_permute = true;
