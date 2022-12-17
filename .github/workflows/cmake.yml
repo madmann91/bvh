@@ -30,4 +30,4 @@ jobs:
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
-      run: ctest -C ${{matrix.build-type}} --verbose
+      run: ctest -C ${{matrix.build-type}} --verbose --rerun-failed --output-on-failure
