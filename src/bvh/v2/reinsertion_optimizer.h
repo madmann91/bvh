@@ -93,7 +93,7 @@ private:
             candidates.begin() + target_count,
             candidates.end(),
             std::greater<>{});
-        candidates.resize(target_count);
+        candidates.resize(std::min(target_count, candidates.size()));
         return candidates;
     }
 
