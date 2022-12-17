@@ -55,7 +55,7 @@ int main() {
     printf("DONE FINDING BOXES AND CENTERS\n");
 
     typename bvh::v2::DefaultBuilder<Node>::Config config;
-    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::Medium;
+    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
     auto bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes, centers, config);
 
     printf("DONE BUILDING\n");
