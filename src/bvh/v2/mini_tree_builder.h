@@ -274,7 +274,8 @@ private:
         // Helper function to copy and fix the child/primitive index of a node
         auto copy_node = [&] (size_t i, Node& dst_node, const Node& src_node) {
             dst_node = src_node;
-            dst_node.index.first_id += src_node.is_leaf() ? prim_offsets[i] : node_offsets[i];
+            dst_node.index.first_id += static_cast<typename Node::Index::Type>(
+                src_node.is_leaf() ? prim_offsets[i] : node_offsets[i]);
         };
 
         // Make the leaves of the top BVH point to the right internal nodes

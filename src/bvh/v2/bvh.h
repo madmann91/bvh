@@ -61,13 +61,14 @@ auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
         auto& dst_node = bvh.nodes[dst_id];
         dst_node = src_node;
         if (src_node.is_leaf()) {
-            dst_node.index.first_id = bvh.prim_ids.size();
+            dst_node.index.first_id = static_cast<typename Index::Type>(bvh.prim_ids.size());
             std::copy_n(
                 prim_ids.begin() + src_node.index.first_id,
                 src_node.index.prim_count,
                 std::back_inserter(bvh.prim_ids));
         } else {
-            size_t first_id = dst_node.index.first_id = bvh.nodes.size();
+            size_t first_id = bvh.nodes.size();
+            dst_node.index.first_id = static_cast<typename Index::Type>(first_id);
             bvh.nodes.emplace_back();
             bvh.nodes.emplace_back();
             stack.emplace(src_node.index.first_id + 0, first_id + 0);
@@ -118,7 +119,7 @@ restart:
                 top = near;
             } else if (hit_right)
                 top = right.index;
-            else
+            else [[unlikely]]
                 goto restart;
         }
 

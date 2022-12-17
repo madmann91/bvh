@@ -17,7 +17,7 @@ class ReinsertionOptimizer {
 public:
     struct Config {
         /// Fraction of the number of nodes to optimize per iteration.
-        Scalar batch_size_ratio = 0.05;
+        Scalar batch_size_ratio = static_cast<Scalar>(0.05);
 
         /// Maximum number of iterations.
         size_t max_iter_count = 3;

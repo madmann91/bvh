@@ -9,7 +9,7 @@ struct Octant {
     uint32_t value = 0;
     static constexpr size_t max_dim = sizeof(value) * CHAR_BIT;
 
-    uint32_t operator [] (int i) const { return (value >> i) & uint32_t{1}; }
+    uint32_t operator [] (size_t i) const { return (value >> i) & uint32_t{1}; }
 };
 
 template <typename T, size_t N>
@@ -34,7 +34,7 @@ struct Ray {
         static_assert(N <= Octant::max_dim);
         Octant octant;
         static_for<0, N>([&] (size_t i) {
-            octant.value |= std::signbit(dir[i]) * (size_t{1} << i);
+            octant.value |= std::signbit(dir[i]) * (uint32_t{1} << i);
         });
         return octant;
     }

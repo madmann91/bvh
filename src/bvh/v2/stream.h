@@ -44,8 +44,8 @@ protected:
     std::istream& stream_;
 
     size_t read_raw(void* data, size_t size) override {
-        stream_.read(reinterpret_cast<char*>(data), size);
-        return stream_.gcount();
+        stream_.read(reinterpret_cast<char*>(data), static_cast<std::streamsize>(size));
+        return static_cast<size_t>(stream_.gcount());
     }
 };
 
@@ -62,7 +62,7 @@ protected:
     std::ostream& stream_;
 
     bool write_raw(const void* data, size_t size) override {
-        stream_.write(reinterpret_cast<const char*>(data), size);
+        stream_.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));
         return stream_.good();
     }
 };

@@ -63,13 +63,13 @@ struct Node {
     BVH_ALWAYS_INLINE void make_leaf(size_t first_prim, size_t prim_count) {
         assert(prim_count != 0);
         assert(prim_count <= max_prim_count);
-        index.prim_count = prim_count;
-        index.first_id = first_prim;
+        index.prim_count = static_cast<typename Index::Type>(prim_count);
+        index.first_id = static_cast<typename Index::Type>(first_prim);
     }
 
     BVH_ALWAYS_INLINE void make_inner(size_t first_child) {
         index.prim_count = 0;
-        index.first_id = first_child;
+        index.first_id = static_cast<typename Index::Type>(first_child);
     }
 
     BVH_ALWAYS_INLINE BBox<T, Dim> get_bbox() const {
@@ -86,11 +86,11 @@ struct Node {
     }
 
     BVH_ALWAYS_INLINE Vec<T, Dim> get_min_bounds(const Octant& octant) const {
-        return Vec<T, Dim>::generate([&] (size_t i) { return bounds[2 * i + octant[i]]; });
+        return Vec<T, Dim>::generate([&] (size_t i) { return bounds[2 * static_cast<uint32_t>(i) + octant[i]]; });
     }
 
     BVH_ALWAYS_INLINE Vec<T, Dim> get_max_bounds(const Octant& octant) const {
-        return Vec<T, Dim>::generate([&] (size_t i) { return bounds[2 * i + 1 - octant[i]]; });
+        return Vec<T, Dim>::generate([&] (size_t i) { return bounds[2 * static_cast<uint32_t>(i) + 1 - octant[i]]; });
     }
 
     /// Robust ray-node intersection routine. See "Robust BVH Ray Traversal", by T. Ize.

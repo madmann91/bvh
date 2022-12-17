@@ -2,13 +2,13 @@
 #define BVH_V2_PLATFORM_H
 
 #if defined(__clang__)
-#define BVH_ENABLE_FP_CONTRACT \
+#define BVH_CLANG_ENABLE_FP_CONTRACT \
     _Pragma("clang diagnostic push") \
     _Pragma("clang diagnostic ignored \"-Wunknown-pragmas\"") \
     _Pragma("STDC FP_CONTRACT ON") \
     _Pragma("clang diagnostic pop")
 #else
-#define BVH_ENABLE_FP_CONTRACT
+#define BVH_CLANG_ENABLE_FP_CONTRACT
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)

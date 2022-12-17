@@ -134,21 +134,21 @@ struct Options {
             } else if (argv[i] == "--eye"sv || argv[i] == "-e"sv) {
                 if (!check_arg(argc, argv, i, 3))
                     return false;
-                eye[0] = std::strtod(argv[++i], nullptr);
-                eye[1] = std::strtod(argv[++i], nullptr);
-                eye[2] = std::strtod(argv[++i], nullptr);
+                eye[0] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                eye[1] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                eye[2] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
             } else if (argv[i] == "--dir"sv || argv[i] == "-d"sv) {
                 if (!check_arg(argc, argv, i, 3))
                     return false;
-                dir[0] = std::strtod(argv[++i], nullptr);
-                dir[1] = std::strtod(argv[++i], nullptr);
-                dir[2] = std::strtod(argv[++i], nullptr);
+                dir[0] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                dir[1] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                dir[2] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
             } else if (argv[i] == "--up"sv || argv[i] == "-u"sv) {
                 if (!check_arg(argc, argv, i, 3))
                     return false;
-                up[0] = std::strtod(argv[++i], nullptr);
-                up[1] = std::strtod(argv[++i], nullptr);
-                up[2] = std::strtod(argv[++i], nullptr);
+                up[0] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                up[1] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
+                up[2] = static_cast<Scalar>(std::strtod(argv[++i], nullptr));
             } else if (argv[i] == "--width"sv || argv[i] == "-w"sv) {
                 if (!check_arg(argc, argv, i))
                     return false;
@@ -327,7 +327,7 @@ std::tuple<uint8_t, uint8_t, uint8_t> intensity_to_color(Scalar k) {
     size_t i = std::min(n - 1, static_cast<size_t>(k * n));
     size_t j = std::min(n - 1, i + 1);
 
-    auto t = (k - i * s) / s;
+    auto t = (k - static_cast<Scalar>(i) * s) / s;
     auto c = (1.0f - t) * g[i] + t * g[j];
     return std::make_tuple(c[0], c[1], c[2]);
 }
@@ -358,7 +358,8 @@ static Image render(const Accel& accel, RenderStats& render_stats, const Options
             if (options.render_mode == RenderMode::EyeLight) {
                 if (prim_id != invalid_id)
                     intensity = std::abs(dot(normalize(accel.tris[prim_id].n), ray.dir));
-                uint8_t pixel = std::min(std::max(0, static_cast<int>(intensity * Scalar{256})), 255);
+                uint8_t pixel = static_cast<uint8_t>(
+                    std::min(std::max(0, static_cast<int>(intensity * Scalar{256})), 255));
                 image.data[3 * pixel_id + 0] = pixel;
                 image.data[3 * pixel_id + 1] = pixel;
                 image.data[3 * pixel_id + 2] = pixel;
@@ -371,8 +372,8 @@ static Image render(const Accel& accel, RenderStats& render_stats, const Options
     }
 
     if (options.render_mode == RenderMode::Debug) {
-        Scalar debug_threshold = options.debug_threshold;
-        if (debug_threshold == Scalar{0})
+        Scalar debug_threshold = static_cast<Scalar>(options.debug_threshold);
+        if (debug_threshold == static_cast<Scalar>(0))
             debug_threshold = static_cast<Scalar>(
                 *std::max_element(debug_data.get(), debug_data.get() + options.width * options.height));
         for (size_t i = 0; i < options.width * options.height; ++i) {
