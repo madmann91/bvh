@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <numeric>
 #include <cmath>
+#include <algorithm>
 
 namespace bvh::v2 {
 
