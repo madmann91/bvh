@@ -94,7 +94,7 @@ inline constexpr T round_up_log2(T i, T p = 0) {
 }
 
 /// Split an unsigned integer such that its bits are spaced by 2 zeros.
-/// For instance, morton_split(0b00110010) = 0b000000001001000000001000.
+/// For instance, split_bits(0b00110010) = 0b000000001001000000001000.
 template <typename T, std::enable_if_t<std::is_unsigned_v<T>, bool> = true>
 BVH_ALWAYS_INLINE T split_bits(T x) {
     constexpr size_t bit_count = sizeof(T) * CHAR_BIT;
