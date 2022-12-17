@@ -1,6 +1,7 @@
 # BVH Construction and Traversal Library
 
-> Note: This is the 2nd version of this library. For the older version, use the `v1` branch.
+> Note: This is the 2nd version of this library. Check the `v1` branch for the older, first version
+> of this library.
 
 This library is a small, standalone library for BVH construction and traversal. It is licensed
 under the MIT license.
