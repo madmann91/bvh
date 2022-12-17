@@ -9,3 +9,5 @@ set_target_properties(simple_example PROPERTIES CXX_STANDARD 20)
 add_executable(benchmark benchmark.cpp load_obj.cpp)
 target_link_libraries(benchmark PUBLIC bvh)
 set_target_properties(benchmark PROPERTIES CXX_STANDARD 20)
+
+add_test(NAME simple_example COMMAND simple_example)
