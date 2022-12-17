@@ -329,7 +329,10 @@ std::tuple<uint8_t, uint8_t, uint8_t> intensity_to_color(Scalar k) {
 
     auto t = (k - static_cast<Scalar>(i) * s) / s;
     auto c = (1.0f - t) * g[i] + t * g[j];
-    return std::make_tuple(c[0], c[1], c[2]);
+    return std::make_tuple(
+        static_cast<uint8_t>(c[0]),
+        static_cast<uint8_t>(c[1]),
+        static_cast<uint8_t>(c[2]));
 }
 
 static Image render(const Accel& accel, RenderStats& render_stats, const Options& options) {
