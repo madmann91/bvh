@@ -34,8 +34,7 @@ int main() {
         Vec3(-1.0,  1.0, 1.0)
     );
 
-    bvh::v2::ThreadPool thread_pool;
-    bvh::v2::ParallelExecutor executor(thread_pool);
+    bvh::v2::SequentialExecutor executor;
 
     // Get triangle centers and bounding boxes (required for BVH builder)
     std::vector<BBox> bboxes(tris.size());
@@ -48,8 +47,8 @@ int main() {
     });
 
     typename bvh::v2::DefaultBuilder<Node>::Config config;
-    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::High;
-    auto bvh = bvh::v2::DefaultBuilder<Node>::build(thread_pool, bboxes, centers, config);
+    config.quality = bvh::v2::DefaultBuilder<Node>::Quality::Medium;
+    auto bvh = bvh::v2::DefaultBuilder<Node>::build(bboxes, centers, config);
 
     // Permuting the primitive data allows to remove indirections during traversal, which makes it faster.
     static constexpr bool should_permute = true;
