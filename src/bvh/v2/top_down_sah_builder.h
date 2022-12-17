@@ -91,12 +91,29 @@ protected:
                     node.make_inner(first_child);
 
                     bvh.nodes.resize(first_child + 2);
-                    bvh.nodes[first_child + 0].set_bbox(compute_bbox(item.begin, *split_pos));
-                    bvh.nodes[first_child + 1].set_bbox(compute_bbox(*split_pos, item.end));
-                    auto first_item  = WorkItem { first_child + 0, item.begin, *split_pos };
-                    auto second_item = WorkItem { first_child + 1, *split_pos, item.end };
+
+                    auto first_bbox   = compute_bbox(item.begin, *split_pos);
+                    auto second_bbox  = compute_bbox(*split_pos, item.end);
+                    auto first_range  = std::make_pair(item.begin, *split_pos);
+                    auto second_range = std::make_pair(*split_pos, item.end);
+
+                    // Implement the surface area traversal order for faster shadow ray queries.
+                    // See "SATO: Surface Area Traversal Order for Shadow Ray Tracing",
+                    // by J. Nah and D. Manocha.
+                    if (first_bbox.get_half_area() < second_bbox.get_half_area()) {
+                        std::swap(first_bbox, second_bbox);
+                        std::swap(first_range, second_range);
+                    }
+
+                    auto first_item  = WorkItem { first_child + 0, first_range.first, first_range.second };
+                    auto second_item = WorkItem { first_child + 1, second_range.first, second_range.second };
+                    bvh.nodes[first_child + 0].set_bbox(first_bbox);
+                    bvh.nodes[first_child + 1].set_bbox(second_bbox);
+
+                    // Process the largest child item first, in order to minimize the stack size.
                     if (first_item.size() < second_item.size())
                         std::swap(first_item, second_item);
+
                     stack.push(first_item);
                     stack.push(second_item);
                     continue;
