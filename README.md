@@ -23,6 +23,9 @@ Here is a comparison of this library with other alternatives
 Here is a list of features supported by this library (changes from `v1` are indicated with [NEW]):
 
 - [NEW] C++20 interface using `std::span` instead of raw pointers,
+- Low-level API with direct access to various builders,
+- [NEW] High-level `DefaultBuilder` API which selects the best builder depending on the desired
+  BVH quality level.
 - High-quality, single-threaded sweeping SAH builder,
 - Fast, medium-quality, single-threaded binned SAH builder inspired by
   "On Fast Construction of SAH-based Bounding Volume Hierarchies", by I. Wald,
