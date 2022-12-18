@@ -54,3 +54,4 @@ The library contains two examples that are kept up-to-date with the API:
 
 - A [basic example](test/simple_example.cpp) that traces one ray on a scene made of a couple of triangles,
 - A [benchmarking utility](test/benchmark.cpp) that showcases what the library can do.
+- A [serialization test](test/serialize.cpp) that shows how to save and load a BVH from a file.
