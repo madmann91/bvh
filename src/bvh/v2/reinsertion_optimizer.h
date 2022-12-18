@@ -6,6 +6,7 @@
 #include "bvh/v2/executor.h"
 
 #include <vector>
+#include <algorithm>
 
 namespace bvh::v2 {
 
@@ -46,7 +47,7 @@ private:
     struct Reinsertion {
         size_t from = 0;
         size_t to = 0;
-        Scalar area_diff = -std::numeric_limits<Scalar>::max();
+        Scalar area_diff = static_cast<Scalar>(0);
 
         BVH_ALWAYS_INLINE bool operator > (const Reinsertion& other) const {
             return area_diff > other.area_diff;
@@ -85,15 +86,21 @@ private:
     }
 
     BVH_ALWAYS_INLINE std::vector<Candidate> find_candidates(size_t target_count) {
-        std::vector<Candidate> candidates(bvh_.nodes.size() - 1);
-        for (size_t i = 0; i < candidates.size(); ++i)
-            candidates[i] = Candidate { i + 1, bvh_.nodes[i + 1].get_bbox().get_half_area() };
-        std::partial_sort(
-            candidates.begin(),
-            candidates.begin() + target_count,
-            candidates.end(),
-            std::greater<>{});
-        candidates.resize(std::min(target_count, candidates.size()));
+        // Gather the `target_count` nodes that have the highest cost.
+        // Note that this may produce fewer nodes if the BVH has fewer than `target_count` nodes.
+        const auto node_count = std::min(bvh_.nodes.size(), target_count + 1);
+        std::vector<Candidate> candidates;
+        for (size_t i = 1; i < node_count; ++i)
+            candidates.push_back(Candidate { i, bvh_.nodes[i].get_bbox().get_half_area() });
+        std::make_heap(candidates.begin(), candidates.end(), std::greater<>{});
+        for (size_t i = node_count; i < bvh_.nodes.size(); ++i) {
+            auto cost = bvh_.nodes[i].get_bbox().get_half_area();
+            if (candidates.front().cost < cost) {
+                std::pop_heap(candidates.begin(), candidates.end(), std::greater<>{});
+                candidates.back() = Candidate { i, cost };
+                std::push_heap(candidates.begin(), candidates.end(), std::greater<>{});
+            }
+        }
         return candidates;
     }
 
@@ -124,12 +131,12 @@ private:
          *     SA(Pn) - SA(B U sibling(P2) U ... U sibling(P(n - 1)) + : Same but for Pn
          *     0 +                                                     : R does not change
          *     SA(Q1) - SA(Q1 U A) +                                   : Q1 now contains A
-         *     SA(Q1) - SA(Q2 U A) +                                   : Q2 now contains A
+         *     SA(Q2) - SA(Q2 U A) +                                   : Q2 now contains A
          *     ... +
          *     -SA(A U C)                                              : For the parent of A and C
          */
 
-        Reinsertion best_reinsertion { node_id };
+        Reinsertion best_reinsertion { .from = node_id };
         auto node_area   = bvh_.nodes[node_id].get_bbox().get_half_area();
         auto parent_area = bvh_.nodes[parents_[node_id]].get_bbox().get_half_area();
         auto area_diff = parent_area;
@@ -169,6 +176,7 @@ private:
                 pivot_bbox.extend(bvh_.nodes[sibling_id].get_bbox());
                 area_diff += bvh_.nodes[pivot_id].get_bbox().get_half_area() - pivot_bbox.get_half_area();
             }
+
             sibling_id = Node::get_sibling_id(pivot_id);
             pivot_id = parents_[pivot_id];
         } while (pivot_id != 0);
@@ -243,10 +251,11 @@ private:
                         reinsertions[i] = find_reinsertion(candidates[i].node_id);
                 });
 
+            reinsertions.erase(std::remove_if(reinsertions.begin(), reinsertions.end(),
+                [] (auto& r) { return r.area_diff <= 0; }), reinsertions.end());
             std::sort(reinsertions.begin(), reinsertions.end(), std::greater<>{});
+
             for (auto& reinsertion : reinsertions) {
-                if (reinsertion.area_diff <= 0)
-                    break;
                 auto conflicts = get_conflicts(reinsertion.from, reinsertion.to);
                 if (std::any_of(conflicts.begin(), conflicts.end(), [&] (size_t i) { return touched[i]; }))
                     continue;
