@@ -48,6 +48,22 @@ Here is a list of features supported by this library (changes from `v1` are indi
 - [NEW] Only depends on the standard library (parallelization uses a custom thread pool based on
   `std::thread`).
 
+## Building
+
+This library is header-only, and can be added as a CMake subproject by cloning or adding as this
+repository as submodule, for instance in `<your-project>/contrib/bvh`, and then adding this to
+`<your-project>/CMakeLists.txt`:
+
+    add_subdirectory(contrib/bvh)
+    target_link_library(my_project PUBLIC bvh)
+
+If you want to build the examples, use:
+
+    mkdir build
+    cd build
+    cmake .. -DCMAKE_BUILD_TYPE=<Debug|Release> -DENABLE_TESTING=ON
+    cmake --build .
+
 ## Usage
 
 The library contains two examples that are kept up-to-date with the API:
