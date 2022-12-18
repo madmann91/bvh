@@ -1,5 +1,5 @@
-#ifndef BVH_V2_SAH_HEURISTIC_H
-#define BVH_V2_SAH_HEURISTIC_H
+#ifndef BVH_V2_SPLIT_HEURISTIC_H
+#define BVH_V2_SPLIT_HEURISTIC_H
 
 #include "bvh/v2/bbox.h"
 #include "bvh/v2/utils.h"
@@ -9,13 +9,13 @@
 namespace bvh::v2 {
 
 template <typename T>
-class SahHeuristic {
+class SplitHeuristic {
 public:
     /// Creates an SAH evaluator object, used by top-down builders to determine where to split.
     /// The two parameters are the log of the size of primitive clusters in base 2, and the ratio of
     /// the cost of intersecting a node (a ray-box intersection) over the cost of intersecting a
     /// primitive.
-    BVH_ALWAYS_INLINE SahHeuristic(
+    BVH_ALWAYS_INLINE SplitHeuristic(
         size_t log_cluster_size = 0,
         T cost_ratio = static_cast<T>(1.))
         : log_cluster_size_(log_cluster_size)

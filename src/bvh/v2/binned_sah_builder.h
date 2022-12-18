@@ -51,7 +51,7 @@ protected:
 
         Bin() = default;
 
-        BVH_ALWAYS_INLINE Scalar get_cost(const SahHeuristic<Scalar>& sah) const {
+        BVH_ALWAYS_INLINE Scalar get_cost(const SplitHeuristic<Scalar>& sah) const {
             return sah.get_leaf_cost(0, prim_count, bbox);
         }
 

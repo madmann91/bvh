@@ -4,7 +4,7 @@
 #include "bvh/v2/bvh.h"
 #include "bvh/v2/vec.h"
 #include "bvh/v2/bbox.h"
-#include "bvh/v2/sah_heuristic.h"
+#include "bvh/v2/split_heuristic.h"
 
 #include <stack>
 #include <span>
@@ -26,7 +26,7 @@ protected:
 public:
     struct Config {
         /// SAH heuristic parameters that control how primitives are partitioned.
-        SahHeuristic<Scalar> sah;
+        SplitHeuristic<Scalar> sah;
 
         /// Nodes containing less than this amount of primitives will not be split.
         /// This is mostly to speed up BVH construction, and using large values may lead to lower
@@ -97,8 +97,9 @@ protected:
                     auto first_range  = std::make_pair(item.begin, *split_pos);
                     auto second_range = std::make_pair(*split_pos, item.end);
 
-                    // Implement the surface area traversal order for faster shadow ray queries.
-                    // See "SATO: Surface Area Traversal Order for Shadow Ray Tracing",
+                    // For "any-hit" queries, the left child is chosen first, so we make sure that
+                    // it is the child with the largest area, as it is more likely to contain an
+                    // an occluder. See "SATO: Surface Area Traversal Order for Shadow Ray Tracing",
                     // by J. Nah and D. Manocha.
                     if (first_bbox.get_half_area() < second_bbox.get_half_area()) {
                         std::swap(first_bbox, second_bbox);
