@@ -32,8 +32,7 @@ public:
         std::span<const Vec> centers,
         const Config& config = {})
     {
-        SweepSahBuilder builder(bboxes, centers, config);
-        return builder.build();
+        return SweepSahBuilder(bboxes, centers, config).build();
     }
 
 protected:

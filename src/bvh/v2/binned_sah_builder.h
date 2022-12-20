@@ -34,8 +34,7 @@ public:
         std::span<const Vec> centers,
         const Config& config = {})
     {
-        BinnedSahBuilder builder(bboxes, centers, config);
-        return builder.build();
+        return BinnedSahBuilder(bboxes, centers, config).build();
     }
 
 protected:
