@@ -66,7 +66,7 @@ If you want to build the examples, use:
 
 ## Usage
 
-The library contains two examples that are kept up-to-date with the API:
+The library contains several examples that are kept up-to-date with the API:
 
 - A [basic example](test/simple_example.cpp) that traces one ray on a scene made of a couple of triangles,
 - A [benchmarking utility](test/benchmark.cpp) that showcases what the library can do.
