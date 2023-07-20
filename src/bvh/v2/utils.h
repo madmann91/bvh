@@ -44,6 +44,8 @@ BVH_ALWAYS_INLINE T robust_max(T a, T b) { return a > b ? a : b; }
 /// Adds the given number of ULPs (Units in the Last Place) to the given floating-point number.
 template <typename T, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
 BVH_ALWAYS_INLINE T add_ulp_magnitude(T t, unsigned ulp) {
+    if (!std::isfinite(t))
+        return t;
     UnsignedIntType<sizeof(T) * CHAR_BIT> u;
     std::memcpy(&u, &t, sizeof(T));
     u += ulp;

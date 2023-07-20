@@ -81,7 +81,7 @@ auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
 template <typename Node>
 template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn>
 void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const {
-    auto inv_dir = ray.get_inv_dir();
+    auto inv_dir = ray.template get_inv_dir<!IsRobust>();
     auto inv_org = -inv_dir * ray.org;
     auto inv_dir_pad = Ray<Scalar, Node::dimension>::pad_inv_dir(inv_dir);
     auto octant = ray.get_octant();

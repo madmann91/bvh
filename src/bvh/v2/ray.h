@@ -26,8 +26,11 @@ struct Ray {
         : org(org), dir(dir), tmin(tmin), tmax(tmax)
     {}
 
+    template <bool SafeInverse = false>
     BVH_ALWAYS_INLINE Vec<T, N> get_inv_dir() const {
-        return Vec<T, N>::generate([&] (size_t i) { return safe_inverse(dir[i]); });
+        return Vec<T, N>::generate([&] (size_t i) {
+            return SafeInverse ? safe_inverse(dir[i]) : static_cast<T>(1) / dir[i];
+        });
     }
 
     BVH_ALWAYS_INLINE Octant get_octant() const {
