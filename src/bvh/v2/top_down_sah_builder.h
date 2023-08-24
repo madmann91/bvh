@@ -7,7 +7,14 @@
 #include "bvh/v2/split_heuristic.h"
 
 #include <stack>
+#if __cplusplus >= 202002L
 #include <span>
+#else
+#include <bvh/v2/span.hpp>
+namespace std{
+    using tcb::span;
+}
+#endif
 #include <algorithm>
 #include <optional>
 #include <numeric>

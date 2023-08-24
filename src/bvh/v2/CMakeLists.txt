@@ -6,5 +6,7 @@ if (Threads_FOUND)
     target_link_libraries(bvh INTERFACE Threads::Threads)
 endif()
 
-target_include_directories(bvh INTERFACE ../..)
+#target_include_directories(bvh INTERFACE ../..)
+target_include_directories(bvh INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..> )
 set_target_properties(bvh PROPERTIES CXX_STANDARD 20)
