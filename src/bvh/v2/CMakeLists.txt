@@ -1,4 +1,13 @@
-add_library(bvh INTERFACE)
+set(BVH_TARGET_NAME bvh)
+set(BVH_INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}")
+if(NOT DEFINED BVH_CONFIG_INSTALL_DIR )
+  set(BVH_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}" CACHE INTERNAL "")
+endif()
+set(BVH_TARGETS_EXPORT_NAME "${PROJECT_NAME}Targets")
+set(BVH_CMAKE_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+set(BVH_CMAKE_PROJECT_TARGETS_FILE "${BVH_CMAKE_CONFIG_DIR}/${PROJECT_NAME}Targets.cmake")
+
+add_library(${BVH_TARGET_NAME} INTERFACE)
 find_package(Threads)
 if (Threads_FOUND)
     # Link with the threading library of the system, which may
@@ -6,7 +15,29 @@ if (Threads_FOUND)
     target_link_libraries(bvh INTERFACE Threads::Threads)
 endif()
 
-#target_include_directories(bvh INTERFACE ../..)
-target_include_directories(bvh INTERFACE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..> )
-set_target_properties(bvh PROPERTIES CXX_STANDARD 20)
+target_include_directories(${BVH_TARGET_NAME} INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+  $<INSTALL_INTERFACE:include>
+  )
+set_target_properties(${BVH_TARGET_NAME} PROPERTIES CXX_STANDARD 20)
+
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../bvh
+  DESTINATION ${BVH_INCLUDE_INSTALL_DIR}
+  )
+export(
+  TARGETS ${BVH_TARGET_NAME}
+  NAMESPACE ${PROJECT_NAME}::
+  FILE ${BVH_CMAKE_PROJECT_TARGETS_FILE}
+  )
+install(
+  TARGETS ${BVH_TARGET_NAME}
+  EXPORT ${BVH_TARGETS_EXPORT_NAME}
+  INCLUDES DESTINATION ${BVH_INCLUDE_INSTALL_DIR}
+  )
+install(
+  EXPORT ${BVH_TARGETS_EXPORT_NAME}
+  NAMESPACE ${PROJECT_NAME}::
+  DESTINATION ${BVH_CONFIG_INSTALL_DIR}
+  )
