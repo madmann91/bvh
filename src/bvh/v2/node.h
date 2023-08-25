@@ -35,15 +35,29 @@ struct Node {
             return first_id == other.first_id && prim_count == other.prim_count;
         }
 
+#if __cplusplus >= 202002L
         bool operator != (const Index&) const = default;
+#else
+        bool operator != (const Index& other) const {
+            return !this->operator==( other );
+        }
+#endif
     } index;
 
     static_assert(sizeof(Index) == sizeof(typename Index::Type));
 
     Node() = default;
-
+#if __cplusplus >= 202002L
     bool operator == (const Node&) const = default;
     bool operator != (const Node&) const = default;
+#else
+    bool operator == (const Node& other) const {
+        return bounds == other.bounds && index == index;
+    }
+    bool operator != (const Node& other) const {
+        return !this->operator==( other );
+    }
+#endif
 
     BVH_ALWAYS_INLINE bool is_leaf() const { return index.prim_count != 0; }
     static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }

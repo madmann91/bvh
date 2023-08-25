@@ -24,9 +24,17 @@ struct Bvh {
 
     Bvh& operator = (Bvh&&) = default;
 
+#if __cplusplus >= 202002L
     bool operator == (const Bvh& other) const = default;
     bool operator != (const Bvh& other) const = default;
-
+#else
+    bool operator == (const Bvh& other) const {
+        return nodes == other.nodes && prim_ids == other.prim_ids;
+    }
+    bool operator != (const Bvh& other) const {
+        return !this->operator==( other );
+    }
+#endif
     /// Returns the root node of this BVH.
     const Node& get_root() const { return nodes[0]; }
 
