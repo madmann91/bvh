@@ -127,8 +127,13 @@ restart:
                 top = near;
             } else if (hit_right)
                 top = right.index;
+#if __cplusplus >= 202002L
             else [[unlikely]]
                 goto restart;
+#else
+            else
+                goto restart;
+#endif
         }
 
         [[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
