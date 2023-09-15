@@ -78,6 +78,15 @@ auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
     return bvh;
 }
 
+// When compiling with MSVC++ under Windows, near and far are defined as macros in minwindef.h.
+// Push current definition and undefine to avoid collision with variable names.
+#ifdef _MSC_VER
+#    pragma push_macro( "near" )
+#    pragma push_macro( "far" )
+#    undef near
+#    undef far
+#endif
+
 template <typename Node>
 template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn>
 void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const {
@@ -129,6 +138,12 @@ restart:
         }
     }
 }
+
+// Pop near and far macro definitions
+#ifdef _MSC_VER
+#    pragma pop_macro( "far" )
+#    pragma pop_macro( "near" )
+#endif
 
 template <typename Node>
 void Bvh<Node>::serialize(OutputStream& stream) const {
