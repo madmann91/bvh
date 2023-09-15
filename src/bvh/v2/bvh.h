@@ -93,7 +93,6 @@ void Bvh<Node>::intersect(Ray<Scalar, Node::dimension>& ray, Index start, Stack&
     };
 
     stack.push(start);
-restart:
     while (!stack.is_empty()) {
         auto top = stack.pop();
         while (top.prim_count == 0) {
@@ -120,7 +119,7 @@ restart:
             } else if (hit_right)
                 top = right.index;
             else [[unlikely]]
-                goto restart;
+                break;
         }
 
         [[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
