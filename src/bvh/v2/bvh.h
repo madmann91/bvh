@@ -109,14 +109,14 @@ restart:
             bool hit_right = intr_right.first <= intr_right.second;
 
             if (hit_left) {
-                auto near = left.index;
+                auto near_index = left.index;
                 if (hit_right) {
-                    auto far = right.index;
+                    auto far_index = right.index;
                     if (!IsAnyHit && intr_left.first > intr_right.first)
-                        std::swap(near, far);
-                    stack.push(far);
+                        std::swap(near_index, far_index);
+                    stack.push(far_index);
                 }
-                top = near;
+                top = near_index;
             } else if (hit_right)
                 top = right.index;
             else [[unlikely]]
