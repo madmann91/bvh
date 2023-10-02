@@ -61,6 +61,7 @@ protected:
         , config_(config)
     {
         assert(bboxes.size() == centers.size());
+        assert(config.min_leaf_size <= config.max_leaf_size);
     }
 
     virtual std::vector<size_t>& get_prim_ids() = 0;

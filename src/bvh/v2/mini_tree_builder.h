@@ -256,7 +256,7 @@ private:
         }
 
         typename SweepSahBuilder<Node>::Config config = config_;
-        config.max_leaf_size = 1; // Needs to have only one mini-tree in each leaf
+        config.max_leaf_size = config.min_leaf_size = 1; // Needs to have only one mini-tree in each leaf
         auto bvh = SweepSahBuilder<Node>::build(bboxes, centers, config);
 
         // Compute the offsets to apply to primitive and node indices
