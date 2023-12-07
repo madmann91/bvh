@@ -21,8 +21,8 @@ struct Tri {
         : p0(p0), p1(p1), p2(p2)
     {}
 
-    BVH_ALWAYS_INLINE BBox<T, 3> get_bbox() const { return BBox(p0).extend(p1).extend(p2); }
-    BVH_ALWAYS_INLINE Vec<T, 3> get_center() const { return (p0 + p1 + p2) * static_cast<T>(1. / 3.); }
+    BVH_ALWAYS_INLINE BBox<T, N> get_bbox() const { return BBox<T, N>(p0).extend(p1).extend(p2); }
+    BVH_ALWAYS_INLINE Vec<T, N> get_center() const { return (p0 + p1 + p2) * static_cast<T>(1. / 3.); }
 };
 
 /// A 3d triangle, represented as two edges and a point, with an (unnormalized, left-handed) normal.
