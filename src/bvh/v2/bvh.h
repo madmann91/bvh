@@ -41,6 +41,9 @@ struct Bvh {
     template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
     inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack&, LeafFn&&, InnerFn&& = {}) const;
 
+	template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
+	inline void traverse(Index top, Stack&, LeafFn&&, InnerFn && = {}) const;
+
     inline void serialize(OutputStream&) const;
     static inline Bvh deserialize(InputStream&);
 };
@@ -128,6 +131,40 @@ restart:
             if (was_hit) return;
         }
     }
+}
+
+template <typename Node>
+template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn>
+void Bvh<Node>::traverse(Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const {
+	stack.push(start);
+restart:
+	while (!stack.is_empty()) {
+		auto top = stack.pop();
+		while (top.prim_count == 0) {
+			auto& left = nodes[top.first_id];
+			auto& right = nodes[top.first_id + 1];
+
+			bool hit_left = false;
+			bool hit_right = false;
+			inner_fn(left, right, hit_left, hit_right);
+
+			if (hit_left) {
+				auto near_index = left.index;
+				if (hit_right)
+					stack.push(right.index);
+				top = near_index;
+			}
+			else if (hit_right)
+				top = right.index;
+			else [[unlikely]]
+				goto restart;
+		}
+
+		[[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
+		if constexpr (IsAnyHit) {
+			if (was_hit) return;
+		}
+	}
 }
 
 template <typename Node>
