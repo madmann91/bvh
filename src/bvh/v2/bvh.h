@@ -41,8 +41,13 @@ struct Bvh {
     template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
     inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack&, LeafFn&&, InnerFn&& = {}) const;
 
-	template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn = std::tuple<bool,bool>(*)(const Node&, const Node&)>
-    inline void traverse(Index top, Stack&, LeafFn&&, InnerFn&& = [](const Node&, const Node&) { return std::make_tuple(true, true); }) const;
+    /// Traverses the BVH tree, starting at the node index `top` and using the given stack object.
+    /// `inner_fn` is called for every non-leaf node and returns two boolean values which indicate
+    /// whether traversal should continue for the left/right child branches. Returning false for
+    /// either will end traversal for that branch. Likewise `leaf_fn` is called for every leaf node.
+    /// When `IsAnyHit` is true, the function stops the first time `leaf_fn` returns true.
+    template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn = std::tuple<bool,bool>(*)(const Node&, const Node&)>
+    inline void traverse(Index top, Stack&, LeafFn&& leaf_fn, InnerFn&& inner_fn = [](const Node&, const Node&) { return std::make_tuple(true, true); }) const;
 
     inline void serialize(OutputStream&) const;
     static inline Bvh deserialize(InputStream&);
