@@ -120,8 +120,9 @@ restart:
                     stack.push(far_index);
                 }
                 top = near_index;
-            } else if (hit_right)
-                top = right.index;
+			}
+			else if (hit_right)
+				top = right.index;
             else [[unlikely]]
                 goto restart;
         }
@@ -144,10 +145,7 @@ restart:
 			auto& left = nodes[top.first_id];
 			auto& right = nodes[top.first_id + 1];
 
-			bool hit_left = false;
-			bool hit_right = false;
-			inner_fn(left, right, hit_left, hit_right);
-
+			auto [hit_left, hit_right] = inner_fn(left, right);
 			if (hit_left) {
 				auto near_index = left.index;
 				if (hit_right)
