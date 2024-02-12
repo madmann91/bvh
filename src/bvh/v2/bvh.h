@@ -125,8 +125,7 @@ restart:
                     stack.push(far_index);
                 }
                 top = near_index;
-			}
-			else if (hit_right)
+			} else if (hit_right)
 				top = right.index;
             else [[unlikely]]
                 goto restart;
@@ -156,8 +155,7 @@ restart:
 				if (hit_right)
 					stack.push(right.index);
 				top = near_index;
-			}
-			else if (hit_right)
+			} else if (hit_right)
 				top = right.index;
 			else [[unlikely]]
 				goto restart;
