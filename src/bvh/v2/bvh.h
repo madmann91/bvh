@@ -41,8 +41,8 @@ struct Bvh {
     template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
     inline void intersect(Ray<Scalar, Node::dimension>& ray, Index top, Stack&, LeafFn&&, InnerFn&& = {}) const;
 
-    template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
-    inline void traverse(Index top, Stack&, LeafFn&&, InnerFn && = {}) const;
+	template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn = std::tuple<bool,bool>(*)(const Node&, const Node&)>
+    inline void traverse(Index top, Stack&, LeafFn&&, InnerFn&& = [](const Node&, const Node&) { return std::make_tuple(true, true); }) const;
 
     inline void serialize(OutputStream&) const;
     static inline Bvh deserialize(InputStream&);
