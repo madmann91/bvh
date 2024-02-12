@@ -125,8 +125,8 @@ restart:
                     stack.push(far_index);
                 }
                 top = near_index;
-			} else if (hit_right)
-				top = right.index;
+            } else if (hit_right)
+                top = right.index;
             else [[unlikely]]
                 goto restart;
         }
@@ -141,31 +141,31 @@ restart:
 template <typename Node>
 template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn>
 void Bvh<Node>::traverse(Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const {
-	stack.push(start);
+    stack.push(start);
 restart:
-	while (!stack.is_empty()) {
-		auto top = stack.pop();
-		while (top.prim_count == 0) {
-			auto& left = nodes[top.first_id];
-			auto& right = nodes[top.first_id + 1];
+    while (!stack.is_empty()) {
+        auto top = stack.pop();
+        while (top.prim_count == 0) {
+            auto& left = nodes[top.first_id];
+            auto& right = nodes[top.first_id + 1];
 
-			auto [hit_left, hit_right] = inner_fn(left, right);
-			if (hit_left) {
-				auto near_index = left.index;
-				if (hit_right)
-					stack.push(right.index);
-				top = near_index;
-			} else if (hit_right)
-				top = right.index;
-			else [[unlikely]]
-				goto restart;
-		}
+            auto [hit_left, hit_right] = inner_fn(left, right);
+            if (hit_left) {
+                auto near_index = left.index;
+                if (hit_right)
+                    stack.push(right.index);
+                top = near_index;
+            } else if (hit_right)
+                top = right.index;
+            else [[unlikely]]
+                goto restart;
+        }
 
-		[[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
-		if constexpr (IsAnyHit) {
-			if (was_hit) return;
-		}
-	}
+        [[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
+        if constexpr (IsAnyHit) {
+            if (was_hit) return;
+        }
+    }
 }
 
 template <typename Node>
