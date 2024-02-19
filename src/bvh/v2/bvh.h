@@ -40,7 +40,7 @@ struct Bvh {
     /// indicating whether the first child should be processed, whether the second child should be
     /// processed, and whether to traverse the second child first instead of the other way around.
     template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn>
-    inline void traverse(Index start, Stack&, LeafFn&&, InnerFn&&) const;
+    inline void traverse_top_down(Index start, Stack&, LeafFn&&, InnerFn&&) const;
 
     /// Intersects the BVH with a single ray, using the given function to intersect the contents
     /// of a leaf. The algorithm starts at the node index `start` and uses the given stack object.
@@ -50,12 +50,21 @@ struct Bvh {
     template <bool IsAnyHit, bool IsRobust, typename Stack, typename LeafFn, typename InnerFn = IgnoreArgs>
     inline void intersect(const Ray& ray, Index start, Stack&, LeafFn&&, InnerFn&& = {}) const;
 
+    /// Traverses this BVH from the bottom to the top, using the given function objects to process
+    /// leaves and inner nodes.
+    template <typename LeafFn = IgnoreArgs, typename InnerFn = IgnoreArgs>
+    inline void traverse_bottom_up(LeafFn&& = {}, InnerFn&& = {});
+
+    /// Refits the BVH, using the given function object to recompute the bounding box of the leaves.
+    template <typename LeafFn = IgnoreArgs>
+    inline void refit(LeafFn&& = {});
+
     inline void serialize(OutputStream&) const;
     static inline Bvh deserialize(InputStream&);
 };
 
 template <typename Node>
-auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
+Bvh<Node> Bvh<Node>::extract_bvh(size_t root_id) const {
     assert(root_id != 0);
 
     Bvh bvh;
@@ -89,7 +98,7 @@ auto Bvh<Node>::extract_bvh(size_t root_id) const -> Bvh {
 
 template <typename Node>
 template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn>
-void Bvh<Node>::traverse(Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const
+void Bvh<Node>::traverse_top_down(Index start, Stack& stack, LeafFn&& leaf_fn, InnerFn&& inner_fn) const
 {
     stack.push(start);
 restart:
@@ -130,20 +139,58 @@ void Bvh<Node>::intersect(const Ray& ray, Index start, Stack& stack, LeafFn&& le
     auto inv_dir_pad = ray.pad_inv_dir(inv_dir);
     auto octant = ray.get_octant();
 
-    traverse<IsAnyHit>(start, stack, leaf_fn, [&] (const Node& left, const Node& right) {
+    traverse_top_down<IsAnyHit>(start, stack, leaf_fn, [&] (const Node& left, const Node& right) {
         inner_fn(left, right);
         std::pair<Scalar, Scalar> intr_left, intr_right;
         if constexpr (IsRobust) {
             intr_left  = left.intersect_robust(ray, inv_dir, inv_dir_pad, octant);
             intr_right = right.intersect_robust(ray, inv_dir, inv_org, octant);
         } else {
-            intr_left = left.intersect_fast(ray, inv_dir, inv_org, octant);
+            intr_left  = left.intersect_fast(ray, inv_dir, inv_org, octant);
             intr_right = right.intersect_fast(ray, inv_dir, inv_org, octant);
         }
         return std::make_tuple(
             intr_left.first <= intr_left.second,
             intr_right.first <= intr_right.second,
             !IsAnyHit && intr_left.first > intr_right.first);
+    });
+}
+
+template <typename Node>
+template <typename LeafFn, typename InnerFn>
+void Bvh<Node>::traverse_bottom_up(LeafFn&& leaf_fn, InnerFn&& inner_fn) {
+    std::vector<size_t> parents(nodes.size(), 0);
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        if (nodes[i].is_leaf())
+            continue;
+        parents[nodes[i].index.first_id] = i;
+        parents[nodes[i].index.first_id + 1] = i;
+    }
+    std::vector<bool> seen(nodes.size(), false);
+    for (size_t i = nodes.size(); i-- > 0;) {
+        if (!nodes[i].is_leaf())
+            continue;
+        leaf_fn(nodes[i]);
+        seen[i] = true;
+        size_t j = parents[i];
+        while (j >= 0) {
+            auto& node = nodes[j];
+            if (seen[j] || !seen[node.index.first_id] || !seen[node.index.first_id + 1])
+                break;
+            inner_fn(nodes[j]);
+            seen[j] = true;
+            j = parents[j];
+        }
+    }
+}
+
+template <typename Node>
+template <typename LeafFn>
+void Bvh<Node>::refit(LeafFn&& leaf_fn) {
+    traverse_bottom_up(leaf_fn, [&] (Node& node) {
+        const auto& left  = nodes[node.index.first_id];
+        const auto& right = nodes[node.index.first_id + 1];
+        node.set_bbox(left.get_bbox().extend(right.get_bbox()));
     });
 }
 

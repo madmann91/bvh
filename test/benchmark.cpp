@@ -414,6 +414,9 @@ int main(int argc, char** argv) {
         << "Built BVH with " << accel.bvh.nodes.size() << " node(s) in "
         << to_ms(build_time) << "ms" << std::endl;
 
+    // Not needed, just for testing
+    accel.bvh.refit();
+
     RenderStats stats;
     Image image;
     auto intersection_time = profile([&] { image = render(accel, stats, options); });
