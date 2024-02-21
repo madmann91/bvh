@@ -143,10 +143,10 @@ void Bvh<Node>::intersect(const Ray& ray, Index start, Stack& stack, LeafFn&& le
         inner_fn(left, right);
         std::pair<Scalar, Scalar> intr_left, intr_right;
         if constexpr (IsRobust) {
-            intr_left  = left.intersect_robust(ray, inv_dir, inv_dir_pad, octant);
-            intr_right = right.intersect_robust(ray, inv_dir, inv_org, octant);
+            intr_left  = left .intersect_robust(ray, inv_dir, inv_dir_pad, octant);
+            intr_right = right.intersect_robust(ray, inv_dir, inv_dir_pad, octant);
         } else {
-            intr_left  = left.intersect_fast(ray, inv_dir, inv_org, octant);
+            intr_left  = left .intersect_fast(ray, inv_dir, inv_org, octant);
             intr_right = right.intersect_fast(ray, inv_dir, inv_org, octant);
         }
         return std::make_tuple(
