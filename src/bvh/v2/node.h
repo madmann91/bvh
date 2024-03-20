@@ -1,7 +1,7 @@
 #ifndef BVH_V2_NODE_H
 #define BVH_V2_NODE_H
 
-#include "bvh/v2/utils.h"
+#include "bvh/v2/index.h"
 #include "bvh/v2/vec.h"
 #include "bvh/v2/bbox.h"
 #include "bvh/v2/ray.h"
@@ -13,6 +13,8 @@
 
 namespace bvh::v2 {
 
+/// Binary BVH node, containing its bounds and an index into its children or the primitives it
+/// contains. By definition, inner BVH nodes do not contain primitives; only leaves do.
 template <
     typename T,
     size_t Dim,
@@ -20,57 +22,26 @@ template <
     size_t PrimCountBits = 4>
 struct Node {
     using Scalar = T;
+    using Index = bvh::v2::Index<IndexBits, PrimCountBits>;
+
     static constexpr size_t dimension = Dim;
     static constexpr size_t prim_count_bits = PrimCountBits;
     static constexpr size_t index_bits = IndexBits;
-    static constexpr size_t max_prim_count = make_bitmask<size_t>(prim_count_bits);
 
+    /// Bounds of the node, laid out in memory as `[min_x, max_x, min_y, max_y, ...]`. Users should
+    /// not really depend on a specific order and instead use `get_bbox()` and extract the `min`
+    /// and/or `max` components accordingly.
     std::array<T, Dim * 2> bounds;
-    struct Index {
-        using Type = UnsignedIntType<IndexBits>;
-        Type first_id   : std::numeric_limits<Type>::digits - prim_count_bits;
-        Type prim_count : prim_count_bits;
 
-        BVH_ALWAYS_INLINE bool operator == (const Index& other) const {
-            return first_id == other.first_id && prim_count == other.prim_count;
-        }
-
-        bool operator != (const Index&) const = default;
-    } index;
-
-    static_assert(sizeof(Index) == sizeof(typename Index::Type));
+    /// Index to the children of an inner node, or to the primitives for a leaf node.
+    Index index;
 
     Node() = default;
 
     bool operator == (const Node&) const = default;
     bool operator != (const Node&) const = default;
 
-    BVH_ALWAYS_INLINE bool is_leaf() const { return index.prim_count != 0; }
-    static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }
-
-    static BVH_ALWAYS_INLINE size_t get_sibling_id(size_t node_id) {
-        return is_left_sibling(node_id) ? node_id + 1 : node_id - 1;
-    }
-
-    static BVH_ALWAYS_INLINE size_t get_left_sibling_id(size_t node_id) {
-        return is_left_sibling(node_id) ? node_id : node_id - 1;
-    }
-
-    static BVH_ALWAYS_INLINE size_t get_right_sibling_id(size_t node_id) {
-        return is_left_sibling(node_id) ? node_id + 1 : node_id;
-    }
-
-    BVH_ALWAYS_INLINE void make_leaf(size_t first_prim, size_t prim_count) {
-        assert(prim_count != 0);
-        assert(prim_count <= max_prim_count);
-        index.prim_count = static_cast<typename Index::Type>(prim_count);
-        index.first_id = static_cast<typename Index::Type>(first_prim);
-    }
-
-    BVH_ALWAYS_INLINE void make_inner(size_t first_child) {
-        index.prim_count = 0;
-        index.first_id = static_cast<typename Index::Type>(first_child);
-    }
+    BVH_ALWAYS_INLINE bool is_leaf() const { return index.is_leaf(); }
 
     BVH_ALWAYS_INLINE BBox<T, Dim> get_bbox() const {
         return BBox<T, Dim>(
@@ -119,16 +90,14 @@ struct Node {
     BVH_ALWAYS_INLINE void serialize(OutputStream& stream) const {
         for (auto&& bound : bounds)
             stream.write(bound);
-        stream.write(static_cast<size_t>(index.first_id));
-        stream.write(static_cast<size_t>(index.prim_count));
+        stream.write(index.value);
     }
 
-    static inline Node deserialize(InputStream& stream) {
+    static BVH_ALWAYS_INLINE Node deserialize(InputStream& stream) {
         Node node;
         for (auto& bound : node.bounds)
             bound = stream.read<T>();
-        node.index.first_id = stream.read<size_t>();
-        node.index.prim_count = stream.read<size_t>();
+        node.index = Index(stream.read<typename Index::Type>());
         return node;
     }
 

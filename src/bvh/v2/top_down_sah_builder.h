@@ -89,7 +89,7 @@ protected:
             if (item.size() > config_.min_leaf_size) {
                 if (auto split_pos = try_split(node.get_bbox(), item.begin, item.end)) {
                     auto first_child = bvh.nodes.size();
-                    node.make_inner(first_child);
+                    node.index = Node::Index::make_inner(first_child);
 
                     bvh.nodes.resize(first_child + 2);
 
@@ -122,7 +122,7 @@ protected:
                 }
             }
 
-            node.make_leaf(item.begin, item.size());
+            node.index = Node::Index::make_leaf(item.begin, item.size());
         }
 
         bvh.prim_ids = std::move(get_prim_ids());

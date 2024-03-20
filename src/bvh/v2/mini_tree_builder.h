@@ -225,8 +225,8 @@ private:
                 if (node.get_bbox().get_half_area() < threshold || node.is_leaf()) {
                     pruned_roots.emplace_back(i, node_id);
                 } else {
-                    stack.push(node.index.first_id);
-                    stack.push(node.index.first_id + 1);
+                    stack.push(node.index.first_id());
+                    stack.push(node.index.first_id() + 1);
                 }
             }
         }
@@ -274,16 +274,16 @@ private:
         // Helper function to copy and fix the child/primitive index of a node
         auto copy_node = [&] (size_t i, Node& dst_node, const Node& src_node) {
             dst_node = src_node;
-            dst_node.index.first_id += static_cast<typename Node::Index::Type>(
-                src_node.is_leaf() ? prim_offsets[i] : node_offsets[i]);
+            dst_node.index.set_first_id(dst_node.index.first_id() +
+                (src_node.is_leaf() ? prim_offsets[i] : node_offsets[i]));
         };
 
         // Make the leaves of the top BVH point to the right internal nodes
         for (auto& node : bvh.nodes) {
             if (!node.is_leaf())
                 continue;
-            assert(node.index.prim_count == 1);
-            size_t tree_id = bvh.prim_ids[node.index.first_id];
+            assert(node.index.prim_count() == 1);
+            size_t tree_id = bvh.prim_ids[node.index.first_id()];
             copy_node(tree_id, node, mini_trees[tree_id].get_root());
         }
 
