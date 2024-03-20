@@ -8,6 +8,7 @@
 #include <vector>
 #include <stack>
 #include <utility>
+#include <algorithm>
 
 namespace bvh::v2 {
 
@@ -28,8 +29,28 @@ struct Bvh {
     bool operator == (const Bvh& other) const = default;
     bool operator != (const Bvh& other) const = default;
 
+    /// Returns whether the node located at the given index is the left child of its parent.
+    static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }
+
+    /// Returns the index of a sibling of a node.
+    static BVH_ALWAYS_INLINE size_t get_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id + 1 : node_id - 1;
+    }
+
+    /// Returns the index of the left sibling of the node. This effectively returns the given index
+    /// unchanged if the node is the left sibling, or the other sibling index otherwise.
+    static BVH_ALWAYS_INLINE size_t get_left_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id : node_id - 1;
+    }
+
+    /// Returns the index of the right sibling of the node. This effectively returns the given index
+    /// unchanged if the node is the right sibling, or the other sibling index otherwise.
+    static BVH_ALWAYS_INLINE size_t get_right_sibling_id(size_t node_id) {
+        return is_left_sibling(node_id) ? node_id + 1 : node_id;
+    }
+
     /// Returns the root node of this BVH.
-    const Node& get_root() const { return nodes[0]; }
+    BVH_ALWAYS_INLINE const Node& get_root() const { return nodes[0]; }
 
     /// Extracts the BVH rooted at the given node index.
     inline Bvh extract_bvh(size_t root_id) const;
@@ -79,18 +100,17 @@ Bvh<Node> Bvh<Node>::extract_bvh(size_t root_id) const {
         auto& dst_node = bvh.nodes[dst_id];
         dst_node = src_node;
         if (src_node.is_leaf()) {
-            dst_node.index.first_id = static_cast<typename Index::Type>(bvh.prim_ids.size());
+            dst_node.index.set_first_id(bvh.prim_ids.size());
             std::copy_n(
-                prim_ids.begin() + src_node.index.first_id,
-                src_node.index.prim_count,
+                prim_ids.begin() + src_node.index.first_id(),
+                src_node.index.prim_count(),
                 std::back_inserter(bvh.prim_ids));
         } else {
-            size_t first_id = bvh.nodes.size();
-            dst_node.index.first_id = static_cast<typename Index::Type>(first_id);
+            dst_node.index.set_first_id(bvh.nodes.size());
             bvh.nodes.emplace_back();
             bvh.nodes.emplace_back();
-            stack.emplace(src_node.index.first_id + 0, first_id + 0);
-            stack.emplace(src_node.index.first_id + 1, first_id + 1);
+            stack.emplace(src_node.index.first_id() + 0, dst_node.index.first_id() + 0);
+            stack.emplace(src_node.index.first_id() + 1, dst_node.index.first_id() + 1);
         }
     }
     return bvh;
@@ -104,9 +124,9 @@ void Bvh<Node>::traverse_top_down(Index start, Stack& stack, LeafFn&& leaf_fn, I
 restart:
     while (!stack.is_empty()) {
         auto top = stack.pop();
-        while (top.prim_count == 0) {
-            auto& left  = nodes[top.first_id];
-            auto& right = nodes[top.first_id + 1];
+        while (top.prim_count() == 0) {
+            auto& left  = nodes[top.first_id()];
+            auto& right = nodes[top.first_id() + 1];
             auto [hit_left, hit_right, should_swap] = inner_fn(left, right);
 
             if (hit_left) {
@@ -124,7 +144,7 @@ restart:
                 goto restart;
         }
 
-        [[maybe_unused]] auto was_hit = leaf_fn(top.first_id, top.first_id + top.prim_count);
+        [[maybe_unused]] auto was_hit = leaf_fn(top.first_id(), top.first_id() + top.prim_count());
         if constexpr (IsAnyHit) {
             if (was_hit) return;
         }
@@ -163,8 +183,8 @@ void Bvh<Node>::traverse_bottom_up(LeafFn&& leaf_fn, InnerFn&& inner_fn) {
     for (size_t i = 0; i < nodes.size(); ++i) {
         if (nodes[i].is_leaf())
             continue;
-        parents[nodes[i].index.first_id] = i;
-        parents[nodes[i].index.first_id + 1] = i;
+        parents[nodes[i].index.first_id()] = i;
+        parents[nodes[i].index.first_id() + 1] = i;
     }
     std::vector<bool> seen(nodes.size(), false);
     for (size_t i = nodes.size(); i-- > 0;) {
@@ -175,7 +195,7 @@ void Bvh<Node>::traverse_bottom_up(LeafFn&& leaf_fn, InnerFn&& inner_fn) {
         size_t j = parents[i];
         while (j >= 0) {
             auto& node = nodes[j];
-            if (seen[j] || !seen[node.index.first_id] || !seen[node.index.first_id + 1])
+            if (seen[j] || !seen[node.index.first_id()] || !seen[node.index.first_id() + 1])
                 break;
             inner_fn(nodes[j]);
             seen[j] = true;
@@ -188,8 +208,8 @@ template <typename Node>
 template <typename LeafFn>
 void Bvh<Node>::refit(LeafFn&& leaf_fn) {
     traverse_bottom_up(leaf_fn, [&] (Node& node) {
-        const auto& left  = nodes[node.index.first_id];
-        const auto& right = nodes[node.index.first_id + 1];
+        const auto& left  = nodes[node.index.first_id()];
+        const auto& right = nodes[node.index.first_id() + 1];
         node.set_bbox(left.get_bbox().extend(right.get_bbox()));
     });
 }

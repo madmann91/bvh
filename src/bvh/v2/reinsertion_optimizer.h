@@ -77,8 +77,8 @@ private:
                 for (size_t i = begin; i < end; ++i) {
                     auto& node = bvh.nodes[i];
                     if (!node.is_leaf()) {
-                        parents[node.index.first_id + 0] = i;
-                        parents[node.index.first_id + 1] = i;
+                        parents[node.index.first_id() + 0] = i;
+                        parents[node.index.first_id() + 1] = i;
                     }
                 }
             });
@@ -140,7 +140,7 @@ private:
         auto node_area   = bvh_.nodes[node_id].get_bbox().get_half_area();
         auto parent_area = bvh_.nodes[parents_[node_id]].get_bbox().get_half_area();
         auto area_diff = parent_area;
-        auto sibling_id = Node::get_sibling_id(node_id);
+        auto sibling_id = Bvh<Node>::get_sibling_id(node_id);
         auto pivot_bbox = bvh_.nodes[sibling_id].get_bbox();
         auto parent_id = parents_[node_id];
         auto pivot_id = parent_id;
@@ -165,8 +165,8 @@ private:
 
                 if (!dst_node.is_leaf()) {
                     auto child_area = reinsert_area + dst_node.get_bbox().get_half_area();
-                    stack.emplace_back(child_area, dst_node.index.first_id + 0);
-                    stack.emplace_back(child_area, dst_node.index.first_id + 1);
+                    stack.emplace_back(child_area, dst_node.index.first_id() + 0);
+                    stack.emplace_back(child_area, dst_node.index.first_id() + 1);
                 }
             }
 
@@ -177,33 +177,33 @@ private:
                 area_diff += bvh_.nodes[pivot_id].get_bbox().get_half_area() - pivot_bbox.get_half_area();
             }
 
-            sibling_id = Node::get_sibling_id(pivot_id);
+            sibling_id = Bvh<Node>::get_sibling_id(pivot_id);
             pivot_id = parents_[pivot_id];
         } while (pivot_id != 0);
 
-        if (best_reinsertion.to == Node::get_sibling_id(best_reinsertion.from) ||
+        if (best_reinsertion.to == Bvh<Node>::get_sibling_id(best_reinsertion.from) ||
             best_reinsertion.to == parents_[best_reinsertion.from])
             best_reinsertion = {};
         return best_reinsertion;
     }
 
     BVH_ALWAYS_INLINE void reinsert_node(size_t from, size_t to) {
-        auto sibling_id = Node::get_sibling_id(from);
+        auto sibling_id = Bvh<Node>::get_sibling_id(from);
         auto parent_id  = parents_[from];
         auto sibling_node = bvh_.nodes[sibling_id];
         auto dst_node     = bvh_.nodes[to];
 
-        bvh_.nodes[to].make_inner(Node::get_left_sibling_id(from));
+        bvh_.nodes[to].index = Node::Index::make_inner(Bvh<Node>::get_left_sibling_id(from));
         bvh_.nodes[sibling_id] = dst_node;
         bvh_.nodes[parent_id] = sibling_node;
 
         if (!dst_node.is_leaf()) {
-            parents_[dst_node.index.first_id + 0] = sibling_id;
-            parents_[dst_node.index.first_id + 1] = sibling_id;
+            parents_[dst_node.index.first_id() + 0] = sibling_id;
+            parents_[dst_node.index.first_id() + 1] = sibling_id;
         }
         if (!sibling_node.is_leaf()) {
-            parents_[sibling_node.index.first_id + 0] = parent_id;
-            parents_[sibling_node.index.first_id + 1] = parent_id;
+            parents_[sibling_node.index.first_id() + 0] = parent_id;
+            parents_[sibling_node.index.first_id() + 1] = parent_id;
         }
 
         parents_[sibling_id] = to;
@@ -217,8 +217,8 @@ private:
             auto& node = bvh_.nodes[index];
             if (!node.is_leaf()) {
                 node.set_bbox(
-                    bvh_.nodes[node.index.first_id + 0].get_bbox().extend(
-                    bvh_.nodes[node.index.first_id + 1].get_bbox()));
+                    bvh_.nodes[node.index.first_id() + 0].get_bbox().extend(
+                    bvh_.nodes[node.index.first_id() + 1].get_bbox()));
             }
             index = parents_[index];
         } while (index != 0);
@@ -227,7 +227,7 @@ private:
     BVH_ALWAYS_INLINE auto get_conflicts(size_t from, size_t to) {
         return std::array<size_t, 5> {
             to, from,
-            Node::get_sibling_id(from),
+            Bvh<Node>::get_sibling_id(from),
             parents_[to],
             parents_[from]
         };
