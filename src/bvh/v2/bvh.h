@@ -89,6 +89,7 @@ Bvh<Node> Bvh<Node>::extract_bvh(size_t root_id) const {
     assert(root_id != 0);
 
     Bvh bvh;
+    bvh.nodes.reserve(nodes.size());
     bvh.nodes.emplace_back();
 
     std::stack<std::pair<size_t, size_t>> stack;
