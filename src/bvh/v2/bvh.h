@@ -96,7 +96,7 @@ Bvh<Node> Bvh<Node>::extract_bvh(size_t root_id) const {
     while (!stack.empty()) {
         auto [src_id, dst_id] = stack.top();
         stack.pop();
-        auto& src_node = nodes[src_id];
+        const auto& src_node = nodes[src_id];
         auto& dst_node = bvh.nodes[dst_id];
         dst_node = src_node;
         if (src_node.is_leaf()) {
@@ -107,10 +107,11 @@ Bvh<Node> Bvh<Node>::extract_bvh(size_t root_id) const {
                 std::back_inserter(bvh.prim_ids));
         } else {
             dst_node.index.set_first_id(bvh.nodes.size());
+            stack.emplace(src_node.index.first_id() + 0, bvh.nodes.size() + 0);
+            stack.emplace(src_node.index.first_id() + 1, bvh.nodes.size() + 1);
+            // Note: This may invalidate `dst_node` so has to happen after any access to it.
             bvh.nodes.emplace_back();
             bvh.nodes.emplace_back();
-            stack.emplace(src_node.index.first_id() + 0, dst_node.index.first_id() + 0);
-            stack.emplace(src_node.index.first_id() + 1, dst_node.index.first_id() + 1);
         }
     }
     return bvh;
