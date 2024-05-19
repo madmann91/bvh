@@ -1,0 +1,14 @@
+add_library(bvh_c SHARED bvh.cpp)
+target_link_libraries(bvh_c PRIVATE bvh)
+target_compile_definitions(bvh_c PRIVATE -DBVH_BUILD_API)
+set_target_properties(bvh_c PROPERTIES
+    CXX_STANDARD 20
+    CXX_VISIBILITY_PRESET hidden
+    INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+
+if (BVH_STATIC_LINK_STDLIB_C_API)
+    # Link statically against standard C++ library
+    target_link_options(bvh_c PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-static-libstdc++>)
+endif()
+
+install(FILES bvh.h DESTINATION include/bvh/v2/c_api/)
