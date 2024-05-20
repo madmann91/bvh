@@ -117,7 +117,7 @@ static inline void build_bvh(struct scene* scene) {
     free(bboxes);
     free(centers);
     const uint64_t build_time = (ts1.tv_sec - ts0.tv_sec) * 1000 + (ts1.tv_nsec - ts0.tv_nsec) / 1000000;
-    printf("Built BVH with %zu node(s) in %lums\n", bvh3f_get_node_count(scene->bvh), build_time);
+    printf("Built BVH with %zu node(s) in %"PRIu64"\n", bvh3f_get_node_count(scene->bvh), build_time);
 }
 
 static inline void destroy_scene(struct scene* scene) {
@@ -326,7 +326,7 @@ static inline void render_image(
     }
     timespec_get(&ts1, TIME_UTC);
     const uint64_t render_time = (ts1.tv_sec - ts0.tv_sec) * 1000 + (ts1.tv_nsec - ts0.tv_nsec) / 1000000;
-    printf("%zu intersection(s) found in %lums\n", intr_count, render_time);
+    printf("%zu intersection(s) found in %"PRIu64"\n", intr_count, render_time);
 }
 
 int main(int argc, char** argv) {
