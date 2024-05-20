@@ -1,5 +1,10 @@
+set(bvh_targets bvh)
+if (BVH_BUILD_C_API)
+    list(APPEND bvh_targets bvh_c)
+endif()
+
 install(
-    TARGETS bvh_c
+    TARGETS ${bvh_targets}
     EXPORT bvh_exports
     RUNTIME DESTINATION bin/
     LIBRARY DESTINATION lib/
@@ -8,7 +13,7 @@ install(
 install(
     EXPORT bvh_exports
     FILE bvh-targets.cmake
-    NAMESPACE bvh::v2
+    NAMESPACE bvh::v2::
     DESTINATION lib/cmake/bvh/v2/)
 
 include(CMakePackageConfigHelpers)
