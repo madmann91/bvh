@@ -46,7 +46,8 @@ Here is a list of features supported by this library (changes from `v1` are indi
 - [NEW] Variable amount of dimensions (e.g. 2D, 3D, 4D BVHs are supported) and different scalar types
   (e.g. `float` or `double`),
 - [NEW] Only depends on the standard library (parallelization uses a custom thread pool based on
-  `std::thread`).
+  `std::thread`),
+- [NEW] C API for the high-level parts of the library are available.
 
 ## Building
 
@@ -64,6 +65,14 @@ If you want to build the examples, use:
     cmake .. -DCMAKE_BUILD_TYPE=<Debug|Release> -DENABLE_TESTING=ON
     cmake --build .
 
+## C API
+
+The library can be used via a small set of high-level C bindings. These bindings are not enabled by
+default, but can be built by configuring CMake with `-DBVH_BUILD_C_API=ON`. Additionally, if the
+intent is to use the library in a pure C environment which does not have the C++ standard library as
+a dependency, it might be a good idea to statically the C++ standard library. That can be done by
+adding the flag `-DBVH_STATIC_LINK_STDLIB_C_API=ON` to the CMake command line.
+
 ## Usage
 
 The library contains several examples that are kept up-to-date with the API:
@@ -71,3 +80,4 @@ The library contains several examples that are kept up-to-date with the API:
 - A [basic example](test/simple_example.cpp) that traces one ray on a scene made of a couple of triangles,
 - A [benchmarking utility](test/benchmark.cpp) that showcases what the library can do.
 - A [serialization test](test/serialize.cpp) that shows how to save and load a BVH from a file.
+- A [C API example](test/c_api_example.cpp) that shows how to use the C bindings to this library.
