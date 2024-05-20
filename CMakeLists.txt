@@ -15,6 +15,6 @@ if (PROJECT_IS_TOP_LEVEL)
     if (BUILD_TESTING)
         add_subdirectory(test)
     endif()
-endif()
 
-include(cmake/Install.cmake)
+    include(cmake/Install.cmake)
+endif()
