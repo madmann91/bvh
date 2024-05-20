@@ -193,14 +193,12 @@ void Bvh<Node>::traverse_bottom_up(LeafFn&& leaf_fn, InnerFn&& inner_fn) {
             continue;
         leaf_fn(nodes[i]);
         seen[i] = true;
-        size_t j = parents[i];
-        while (j >= 0) {
+        for (size_t j = parents[i];; j = parents[j]) {
             auto& node = nodes[j];
             if (seen[j] || !seen[node.index.first_id()] || !seen[node.index.first_id() + 1])
                 break;
             inner_fn(nodes[j]);
             seen[j] = true;
-            j = parents[j];
         }
     }
 }
