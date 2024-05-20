@@ -429,6 +429,6 @@ int main(int argc, char** argv) {
     }
 
     image.save(options.output_image);
-    std::cout << "Image saved as " << options.output_image << std::endl;
+    std::cout << "Image saved as '" << options.output_image << "'" << std::endl;
     return 0;
 }

@@ -11,11 +11,11 @@ BVH_TYPES(double, 3, 3d)
 
 extern "C" {
 
-struct bvh_thread_pool* bvh_thread_pool_create(size_t thread_count) {
+BVH_EXPORT struct bvh_thread_pool* bvh_thread_pool_create(size_t thread_count) {
     return reinterpret_cast<bvh_thread_pool*>(new bvh::v2::ThreadPool(thread_count));
 }
 
-void bvh_thread_pool_destroy(bvh_thread_pool* thread_pool) {
+BVH_EXPORT void bvh_thread_pool_destroy(bvh_thread_pool* thread_pool) {
     return delete reinterpret_cast<bvh::v2::ThreadPool*>(thread_pool);
 }
 

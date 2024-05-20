@@ -260,7 +260,7 @@ static void bvh_intersect_ray(
     };
 
 #define BVH_IMPL(T, Dim, suffix) \
-    typename BvhTypes<T, Dim>::Bvh* bvh##suffix##_build( \
+    BVH_EXPORT typename BvhTypes<T, Dim>::Bvh* bvh##suffix##_build( \
         bvh_thread_pool* thread_pool, \
         const typename BvhTypes<T, Dim>::BBox* bboxes, \
         const typename BvhTypes<T, Dim>::Vec* centers, \
@@ -269,82 +269,82 @@ static void bvh_intersect_ray(
     { \
         return bvh_build<T, Dim>(thread_pool, bboxes, centers, prim_count, config); \
     } \
-    void bvh##suffix##_destroy(typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT void bvh##suffix##_destroy(typename BvhTypes<T, Dim>::Bvh* bvh) { \
         delete reinterpret_cast<bvh::v2::Bvh<bvh::v2::Node<T, Dim>>*>(bvh); \
     } \
-    void bvh##suffix##_save(const typename BvhTypes<T, Dim>::Bvh* bvh, FILE* file) { \
+    BVH_EXPORT void bvh##suffix##_save(const typename BvhTypes<T, Dim>::Bvh* bvh, FILE* file) { \
         bvh_save<T, Dim>(bvh, file); \
     } \
-    typename BvhTypes<T, Dim>::Bvh* bvh##suffix##_load(FILE* file) { \
+    BVH_EXPORT typename BvhTypes<T, Dim>::Bvh* bvh##suffix##_load(FILE* file) { \
         return bvh_load<T, Dim>(file); \
     } \
-    typename BvhTypes<T, Dim>::Node* bvh##suffix##_get_node(typename BvhTypes<T, Dim>::Bvh* bvh, size_t node_id) { \
+    BVH_EXPORT typename BvhTypes<T, Dim>::Node* bvh##suffix##_get_node(typename BvhTypes<T, Dim>::Bvh* bvh, size_t node_id) { \
         return bvh_get_node<T, Dim>(bvh, node_id); \
     } \
-    size_t bvh##suffix##_get_prim_id(const typename BvhTypes<T, Dim>::Bvh* bvh, size_t i) { \
+    BVH_EXPORT size_t bvh##suffix##_get_prim_id(const typename BvhTypes<T, Dim>::Bvh* bvh, size_t i) { \
         return bvh_get_prim_id<T, Dim>(bvh, i); \
     } \
-    size_t bvh##suffix##_get_prim_count(const typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT size_t bvh##suffix##_get_prim_count(const typename BvhTypes<T, Dim>::Bvh* bvh) { \
         return bvh_get_prim_count<T, Dim>(bvh); \
     } \
-    size_t bvh##suffix##_get_node_count(const typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT size_t bvh##suffix##_get_node_count(const typename BvhTypes<T, Dim>::Bvh* bvh) { \
         return bvh_get_node_count<T, Dim>(bvh); \
     } \
-    bool bvh_node##suffix##_is_leaf(const typename BvhTypes<T, Dim>::Node* node) { \
+    BVH_EXPORT bool bvh_node##suffix##_is_leaf(const typename BvhTypes<T, Dim>::Node* node) { \
         return bvh_node_is_leaf<T, Dim>(node); \
     } \
-    size_t bvh_node##suffix##_get_prim_count(const typename BvhTypes<T, Dim>::Node* node) { \
+    BVH_EXPORT size_t bvh_node##suffix##_get_prim_count(const typename BvhTypes<T, Dim>::Node* node) { \
         return bvh_node_get_prim_count<T, Dim>(node); \
     } \
-    void bvh_node##suffix##_set_prim_count(typename BvhTypes<T, Dim>::Node* node, size_t prim_count) { \
+    BVH_EXPORT void bvh_node##suffix##_set_prim_count(typename BvhTypes<T, Dim>::Node* node, size_t prim_count) { \
         bvh_node_set_prim_count<T, Dim>(node, prim_count); \
     } \
-    size_t bvh_node##suffix##_get_first_id(const typename BvhTypes<T, Dim>::Node* node) { \
+    BVH_EXPORT size_t bvh_node##suffix##_get_first_id(const typename BvhTypes<T, Dim>::Node* node) { \
         return bvh_node_get_first_id<T, Dim>(node); \
     } \
-    void bvh_node##suffix##_set_first_id(typename BvhTypes<T, Dim>::Node* node, size_t first_id) { \
+    BVH_EXPORT void bvh_node##suffix##_set_first_id(typename BvhTypes<T, Dim>::Node* node, size_t first_id) { \
         bvh_node_set_first_id<T, Dim>(node, first_id); \
     } \
-    typename BvhTypes<T, Dim>::BBox bvh_node##suffix##_get_bbox(const typename BvhTypes<T, Dim>::Node* node) { \
+    BVH_EXPORT typename BvhTypes<T, Dim>::BBox bvh_node##suffix##_get_bbox(const typename BvhTypes<T, Dim>::Node* node) { \
         return bvh_node_get_bbox<T, Dim>(node); \
     } \
-    void bvh_node##suffix##_set_bbox(typename BvhTypes<T, Dim>::Node* node, const typename BvhTypes<T, Dim>::BBox* bbox) { \
+    BVH_EXPORT void bvh_node##suffix##_set_bbox(typename BvhTypes<T, Dim>::Node* node, const typename BvhTypes<T, Dim>::BBox* bbox) { \
         bvh_node_set_bbox<T, Dim>(node, bbox); \
     } \
-    void bvh##suffix##_append_node(typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT void bvh##suffix##_append_node(typename BvhTypes<T, Dim>::Bvh* bvh) { \
         bvh_append_node<T, Dim>(bvh); \
     } \
-    void bvh##suffix##_remove_last_node(typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT void bvh##suffix##_remove_last_node(typename BvhTypes<T, Dim>::Bvh* bvh) { \
         bvh_remove_last_node<T, Dim>(bvh); \
     } \
-    void bvh##suffix##_refit(typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT void bvh##suffix##_refit(typename BvhTypes<T, Dim>::Bvh* bvh) { \
         bvh_refit<T, Dim>(bvh); \
     } \
-    void bvh##suffix##_optimize(bvh_thread_pool* thread_pool, typename BvhTypes<T, Dim>::Bvh* bvh) { \
+    BVH_EXPORT void bvh##suffix##_optimize(bvh_thread_pool* thread_pool, typename BvhTypes<T, Dim>::Bvh* bvh) { \
         bvh_optimize<T, Dim>(thread_pool, bvh); \
     } \
-    void bvh##suffix##_intersect_ray_any( \
+    BVH_EXPORT void bvh##suffix##_intersect_ray_any( \
         const typename BvhTypes<T, Dim>::Bvh* bvh, \
         const typename BvhTypes<T, Dim>::Ray* ray, \
         const typename BvhCallback<T>::Type* callback) \
     { \
         bvh_intersect_ray<T, Dim, true, false>(bvh, ray, callback); \
     } \
-    void bvh##suffix##_intersect_ray_any_robust( \
+    BVH_EXPORT void bvh##suffix##_intersect_ray_any_robust( \
         const typename BvhTypes<T, Dim>::Bvh* bvh, \
         const typename BvhTypes<T, Dim>::Ray* ray, \
         const typename BvhCallback<T>::Type* callback) \
     { \
         bvh_intersect_ray<T, Dim, true, true>(bvh, ray, callback); \
     } \
-    void bvh##suffix##_intersect_ray( \
+    BVH_EXPORT void bvh##suffix##_intersect_ray( \
         const typename BvhTypes<T, Dim>::Bvh* bvh, \
         const typename BvhTypes<T, Dim>::Ray* ray, \
         const typename BvhCallback<T>::Type* callback) \
     { \
         bvh_intersect_ray<T, Dim, false, false>(bvh, ray, callback); \
     } \
-    void bvh##suffix##_intersect_ray_robust( \
+    BVH_EXPORT void bvh##suffix##_intersect_ray_robust( \
         const typename BvhTypes<T, Dim>::Bvh* bvh, \
         const typename BvhTypes<T, Dim>::Ray* ray, \
         const typename BvhCallback<T>::Type* callback) \

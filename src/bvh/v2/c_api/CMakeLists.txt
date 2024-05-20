@@ -1,6 +1,9 @@
 add_library(bvh_c SHARED bvh.cpp)
 target_link_libraries(bvh_c PRIVATE bvh)
 target_compile_definitions(bvh_c PRIVATE -DBVH_BUILD_API)
+target_include_directories(bvh_c INTERFACE
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>)
 set_target_properties(bvh_c PROPERTIES
     CXX_STANDARD 20
     CXX_VISIBILITY_PRESET hidden
