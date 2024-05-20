@@ -26,6 +26,7 @@ add_test(
 if (BVH_BUILD_C_API)
     add_executable(c_api_example c_api_example.c load_obj.cpp)
     target_link_libraries(c_api_example PUBLIC bvh_c)
+    set_target_properties(c_api_example PROPERTIES CXX_STANDARD 20 C_STANDARD 99)
 
     add_test(
         NAME c_api_example
