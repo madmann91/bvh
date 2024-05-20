@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
-    types: [opened]
+    types: [opened, reopened]
 
 jobs:
   build-and-test:
