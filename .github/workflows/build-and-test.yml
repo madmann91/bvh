@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         build-type: [Debug, Release]
+        c-api: [ON, OFF]
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
@@ -23,7 +24,7 @@ jobs:
     - name: Configure CMake
       working-directory: ${{runner.workspace}}/build
       shell: bash # Necessary because of the $GITHUB_WORKSPACE variable
-      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DBUILD_TESTING=ON -S $GITHUB_WORKSPACE
+      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DBVH_BUILD_C_API=${{matrix.c-api}} -DBUILD_TESTING=ON -S $GITHUB_WORKSPACE
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
