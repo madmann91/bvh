@@ -3,6 +3,8 @@ name: build-and-test
 on:
   push:
     branches: [master]
+  pull_request:
+    types: [opened]
 
 jobs:
   build-and-test:
