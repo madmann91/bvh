@@ -16,15 +16,17 @@ extern "C" {
 #endif
 
 #ifdef _MSC_VER
-#ifdef BVH_BUILD_API
-#define BVH_API __declspec(dllexport)
+#define BVH_EXPORT __declspec(dllexport)
+#define BVH_IMPORT __declspec(dllimport)
 #else
-#define BVH_API __declspec(dllimport)
+#define BVH_EXPORT __attribute__((visibility("default")))
+#define BVH_IMPORT BVH_EXPORT
 #endif
-#elif defined(__GCC__) || defined(__CLANG__)
-#define BVH_API __attribute__((visibility("default")))
+
+#ifdef BVH_BUILD_API
+#define BVH_API BVH_EXPORT
 #else
-#define BVH_API
+#define BVH_API BVH_IMPORT
 #endif
 
 #define BVH_ROOT_INDEX 0
@@ -79,9 +81,6 @@ struct bvh_intersect_callbackd {
     void* user_data;
     bool (*user_fn)(void*, double*, size_t begin, size_t end);
 };
-
-struct bvh_tri3f { struct bvh_vec3f v[3]; };
-struct bvh_tri3d { struct bvh_vec3d v[3]; };
 
 // Thread Pool ------------------------------------------------------------------------------------
 
