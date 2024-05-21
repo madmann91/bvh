@@ -47,7 +47,7 @@ Here is a list of features supported by this library (changes from `v1` are indi
   (e.g. `float` or `double`),
 - [NEW] Only depends on the standard library (parallelization uses a custom thread pool based on
   `std::thread`),
-- [NEW] C API for the high-level parts of the library are available.
+- [NEW] C API for the high-level parts of the library is available.
 
 ## Building
 
@@ -80,4 +80,4 @@ The library contains several examples that are kept up-to-date with the API:
 - A [basic example](test/simple_example.cpp) that traces one ray on a scene made of a couple of triangles,
 - A [benchmarking utility](test/benchmark.cpp) that showcases what the library can do.
 - A [serialization test](test/serialize.cpp) that shows how to save and load a BVH from a file.
-- A [C API example](test/c_api_example.cpp) that shows how to use the C bindings to this library.
+- A [C API example](test/c_api_example.c) that shows how to use the C bindings to this library.
