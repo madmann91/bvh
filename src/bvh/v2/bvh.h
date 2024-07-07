@@ -8,6 +8,7 @@
 #include <vector>
 #include <stack>
 #include <utility>
+#include <tuple>
 #include <algorithm>
 
 namespace bvh::v2 {

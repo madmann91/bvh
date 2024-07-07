@@ -19,7 +19,7 @@ template <> struct BvhCallback<double> { using Type = bvh_intersect_callbackd; }
 template <typename T, size_t Dim>
 static auto translate(enum bvh_build_quality quality) {
     switch (quality) {
-#ifndef BVH_C_UNSAFE_CASTS
+#ifndef BVH_C_API_UNSAFE_CASTS
         case BVH_BUILD_QUALITY_LOW:
             return bvh::v2::DefaultBuilder<bvh::v2::Node<T, Dim>>::Quality::Low;
         case BVH_BUILD_QUALITY_MEDIUM:
@@ -28,7 +28,7 @@ static auto translate(enum bvh_build_quality quality) {
             return bvh::v2::DefaultBuilder<bvh::v2::Node<T, Dim>>::Quality::High;
 #endif
         default:
-            return static_cast<bvh::v2::DefaultBuilder<bvh::v2::Node<T, Dim>>::Quality>(quality);
+            return static_cast<typename bvh::v2::DefaultBuilder<bvh::v2::Node<T, Dim>>::Quality>(quality);
     }
 }
 
@@ -89,7 +89,7 @@ static typename BvhTypes<T, Dim>::Bvh* bvh_build(
 {
     bvh::v2::BBox<T, Dim>* translated_bboxes = nullptr;
     bvh::v2::Vec<T, Dim>* translated_centers = nullptr;
-#ifdef BVH_C_UNSAFE_CASTS
+#ifdef BVH_C_API_UNSAFE_CASTS
     translated_bboxes  = reinterpret_cast<decltype(translated_bboxes)>(bboxes);
     translated_centers = reinterpret_cast<decltype(translated_centers)>(centers);
 #else

@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 project(bvh VERSION 2.0)
 
 option(BVH_BUILD_C_API "Builds the C API library wrapper" OFF)
-option(BVH_STATIC_LINK_STDLIB_C_API "Link the C API library statically against the standard C++ library" OFF)
+option(BVH_C_API_STATIC_LINK_STDLIB "Link the C API library statically against the standard C++ library (only supported by clang/gcc)" OFF)
+option(BVH_C_API_UNSAFE_CASTS "Enable unsafe casts in C API" OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
