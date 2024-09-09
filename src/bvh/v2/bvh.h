@@ -58,7 +58,7 @@ struct Bvh {
 
     /// Traverses the BVH from the given index in `start` using the provided stack. Every leaf
     /// encountered on the way is processed using the given `LeafFn` function, and every pair of
-    /// nodes is processed with the function in `HitFn`, which returns a triplet of booleans
+    /// nodes is processed with the function in `InnerFn`, which returns a triplet of booleans
     /// indicating whether the first child should be processed, whether the second child should be
     /// processed, and whether to traverse the second child first instead of the other way around.
     template <bool IsAnyHit, typename Stack, typename LeafFn, typename InnerFn>
