@@ -4,6 +4,14 @@ if (BVH_BUILD_C_API)
 endif()
 
 install(
+    DIRECTORY ${PROJECT_SOURCE_DIR}/src/bvh
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN "c_api" EXCLUDE)
+install(
+    FILES ${PROJECT_SOURCE_DIR}/src/bvh/v2/c_api/bvh.h
+    DESTINATION include/bvh/v2/c_api/)
+install(
     TARGETS ${bvh_targets}
     EXPORT bvh_exports
     RUNTIME DESTINATION bin/
