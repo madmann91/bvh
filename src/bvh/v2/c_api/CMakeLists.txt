@@ -17,5 +17,3 @@ endif()
 if (BVH_C_API_UNSAFE_CASTS)
     target_compile_definitions(bvh_c PRIVATE -DBVH_C_API_UNSAFE_CASTS)
 endif()
-
-install(FILES bvh.h DESTINATION include/bvh/v2/c_api/)
