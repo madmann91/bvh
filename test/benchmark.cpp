@@ -283,8 +283,10 @@ static size_t intersect_accel(Ray& ray, const Accel& accel, TraversalStats& stat
                 stats.visited_leaves++;
             for (size_t i = begin; i < end; ++i) {
                 size_t j = PermutePrims ? i : accel.bvh.prim_ids[i];
-                if (accel.tris[j].intersect(ray))
+                if (auto hit = accel.tris[j].intersect(ray)) {
+                    ray.tmax = std::get<0>(*hit);
                     prim_id = j;
+                }
             }
             return prim_id != invalid_id;
         },

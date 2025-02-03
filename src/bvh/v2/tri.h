@@ -6,7 +6,7 @@
 #include "bvh/v2/bbox.h"
 
 #include <limits>
-#include <utility>
+#include <tuple>
 #include <optional>
 
 namespace bvh::v2 {
@@ -44,17 +44,16 @@ struct PrecomputedTri {
     BVH_ALWAYS_INLINE BBox<T, 3> get_bbox() const { return convert_to_tri().get_bbox(); }
     BVH_ALWAYS_INLINE Vec<T, 3> get_center() const { return convert_to_tri().get_center(); }
 
-    /// Returns a pair containing the barycentric coordinates of the hit point if the given ray
-    /// intersects the triangle, otherwise returns nothing. The distance at which the ray intersects
-    /// the triangle is set in `ray.tmax`. The tolerance can be adjusted to account for numerical
-    /// precision issues.
-    BVH_ALWAYS_INLINE std::optional<std::pair<T, T>> intersect(
-        Ray<T, 3>& ray,
+    /// Returns a tuple containing the distance at which the ray intersects the triangle, and the
+    /// barycentric coordinates of the hit point if the given ray intersects the triangle, otherwise
+    /// returns nothing. The tolerance can be adjusted to account for numerical precision issues.
+    [[nodiscard]] BVH_ALWAYS_INLINE std::optional<std::tuple<T, T, T>> intersect(
+        const Ray<T, 3>& ray,
         T tolerance = -std::numeric_limits<T>::epsilon()) const;
 };
 
 template <typename T>
-std::optional<std::pair<T, T>> PrecomputedTri<T>::intersect(Ray<T, 3>& ray, T tolerance) const {
+std::optional<std::tuple<T, T, T>> PrecomputedTri<T>::intersect(const Ray<T, 3>& ray, T tolerance) const {
     auto c = p0 - ray.org;
     auto r = cross(ray.dir, c);
     auto inv_det = static_cast<T>(1.) / dot(n, ray.dir);
@@ -67,10 +66,8 @@ std::optional<std::pair<T, T>> PrecomputedTri<T>::intersect(Ray<T, 3>& ray, T to
     // when one of t, u, or v is a NaN
     if (u >= tolerance && v >= tolerance && w >= tolerance) {
         auto t = dot(n, c) * inv_det;
-        if (t >= ray.tmin && t <= ray.tmax) {
-            ray.tmax = t;
-            return std::make_optional(std::pair<T, T> { u, v });
-        }
+        if (t >= ray.tmin && t <= ray.tmax)
+            return std::make_optional(std::make_tuple(t, u, v));
     }
 
     return std::nullopt;

@@ -123,7 +123,7 @@ BVH_ALWAYS_INLINE T length(const Vec<T, N>& v) {
 }
 
 template <typename T, size_t N>
-BVH_ALWAYS_INLINE Vec<T, N> normalize(const Vec<T, N>& v) {
+[[nodiscard]] BVH_ALWAYS_INLINE Vec<T, N> normalize(const Vec<T, N>& v) {
     return v * (static_cast<T>(1.) / length(v));
 }
 

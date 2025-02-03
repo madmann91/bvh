@@ -54,7 +54,7 @@ struct Bvh {
     BVH_ALWAYS_INLINE const Node& get_root() const { return nodes[0]; }
 
     /// Extracts the BVH rooted at the given node index.
-    inline Bvh extract_bvh(size_t root_id) const;
+    [[nodiscard]] inline Bvh extract_bvh(size_t root_id) const;
 
     /// Traverses the BVH from the given index in `start` using the provided stack. Every leaf
     /// encountered on the way is processed using the given `LeafFn` function, and every pair of
@@ -85,7 +85,7 @@ struct Bvh {
     inline void serialize(OutputStream&) const;
 
     template <typename IndexType = typename Index::Type>
-    static inline Bvh deserialize(InputStream&);
+    [[nodiscard]] static inline Bvh deserialize(InputStream&);
 };
 
 template <typename Node>
