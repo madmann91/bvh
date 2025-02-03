@@ -65,7 +65,7 @@ struct Node {
     }
 
     /// Robust ray-node intersection routine. See "Robust BVH Ray Traversal", by T. Ize.
-    BVH_ALWAYS_INLINE std::pair<T, T> intersect_robust(
+    [[nodiscard]] BVH_ALWAYS_INLINE std::pair<T, T> intersect_robust(
         const Ray<T, Dim>& ray,
         const Vec<T, Dim>& inv_dir,
         const Vec<T, Dim>& inv_dir_pad,
@@ -76,7 +76,7 @@ struct Node {
         return make_intersection_result(ray, tmin, tmax);
     }
 
-    BVH_ALWAYS_INLINE std::pair<T, T> intersect_fast(
+    [[nodiscard]] BVH_ALWAYS_INLINE std::pair<T, T> intersect_fast(
         const Ray<T, Dim>& ray,
         const Vec<T, Dim>& inv_dir,
         const Vec<T, Dim>& inv_org,
@@ -93,7 +93,7 @@ struct Node {
         stream.write(index.value);
     }
 
-    static BVH_ALWAYS_INLINE Node deserialize(InputStream& stream) {
+    [[nodiscard]] static BVH_ALWAYS_INLINE Node deserialize(InputStream& stream) {
         Node node;
         for (auto& bound : node.bounds)
             bound = stream.read<T>();

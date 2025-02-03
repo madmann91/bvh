@@ -44,7 +44,7 @@ public:
 
     /// Starts building a BVH with the given primitive data. The build algorithm is multi-threaded,
     /// and runs on the given thread pool.
-    BVH_ALWAYS_INLINE static Bvh<Node> build(
+    [[nodiscard]] BVH_ALWAYS_INLINE static Bvh<Node> build(
         ThreadPool& thread_pool,
         std::span<const BBox> bboxes,
         std::span<const Vec> centers,

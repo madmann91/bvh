@@ -29,7 +29,7 @@ struct Sphere  {
     /// Intersects a ray with the sphere. If the ray is normalized, a dot product can be saved by
     /// setting `AssumeNormalized` to true.
     template <bool AssumeNormalized = false>
-    BVH_ALWAYS_INLINE std::optional<std::pair<T, T>> intersect(const Ray<T, N>& ray) const {
+    [[nodiscard]] BVH_ALWAYS_INLINE std::optional<std::pair<T, T>> intersect(const Ray<T, N>& ray) const {
         auto oc = ray.org - center;
         auto a = AssumeNormalized ? static_cast<T>(1.) : dot(ray.dir, ray.dir);
         auto b = static_cast<T>(2.) * dot(ray.dir, oc);
