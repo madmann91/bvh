@@ -3,6 +3,9 @@ name: build-and-test
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master,feelpp]
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -10,24 +13,17 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        build-type: [Debug, Release]
+        build-type: [debug, release]
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Create Build Environment
-      run: cmake -E make_directory ${{runner.workspace}}/build
+    - uses: actions/checkout@v4
 
     - name: Configure CMake
-      working-directory: ${{runner.workspace}}/build
-      shell: bash # Necessary because of the $GITHUB_WORKSPACE variable
-      run: cmake -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DBUILD_TESTING=ON -S $GITHUB_WORKSPACE
+      run: cmake --preset ${{matrix.build-type}} 
 
     - name: Build
-      working-directory: ${{runner.workspace}}/build
-      run: cmake --build . --config ${{matrix.build-type}}
+      run: cmake --build --preset ${{matrix.build-type}}
 
     - name: Test
-      working-directory: ${{runner.workspace}}/build
-      run: ctest -C ${{matrix.build-type}} --verbose --rerun-failed --output-on-failure
+      run: ctest --preset ${{matrix.build-type}} 

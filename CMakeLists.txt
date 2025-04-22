@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(bvh)
+project(bvh VERSION 2.0.0 LANGUAGES CXX)
 
 add_subdirectory(src/bvh/v2)
 

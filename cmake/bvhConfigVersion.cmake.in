@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# Package version compatibility
+# This will enforce that consumers ask for the same major version.
+if("${PACKAGE_VERSION}" VERSION_LESS "${PACKAGE_FIND_VERSION}")
+  message(FATAL_ERROR
+    "Required version ${PACKAGE_FIND_VERSION} but found version ${PACKAGE_VERSION}")
+endif()

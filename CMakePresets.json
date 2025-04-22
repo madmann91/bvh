@@ -1,0 +1,92 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 21,
+      "patch": 0
+    },
+    "configurePresets": [
+      {
+        "name": "default",
+        "hidden": true,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/${presetName}",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release"
+        }
+      },
+      {
+        "name": "debug",
+        "inherits": "default",
+        "description": "Debug build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug"
+        }
+      },
+      {
+        "name": "release",
+        "inherits": "default",
+        "description": "Release build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release"
+        }
+      },
+      {
+        "name": "with-tests",
+        "inherits": "debug",
+        "description": "Debug build with tests enabled",
+        "cacheVariables": {
+          "BUILD_TESTING": "ON"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "default",
+        "configurePreset": "release"
+      },
+      {
+        "name": "debug",
+        "configurePreset": "debug"
+      },
+      {
+        "name": "release",
+        "configurePreset": "release"
+      },
+      {
+        "name": "test",
+        "configurePreset": "with-tests",
+        "targets": ["test"]
+      }
+    ],
+    "testPresets": [
+      {
+        "name": "default",
+        "configurePreset": "with-tests",
+        "output": {
+            "outputOnFailure": true
+        },
+        "execution": {
+            "jobs":2,
+            "noTestsAction": "error",
+            "stopOnFailure": false,
+            "repeat": {
+                "mode": "until-pass",
+                "count": 3
+            },
+            "timeout": 700
+        }
+      },
+      {
+        "name": "release",
+        "configurePreset": "release",
+        "inherits": "default"
+      },
+      {
+        "name": "debug",
+        "configurePreset": "debug",
+        "inherits": "default"
+      }
+    ]
+  }
+  
