@@ -13,12 +13,12 @@ namespace bvh::v2 {
 template <typename Derived>
 struct Executor {
     template <typename Loop>
-    inline void for_each(size_t begin, size_t end, const Loop& loop) {
+    BVH_ALWAYS_INLINE void for_each(size_t begin, size_t end, const Loop& loop) {
         return static_cast<Derived*>(this)->for_each(begin, end, loop);
     }
 
     template <typename T, typename Reduce, typename Join>
-    inline T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join& join) {
+    BVH_ALWAYS_INLINE T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join& join) {
         return static_cast<Derived*>(this)->reduce(begin, end, init, reduce, join);
     }
 };
@@ -26,12 +26,12 @@ struct Executor {
 /// Executor that executes serially.
 struct SequentialExecutor : Executor<SequentialExecutor> {
     template <typename Loop>
-    void for_each(size_t begin, size_t end, const Loop& loop) {
+    BVH_ALWAYS_INLINE void for_each(size_t begin, size_t end, const Loop& loop) {
         loop(begin, end);
     }
 
     template <typename T, typename Reduce, typename Join>
-    T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join&) {
+    BVH_ALWAYS_INLINE T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join&) {
         T result(init);
         reduce(result, begin, end);
         return result;
@@ -48,7 +48,7 @@ struct ParallelExecutor : Executor<ParallelExecutor> {
     {}
 
     template <typename Loop>
-    void for_each(size_t begin, size_t end, const Loop& loop) {
+    BVH_ALWAYS_INLINE void for_each(size_t begin, size_t end, const Loop& loop) {
         if (end - begin < parallel_threshold)
             return loop(begin, end);
 
@@ -61,7 +61,7 @@ struct ParallelExecutor : Executor<ParallelExecutor> {
     }
 
     template <typename T, typename Reduce, typename Join>
-    T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join& join) {
+    BVH_ALWAYS_INLINE T reduce(size_t begin, size_t end, const T& init, const Reduce& reduce, const Join& join) {
         if (end - begin < parallel_threshold) {
             T result(init);
             reduce(result, begin, end);

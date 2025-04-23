@@ -44,7 +44,7 @@ public:
 
     /// Starts building a BVH with the given primitive data. The build algorithm is multi-threaded,
     /// and runs on the given thread pool.
-    BVH_ALWAYS_INLINE static Bvh<Node> build(
+    [[nodiscard]] BVH_ALWAYS_INLINE static Bvh<Node> build(
         ThreadPool& thread_pool,
         std::span<const BBox> bboxes,
         std::span<const Vec> centers,
@@ -225,8 +225,8 @@ private:
                 if (node.get_bbox().get_half_area() < threshold || node.is_leaf()) {
                     pruned_roots.emplace_back(i, node_id);
                 } else {
-                    stack.push(node.index.first_id);
-                    stack.push(node.index.first_id + 1);
+                    stack.push(node.index.first_id());
+                    stack.push(node.index.first_id() + 1);
                 }
             }
         }
@@ -256,7 +256,7 @@ private:
         }
 
         typename SweepSahBuilder<Node>::Config config = config_;
-        config.max_leaf_size = 1; // Needs to have only one mini-tree in each leaf
+        config.max_leaf_size = config.min_leaf_size = 1; // Needs to have only one mini-tree in each leaf
         auto bvh = SweepSahBuilder<Node>::build(bboxes, centers, config);
 
         // Compute the offsets to apply to primitive and node indices
@@ -274,16 +274,16 @@ private:
         // Helper function to copy and fix the child/primitive index of a node
         auto copy_node = [&] (size_t i, Node& dst_node, const Node& src_node) {
             dst_node = src_node;
-            dst_node.index.first_id += static_cast<typename Node::Index::Type>(
-                src_node.is_leaf() ? prim_offsets[i] : node_offsets[i]);
+            dst_node.index.set_first_id(dst_node.index.first_id() +
+                (src_node.is_leaf() ? prim_offsets[i] : node_offsets[i]));
         };
 
         // Make the leaves of the top BVH point to the right internal nodes
         for (auto& node : bvh.nodes) {
             if (!node.is_leaf())
                 continue;
-            assert(node.index.prim_count == 1);
-            size_t tree_id = bvh.prim_ids[node.index.first_id];
+            assert(node.index.prim_count() == 1);
+            size_t tree_id = bvh.prim_ids[node.index.first_id()];
             copy_node(tree_id, node, mini_trees[tree_id].get_root());
         }
 

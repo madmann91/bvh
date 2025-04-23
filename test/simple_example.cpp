@@ -85,7 +85,7 @@ int main() {
                 size_t j = should_permute ? i : bvh.prim_ids[i];
                 if (auto hit = precomputed_tris[j].intersect(ray)) {
                     prim_id = i;
-                    std::tie(u, v) = *hit;
+                    std::tie(ray.tmax, u, v) = *hit;
                 }
             }
             return prim_id != invalid_id;

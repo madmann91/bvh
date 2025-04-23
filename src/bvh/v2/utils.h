@@ -3,6 +3,7 @@
 
 #include "bvh/v2/platform.h"
 
+#include <limits>
 #include <climits>
 #include <cstdint>
 #include <cstring>
@@ -61,7 +62,9 @@ BVH_ALWAYS_INLINE T safe_inverse(T x) {
         : static_cast<T>(1.) / x;
 }
 
-/// Fast multiply-add operation. Should translate into an FMA for architectures that support it.
+/// Fast multiply-add operation. Should translate into an FMA for architectures that support it. On
+/// architectures which do not support FMA in hardware, or on which FMA is slow, this defaults to a
+/// regular multiplication followed by an addition.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma float_control(push)
 #pragma float_control(precise, off)

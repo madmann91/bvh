@@ -283,8 +283,10 @@ static size_t intersect_accel(Ray& ray, const Accel& accel, TraversalStats& stat
                 stats.visited_leaves++;
             for (size_t i = begin; i < end; ++i) {
                 size_t j = PermutePrims ? i : accel.bvh.prim_ids[i];
-                if (accel.tris[j].intersect(ray))
+                if (auto hit = accel.tris[j].intersect(ray)) {
+                    ray.tmax = std::get<0>(*hit);
                     prim_id = j;
+                }
             }
             return prim_id != invalid_id;
         },
@@ -414,6 +416,9 @@ int main(int argc, char** argv) {
         << "Built BVH with " << accel.bvh.nodes.size() << " node(s) in "
         << to_ms(build_time) << "ms" << std::endl;
 
+    // Not needed, just for testing
+    accel.bvh.refit();
+
     RenderStats stats;
     Image image;
     auto intersection_time = profile([&] { image = render(accel, stats, options); });
@@ -426,6 +431,6 @@ int main(int argc, char** argv) {
     }
 
     image.save(options.output_image);
-    std::cout << "Image saved as " << options.output_image << std::endl;
+    std::cout << "Image saved as '" << options.output_image << "'" << std::endl;
     return 0;
 }

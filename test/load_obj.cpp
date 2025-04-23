@@ -112,3 +112,27 @@ std::vector<Tri<T, 3>> load_obj(const std::string& file) {
 
 template std::vector<Tri<float, 3>> load_obj(const std::string&);
 template std::vector<Tri<double, 3>> load_obj(const std::string&);
+
+extern "C" {
+
+tri* load_obj(const char* file_name, size_t* tri_count) {
+    auto tri_vec = load_obj<float>(file_name);
+    *tri_count = tri_vec.size();
+    if (tri_vec.size() == 0)
+        return NULL;
+    tri* tris = reinterpret_cast<tri*>(malloc(sizeof(tri) * tri_vec.size()));
+    for (size_t i = 0; i < tri_vec.size(); ++i) {
+        tris[i].v[0].x = tri_vec[i].p0[0];
+        tris[i].v[0].y = tri_vec[i].p0[1];
+        tris[i].v[0].z = tri_vec[i].p0[2];
+        tris[i].v[1].x = tri_vec[i].p1[0];
+        tris[i].v[1].y = tri_vec[i].p1[1];
+        tris[i].v[1].z = tri_vec[i].p1[2];
+        tris[i].v[2].x = tri_vec[i].p2[0];
+        tris[i].v[2].y = tri_vec[i].p2[1];
+        tris[i].v[2].z = tri_vec[i].p2[2];
+    }
+    return tris;
+}
+
+} // extern "C"
