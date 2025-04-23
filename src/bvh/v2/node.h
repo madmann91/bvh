@@ -33,35 +33,13 @@ struct Node {
     /// and/or `max` components accordingly.
     std::array<T, Dim * 2> bounds;
 
-    BVH_ALWAYS_INLINE bool operator == (const Index& other) const {
-        return first_id == other.first_id && prim_count == other.prim_count;
-    }
-
-#if __cplusplus >= 202002L
-    bool operator != (const Index&) const = default;
-#else
-    bool operator != (const Index& other) const {
-        return !this->operator==( other );
-    }
-#endif
-    } index;
-
-    static_assert(sizeof(Index) == sizeof(typename Index::Type));
     /// Index to the children of an inner node, or to the primitives for a leaf node.
     Index index;
 
     Node() = default;
-#if __cplusplus >= 202002L
+
     bool operator == (const Node&) const = default;
     bool operator != (const Node&) const = default;
-#else
-    bool operator == (const Node& other) const {
-        return bounds == other.bounds && index == index;
-    }
-    bool operator != (const Node& other) const {
-        return !this->operator==( other );
-    }
-#endif
 
     BVH_ALWAYS_INLINE bool is_leaf() const { return index.is_leaf(); }
 

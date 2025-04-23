@@ -36,7 +36,6 @@ if (Threads_FOUND)
     target_link_libraries(bvh INTERFACE Threads::Threads)
 endif()
 
-<<<<<<< HEAD
 target_include_directories(${BVH_TARGET_NAME} INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
   $<INSTALL_INTERFACE:include>
@@ -69,7 +68,6 @@ install(
     "${BVH_CMAKE_CONFIG_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION ${BVH_CONFIG_INSTALL_DIR}
 )
-=======
 target_include_directories(bvh INTERFACE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>)
@@ -79,4 +77,3 @@ set_target_properties(bvh PROPERTIES CXX_STANDARD 20)
 if (BVH_BUILD_C_API)
     add_subdirectory(c_api)
 endif()
->>>>>>> upstream/master

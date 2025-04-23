@@ -30,7 +30,6 @@ struct Bvh {
 #if __cplusplus >= 202002L
     bool operator == (const Bvh& other) const = default;
     bool operator != (const Bvh& other) const = default;
-<<<<<<< HEAD
 #else
     bool operator == (const Bvh& other) const {
         return nodes == other.nodes && prim_ids == other.prim_ids;
@@ -39,7 +38,6 @@ struct Bvh {
         return !this->operator==( other );
     }
 #endif
-=======
 
     /// Returns whether the node located at the given index is the left child of its parent.
     static BVH_ALWAYS_INLINE bool is_left_sibling(size_t node_id) { return node_id % 2 == 1; }
@@ -61,7 +59,6 @@ struct Bvh {
         return is_left_sibling(node_id) ? node_id + 1 : node_id;
     }
 
->>>>>>> upstream/master
     /// Returns the root node of this BVH.
     BVH_ALWAYS_INLINE const Node& get_root() const { return nodes[0]; }
 
