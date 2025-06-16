@@ -54,30 +54,21 @@ struct Index {
     BVH_ALWAYS_INLINE bool is_inner() const { return !is_leaf(); }
 
     BVH_ALWAYS_INLINE void set_first_id(size_t first_id) {
-        *this = Index { first_id, prim_count() };
+        *this = make_leaf(first_id, prim_count());
     }
 
     BVH_ALWAYS_INLINE void set_prim_count(size_t prim_count) {
-        *this = Index { first_id(), prim_count };
+        *this = make_leaf(first_id(), prim_count);
     }
 
     static BVH_ALWAYS_INLINE Index make_leaf(size_t first_prim, size_t prim_count) {
         assert(prim_count != 0);
-        return Index { first_prim, prim_count };
+        return Index { (static_cast<Type>(first_prim) << prim_count_bits) |
+                        (static_cast<Type>(prim_count) & max_prim_count) };
     }
 
     static BVH_ALWAYS_INLINE Index make_inner(size_t first_child) {
-        return Index { first_child, 0 };
-    }
-
-private:
-    explicit Index(size_t first_id, size_t prim_count)
-        : Index(
-            (static_cast<Type>(first_id) << prim_count_bits) |
-            (static_cast<Type>(prim_count) & max_prim_count))
-    {
-        assert(first_id   <= static_cast<size_t>(max_first_id));
-        assert(prim_count <= static_cast<size_t>(max_prim_count));
+        return Index { static_cast<Type>(first_child) << prim_count_bits };
     }
 };
 
