@@ -54,11 +54,11 @@ struct Index {
     BVH_ALWAYS_INLINE bool is_inner() const { return !is_leaf(); }
 
     BVH_ALWAYS_INLINE void set_first_id(size_t first_id) {
-        *this = Index { first_id, prim_count() };
+        *this = Index { first_id, static_cast<size_t>(prim_count()) };
     }
 
     BVH_ALWAYS_INLINE void set_prim_count(size_t prim_count) {
-        *this = Index { first_id(), prim_count };
+        *this = Index { static_cast<size_t>(first_id()), prim_count };
     }
 
     static BVH_ALWAYS_INLINE Index make_leaf(size_t first_prim, size_t prim_count) {
