@@ -54,9 +54,9 @@ protected:
             return sah.get_leaf_cost(0, prim_count, bbox);
         }
 
-        BVH_ALWAYS_INLINE void add(const BBox& bbox, size_t prim_count = 1) {
-            this->bbox.extend(bbox);
-            this->prim_count += prim_count;
+        BVH_ALWAYS_INLINE void add(const BBox& other, size_t other_prim_count = 1) {
+            this->bbox.extend(other);
+            this->prim_count += other_prim_count;
         }
 
         BVH_ALWAYS_INLINE void add(const Bin& bin) { add(bin.bbox, bin.prim_count); }

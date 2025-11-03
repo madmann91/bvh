@@ -34,7 +34,6 @@ struct BBox {
         static_assert(N == 2 || N == 3);
         if constexpr (N == 3) return (d[0] + d[1]) * d[2] + d[0] * d[1];
         if constexpr (N == 2) return d[0] + d[1];
-        return static_cast<T>(0.);
     }
 
     BVH_ALWAYS_INLINE static constexpr BBox make_empty() {
