@@ -1,7 +1,6 @@
 #ifndef BVH_V2_THREAD_POOL_H
 #define BVH_V2_THREAD_POOL_H
 
-#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
@@ -24,7 +23,7 @@ public:
         TaskGroup() = default;
 
     private:
-        std::atomic<std::size_t> remaining_{0};
+        size_t remaining_{0};  // GUARDED_BY(ThreadPool::mutex_)
 
         TaskGroup(const TaskGroup&) = delete;
         TaskGroup& operator=(const TaskGroup&) = delete;
@@ -32,10 +31,6 @@ public:
         TaskGroup& operator=(TaskGroup&&) = delete;
 
         friend ThreadPool;
-
-        inline void increment();
-        inline void decrement();
-        inline size_t remaining() const;
     };
 
     /// Creates a thread pool with the given number of threads (a value of 0 tries to autodetect
@@ -72,20 +67,20 @@ private:
     inline void stop();
     inline void join();
 
-    int busy_count_ = 0;
-    bool should_stop_ = false;
+    int busy_count_ = 0;  // GUARDED_BY(mutex_)
+    bool should_stop_ = false;  // GUARDED_BY(mutex_)
     std::mutex mutex_;
     std::vector<std::thread> threads_;
     std::condition_variable avail_;
     std::condition_variable group_done_;
-    std::queue<Task> tasks_;
+    std::queue<Task> tasks_;  // GUARDED_BY(mutex_)
 };
 
 template<typename F>
 void ThreadPool::push(TaskGroup& group, F&& fun) {
     {
-        std::unique_lock<std::mutex> lock(mutex_);
-        group.increment();
+        std::lock_guard<std::mutex> lock(mutex_);
+        group.remaining_++;
         tasks_.emplace(Task{&group, std::forward<F>(fun)});
     }
     avail_.notify_one();
@@ -93,7 +88,7 @@ void ThreadPool::push(TaskGroup& group, F&& fun) {
 
 inline void ThreadPool::wait(TaskGroup& group) {
     std::unique_lock<std::mutex> lock(mutex_);
-    group_done_.wait(lock, [&group] { return group.remaining() == 0; });
+    group_done_.wait(lock, [&group] { return group.remaining_ == 0; });
 }
 
 inline void ThreadPool::wait_all() {
@@ -116,15 +111,14 @@ void ThreadPool::worker(ThreadPool* pool, size_t thread_id) {
         }
 
         task.fn(thread_id);
-        task.group->decrement();
 
         {
-            std::unique_lock<std::mutex> lock(pool->mutex_);
+            std::lock_guard<std::mutex> lock(pool->mutex_);
+            task.group->remaining_--;
             pool->busy_count_--;
+            if (task.group->remaining_ == 0)
+                pool->group_done_.notify_all();
         }
-
-        if (task.group->remaining() == 0)
-            pool->group_done_.notify_all();
     }
 }
 
@@ -137,7 +131,7 @@ void ThreadPool::start(size_t thread_count) {
 
 void ThreadPool::stop() {
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutex_);
         should_stop_ = true;
     }
     avail_.notify_all();
@@ -146,18 +140,6 @@ void ThreadPool::stop() {
 void ThreadPool::join() {
     for (auto& thread : threads_)
         thread.join();
-}
-
-inline void ThreadPool::TaskGroup::increment() {
-    remaining_.fetch_add(1, std::memory_order_release);
-}
-
-inline void ThreadPool::TaskGroup::decrement() {
-    remaining_.fetch_sub(1, std::memory_order_release);
-}
-
-inline size_t ThreadPool::TaskGroup::remaining() const {
-    return remaining_.load(std::memory_order_acquire);
 }
 
 } // namespace bvh::v2
